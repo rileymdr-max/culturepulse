@@ -170,6 +170,20 @@ export function generateTopVoices(
  * @param titles - Pool of realistic content title fragments
  * @param count - Number of items (default 6)
  */
+/** Returns a real platform search URL for a query — used as fallback for mock content */
+function platformSearchUrl(platform: string, query: string): string {
+  const q = encodeURIComponent(query);
+  switch (platform) {
+    case "reddit":    return `https://www.reddit.com/search/?q=${q}&sort=top`;
+    case "twitter":   return `https://x.com/search?q=${q}&f=live`;
+    case "tiktok":    return `https://www.tiktok.com/search?q=${q}`;
+    case "instagram": return `https://www.instagram.com/explore/tags/${q}/`;
+    case "facebook":  return `https://www.facebook.com/search/posts/?q=${q}`;
+    case "substack":  return `https://substack.com/search?query=${q}`;
+    default:          return `https://www.google.com/search?q=${q}`;
+  }
+}
+
 export function generateContent(
   query: string,
   platform: string,
@@ -179,9 +193,10 @@ export function generateContent(
 ): import("./types").TrendingContent[] {
   const rng = seededRng(`${query}-content-${platform}`);
   const shuffled = [...titles].sort(() => rng() - 0.5);
-  return shuffled.slice(0, count).map((title, i) => ({
+  const searchUrl = platformSearchUrl(platform, query);
+  return shuffled.slice(0, count).map((title) => ({
     title,
-    url: `https://example.com/${platform}/${query.toLowerCase().replace(/\s+/g, "-")}/${i + 1}`,
+    url: searchUrl,
     engagement: randInt(500, 500000, rng),
     type: contentType,
   }));
