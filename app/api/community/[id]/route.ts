@@ -44,7 +44,7 @@ export async function GET(
 
     if (cached && cached.expiresAt > new Date()) {
       return NextResponse.json({
-        community: cached.data as CommunityData,
+        community: cached.data as unknown as CommunityData,
         cached: true,
       });
     }
