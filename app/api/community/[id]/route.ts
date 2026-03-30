@@ -43,10 +43,16 @@ export async function GET(
     });
 
     if (cached && cached.expiresAt > new Date()) {
-      return NextResponse.json({
-        community: cached.data as unknown as CommunityData,
-        cached: true,
-      });
+      const cachedData = cached.data as unknown as CommunityData;
+      // Invalidate cache entries that still contain stale example.com URLs
+      // (left over from an earlier mock-data build)
+      const hasStaleUrls =
+        cachedData.trending_content?.some((c) => c.url.includes("example.com")) ||
+        cachedData.top_voices?.some((v) => v.url.includes("example.com"));
+      if (!hasStaleUrls) {
+        return NextResponse.json({ community: cachedData, cached: true });
+      }
+      // Fall through to fresh fetch — stale entry will be overwritten below
     }
 
     // ── Live fetch ────────────────────────────────────────────────────────

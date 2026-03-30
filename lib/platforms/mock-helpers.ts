@@ -157,7 +157,7 @@ export function generateTopVoices(
       name,
       handle: `${handlePrefix}${handle}`,
       followers: randInt(5000, 2000000, rng),
-      url: `https://example.com/${platform}/${handle}`,
+      url: platformProfileUrl(platform, handle),
     };
   });
 }
@@ -170,6 +170,20 @@ export function generateTopVoices(
  * @param titles - Pool of realistic content title fragments
  * @param count - Number of items (default 6)
  */
+/** Returns a real platform profile URL for a handle — used in top voices */
+function platformProfileUrl(platform: string, handle: string): string {
+  const h = handle.replace(/^[@u\/r\/]+/, "");
+  switch (platform) {
+    case "reddit":    return `https://www.reddit.com/user/${h}`;
+    case "twitter":   return `https://x.com/${h}`;
+    case "tiktok":    return `https://www.tiktok.com/@${h}`;
+    case "instagram": return `https://www.instagram.com/${h}/`;
+    case "facebook":  return `https://www.facebook.com/${h}`;
+    case "substack":  return `https://substack.com/@${h}`;
+    default:          return `https://www.google.com/search?q=${encodeURIComponent(h)}`;
+  }
+}
+
 /** Returns a real platform search URL for a query — used as fallback for mock content */
 function platformSearchUrl(platform: string, query: string): string {
   const q = encodeURIComponent(query);
