@@ -392,6 +392,48 @@ async function scrapeInstagram(handle: string): Promise<AudienceResult> {
   return buildResult(handle, "instagram", scored, followerCount || 10_000, 10);
 }
 
+// ─── All-platforms scraper ────────────────────────────────────────────────────
+// Runs Twitter + TikTok in parallel, merges community lists, deduplicates.
+
+async function scrapeAll(handle: string): Promise<AudienceResult> {
+  const [twitterResult, tiktokResult] = await Promise.allSettled([
+    scrapeTwitter(handle, "all"),
+    scrapeTikTok(handle),
+  ]);
+
+  const results: AudienceResult[] = [];
+  if (twitterResult.status === "fulfilled") results.push(twitterResult.value);
+  if (tiktokResult.status === "fulfilled") results.push(tiktokResult.value);
+
+  // If both failed, throw so the caller falls back to mock
+  if (results.length === 0) throw new Error("All platform scrapers failed");
+
+  // Merge communities — deduplicate by community_id, keep highest overlap
+  const communityMap = new Map<string, AudienceResult["communities"][number]>();
+  for (const result of results) {
+    for (const c of result.communities) {
+      const existing = communityMap.get(c.community_id);
+      if (!existing || c.overlap_pct > existing.overlap_pct) {
+        communityMap.set(c.community_id, c);
+      }
+    }
+  }
+
+  const merged = Array.from(communityMap.values())
+    .sort((a, b) => b.overlap_pct - a.overlap_pct)
+    .slice(0, 18);
+
+  const totalAudience = Math.max(...results.map((r) => r.estimated_total_audience));
+
+  return {
+    handle: `@${handle}`,
+    platform: "all",
+    estimated_total_audience: totalAudience,
+    communities: merged,
+    analyzed_at: new Date().toISOString(),
+  };
+}
+
 // ─── Main export ──────────────────────────────────────────────────────────────
 
 export async function getLiveAudience(
@@ -409,8 +451,9 @@ export async function getLiveAudience(
       case "instagram":
         return await scrapeInstagram(normalized);
       case "twitter":
+        return await scrapeTwitter(normalized, "twitter");
       case "all":
-        return await scrapeTwitter(normalized, platform);
+        return await scrapeAll(normalized);
       default:
         // Facebook / Substack — no reliable public scraper, use mock
         console.warn(`[audience-live] No live scraper for ${platform}, using mock`);

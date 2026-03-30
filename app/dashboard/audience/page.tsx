@@ -25,7 +25,7 @@ const PLATFORM_LABELS: Record<string, string> = {
 
 // Platform-specific handle format hints
 const PLATFORM_HINTS: Record<string, { placeholder: string; prefix: string; note?: string }> = {
-  all:       { placeholder: "twitterhandle", prefix: "@", note: "Uses Twitter as primary signal — enter your X/Twitter handle" },
+  all:       { placeholder: "handle", prefix: "@", note: "Scrapes Twitter + TikTok in parallel for maximum coverage — enter the same handle used on both platforms" },
   twitter:   { placeholder: "twitterhandle", prefix: "@" },
   reddit:    { placeholder: "username", prefix: "u/", note: "Enter your Reddit username without u/" },
   tiktok:    { placeholder: "tiktokhandle", prefix: "@" },
