@@ -1,0 +1,131 @@
+// CulturePulse — Prisma Schema
+// Run `npm run db:generate` after changes, `npm run db:push` to sync with DB.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Auth (NextAuth adapter tables) ─────────────────────────────────────────
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ─── Users ───────────────────────────────────────────────────────────────────
+
+model User {
+  id             String    @id @default(cuid())
+  name           String?
+  email          String    @unique
+  emailVerified  DateTime?
+  hashedPassword String?
+  image          String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  accounts            Account[]
+  sessions            Session[]
+  savedSearches       SavedSearch[]
+  trackedCommunities  TrackedCommunity[]
+}
+
+// ─── Saved Searches ──────────────────────────────────────────────────────────
+
+model SavedSearch {
+  id          String   @id @default(cuid())
+  userId      String
+  query       String
+  platforms   String[] // e.g. ["reddit", "twitter"]
+  label       String?  // optional display name
+  createdAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// ─── Tracked Communities + History ───────────────────────────────────────────
+// Users can track specific communities to observe metric changes over time.
+// Each visit to a tracked community's detail page captures a new snapshot.
+
+model TrackedCommunity {
+  id            String              @id @default(cuid())
+  userId        String
+  communityId   String              // e.g. "reddit_gaming"
+  communityName String
+  platform      String
+  createdAt     DateTime            @default(now())
+
+  user          User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  snapshots     CommunitySnapshot[]
+
+  @@unique([userId, communityId])
+  @@index([userId])
+}
+
+model CommunitySnapshot {
+  id                 String           @id @default(cuid())
+  trackedCommunityId String
+  communitySize      Int
+  topTopics          String[]         // top 5 topic labels at time of capture
+  topCategories      Json             // { label: string, volume: number }[]
+  capturedAt         DateTime         @default(now())
+
+  trackedCommunity   TrackedCommunity @relation(fields: [trackedCommunityId], references: [id], onDelete: Cascade)
+
+  @@index([trackedCommunityId])
+  @@index([capturedAt])
+}
+
+// ─── Community Cache ──────────────────────────────────────────────────────────
+// Caches fetched community data to reduce API calls and support offline display.
+
+model CommunityCache {
+  id              String   @id @default(cuid())
+  platform        String
+  communityId     String
+  communityName   String
+  data            Json     // Stores the full unified CommunityData payload
+  fetchedAt       DateTime @default(now())
+  expiresAt       DateTime
+
+  @@unique([platform, communityId])
+  @@index([platform])
+  @@index([expiresAt])
+}

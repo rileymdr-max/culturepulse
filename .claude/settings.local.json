@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(export PATH=\"/opt/homebrew/bin:/usr/local/bin:$PATH\")",
+      "Bash(npm --version)",
+      "Bash(export PATH=\"$PATH:/opt/homebrew/bin:/usr/local/bin\")",
+      "Bash(echo $PATH)",
+      "Read(//usr/bin/**)",
+      "Read(//Users/megriley/.nvm/alias/**)"
+    ]
+  }
+}
