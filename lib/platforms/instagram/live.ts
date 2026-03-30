@@ -120,7 +120,7 @@ async function apifyInstagramSearch(query: string): Promise<PlatformSearchResult
     resultsType: "posts",
     resultsLimit: 30,
     addParentData: false,
-  }, 90);
+  }, 45);
 
   if (!posts.length) throw new Error("Apify Instagram returned no results");
 

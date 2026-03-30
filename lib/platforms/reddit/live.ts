@@ -49,8 +49,8 @@ async function apifyRedditSearch(query: string): Promise<PlatformSearchResult> {
     maxItems: 50,
     maxPostCount: 50,
     skipComments: true,
-    proxy: { useApifyProxy: true, apifyProxyGroups: ["RESIDENTIAL"] },
-  }, 90);
+    proxy: { useApifyProxy: true },
+  }, 45);
 
   if (!posts.length) throw new Error("Apify Reddit returned no results");
 
@@ -114,8 +114,8 @@ async function apifyGetRedditCommunity(communityId: string): Promise<CommunityDa
     maxItems: 20,
     maxPostCount: 20,
     skipComments: true,
-    proxy: { useApifyProxy: true, apifyProxyGroups: ["RESIDENTIAL"] },
-  }, 90);
+    proxy: { useApifyProxy: true },
+  }, 45);
 
   if (!posts.length) return null;
 

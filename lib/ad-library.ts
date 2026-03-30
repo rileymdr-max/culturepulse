@@ -165,7 +165,7 @@ export async function fetchMetaAdIntel(
     country: "US",
     maxAds: limit,
     activeStatus: "ALL",
-  }, 90);
+  }, 45);
 
   return ads.slice(0, limit).map(mapAd);
 }
@@ -185,7 +185,7 @@ export async function fetchTikTokAdIntel(
     region: "all",
     maxAds: limit,
     fetchDetails: true,
-  }, 90);
+  }, 45);
 
   return ads.slice(0, limit).map(mapTikTokAd);
 }

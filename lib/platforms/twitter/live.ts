@@ -63,7 +63,7 @@ async function apifyTwitterSearch(query: string): Promise<PlatformSearchResult> 
     maxItems: 50,
     sort: "Latest",
     tweetLanguage: "en",
-  }, 90);
+  }, 45);
 
   if (!tweets.length) throw new Error("Apify Twitter returned no results");
 

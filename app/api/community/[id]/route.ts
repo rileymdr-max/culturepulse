@@ -13,6 +13,9 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+
+// Allow up to 5 minutes — required for Apify actors (Vercel Pro / Enterprise only)
+export const maxDuration = 300;
 import { requireSession, enforceRateLimit, notFound, serverError } from "@/lib/api-helpers";
 import { getCommunity, type CommunityData } from "@/lib/platforms";
 import { prisma } from "@/lib/prisma";

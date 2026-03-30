@@ -12,6 +12,9 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+
+// Allow up to 5 minutes — required for Apify actors (Vercel Pro / Enterprise only)
+export const maxDuration = 300;
 import { z } from "zod";
 import { requireSession, enforceRateLimit, badRequest, serverError } from "@/lib/api-helpers";
 import { searchPlatforms, PLATFORM_NAMES, getPlatformStatuses, type Platform } from "@/lib/platforms";
