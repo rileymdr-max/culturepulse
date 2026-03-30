@@ -94,16 +94,16 @@ export function isPlatformLive(
 
   switch (platform) {
     case "reddit":
-      return !!(env.REDDIT_CLIENT_ID && env.REDDIT_CLIENT_SECRET);
+      // Live via official OAuth keys OR via Apify scraper (no keys needed)
+      return !!(env.REDDIT_CLIENT_ID && env.REDDIT_CLIENT_SECRET) || !!env.APIFY_API_TOKEN;
     case "twitter":
       return !!env.TWITTER_BEARER_TOKEN;
     case "tiktok":
       // Live via Apify scraper (no TikTok API key needed) or official Research API
       return !!(env.APIFY_API_TOKEN || (env.TIKTOK_CLIENT_KEY && env.TIKTOK_CLIENT_SECRET));
     case "instagram":
-      return !!(
-        env.INSTAGRAM_ACCESS_TOKEN && env.INSTAGRAM_BUSINESS_ACCOUNT_ID
-      );
+      // Live via official Graph API OR via Apify scraper (no Meta approval needed)
+      return !!(env.INSTAGRAM_ACCESS_TOKEN && env.INSTAGRAM_BUSINESS_ACCOUNT_ID) || !!env.APIFY_API_TOKEN;
     case "facebook":
       return !!(env.FACEBOOK_ACCESS_TOKEN && env.FACEBOOK_APP_ID);
     case "substack":

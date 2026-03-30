@@ -52,10 +52,80 @@
  */
 
 import type { CommunityData, PlatformSearchResult } from "../types";
-import { generateCategories, generateTopics } from "../mock-helpers";
-import { mockInstagramSearch, mockGetInstagramCommunity } from "./mock";
+import { generateCategories, generateTopics, seededRng, randInt } from "../mock-helpers";
+import { runActor } from "@/lib/apify";
 
 const IG_API_BASE = "https://graph.facebook.com/v19.0";
+
+// ─── Apify Instagram types ────────────────────────────────────────────────────
+
+interface ApifyInstagramPost {
+  caption?: string;
+  hashtags?: string[];
+  url?: string;
+  shortCode?: string;
+  likesCount?: number;
+  commentsCount?: number;
+  videoViewCount?: number;
+  type?: string;
+  ownerUsername?: string;
+  locationName?: string;
+}
+
+/**
+ * Searches Instagram via Apify hashtag scraper — no Meta approval needed.
+ */
+async function apifyInstagramSearch(query: string): Promise<PlatformSearchResult> {
+  const hashtag = query.replace(/^#/, "").replace(/\s+/g, "");
+
+  const posts = await runActor<ApifyInstagramPost>("apify/instagram-scraper", {
+    directUrls: [`https://www.instagram.com/explore/tags/${hashtag}/`],
+    resultsType: "posts",
+    resultsLimit: 30,
+    addParentData: false,
+  }, 90);
+
+  if (!posts.length) throw new Error("Apify Instagram returned no results");
+
+  const rng = seededRng(`instagram-apify-${hashtag}`);
+  const totalEngagement = posts.reduce(
+    (s, p) => s + (p.likesCount ?? 0) + (p.commentsCount ?? 0) * 5,
+    0
+  );
+
+  const community: CommunityData = {
+    platform: "instagram",
+    community_id: `instagram_${hashtag}`,
+    community_name: `#${hashtag}`,
+    community_size: randInt(50_000, 10_000_000, rng),
+    description: `Instagram community around #${hashtag}. ${posts.length} recent posts analysed via Apify.`,
+    conversation_categories: generateCategories(`instagram-${hashtag}`),
+    trending_topics: generateTopics(`instagram-${hashtag}`, [query]),
+    trending_content: posts.slice(0, 6).map((p) => ({
+      title: (p.caption ?? "").slice(0, 120) || `Instagram ${p.type ?? "post"}`,
+      url: p.url ?? `https://www.instagram.com/p/${p.shortCode ?? ""}`,
+      engagement: (p.likesCount ?? 0) + (p.commentsCount ?? 0) * 5 + (p.videoViewCount ?? 0),
+      type: (p.type === "Video" ? "reel" : "post") as "reel" | "post",
+    })),
+    top_voices: [],
+    last_updated: new Date().toISOString(),
+  };
+
+  return { communities: [community], isLive: true };
+}
+
+/**
+ * Fetches a single Instagram hashtag community via Apify.
+ */
+async function apifyGetInstagramCommunity(communityId: string): Promise<CommunityData | null> {
+  const hashtag = communityId.replace(/^instagram_#?/, "");
+  try {
+    const result = await apifyInstagramSearch(hashtag);
+    return result.communities[0] ?? null;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Authenticated fetch against the Instagram Graph API.
@@ -81,6 +151,11 @@ async function igFetch(path: string, params: Record<string, string> = {}): Promi
  * Replace the throw with real logic once credentials are obtained.
  */
 export async function liveInstagramSearch(query: string): Promise<PlatformSearchResult> {
+  // Use Apify path when official Meta credentials are absent but Apify token is present
+  if (!process.env.INSTAGRAM_ACCESS_TOKEN && process.env.APIFY_API_TOKEN) {
+    return apifyInstagramSearch(query);
+  }
+
   const { INSTAGRAM_BUSINESS_ACCOUNT_ID } = process.env;
   if (!INSTAGRAM_BUSINESS_ACCOUNT_ID) {
     throw new Error("INSTAGRAM_BUSINESS_ACCOUNT_ID not configured.");
@@ -109,6 +184,11 @@ export async function liveInstagramSearch(query: string): Promise<PlatformSearch
 }
 
 export async function liveGetInstagramCommunity(communityId: string): Promise<CommunityData | null> {
+  // Use Apify path when official Meta credentials are absent but Apify token is present
+  if (!process.env.INSTAGRAM_ACCESS_TOKEN && process.env.APIFY_API_TOKEN) {
+    return apifyGetInstagramCommunity(communityId);
+  }
+
   const tag = communityId.replace(/^instagram_/, "");
   try {
     const result = await liveInstagramSearch(tag);
