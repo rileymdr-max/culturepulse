@@ -18,38 +18,55 @@ import { runActor } from "@/lib/apify";
 
 interface ApifyRedditPost {
   title?: string;
+  // trudax/reddit-scraper-lite community name fields
   subreddit?: string;
   community?: string;
   communityName?: string;
+  parsedCommunityName?: string; // trudax uses this
+  dataType?: string; // "post" | "community"
   url?: string;
+  link?: string; // alternate URL field
   permalink?: string;
+  // Engagement metrics (trudax field names)
   score?: number;
+  upvotes?: number;
   numberOfComments?: number;
+  numComments?: number;
+  commentsCount?: number;
   upVoteRatio?: number;
 }
 
 /**
  * Searches Reddit via Apify — no OAuth keys needed.
- * Groups posts by subreddit to surface communities.
+ * Uses trudax/reddit-scraper-lite to search for communities and posts.
  */
 async function apifyRedditSearch(query: string): Promise<PlatformSearchResult> {
-  const posts = await runActor<ApifyRedditPost>("apify/reddit-scraper", {
+  const posts = await runActor<ApifyRedditPost>("trudax/reddit-scraper-lite", {
     searches: [query],
-    type: "posts",
-    maxItems: 50,
+    searchPosts: true,
+    searchCommunities: false,
     sort: "relevance",
+    maxItems: 50,
+    maxPostCount: 50,
+    skipComments: true,
+    proxy: { useApifyProxy: true, apifyProxyGroups: ["RESIDENTIAL"] },
   }, 90);
 
   if (!posts.length) throw new Error("Apify Reddit returned no results");
 
   // Group posts by subreddit and count activity
+  // trudax returns parsedCommunityName, communityName, or subreddit
   const subredditMap = new Map<string, { posts: ApifyRedditPost[]; score: number }>();
   for (const post of posts) {
-    const sub = (post.subreddit ?? post.communityName ?? post.community ?? "").replace(/^r\//, "");
+    const sub = (
+      post.parsedCommunityName ?? post.subreddit ?? post.communityName ?? post.community ?? ""
+    ).replace(/^r\//, "");
     if (!sub) continue;
+    const comments = post.numberOfComments ?? post.numComments ?? post.commentsCount ?? 0;
+    const upvotes = post.score ?? post.upvotes ?? 0;
     const existing = subredditMap.get(sub) ?? { posts: [], score: 0 };
     existing.posts.push(post);
-    existing.score += (post.score ?? 0) + (post.numberOfComments ?? 0) * 3;
+    existing.score += upvotes + comments * 3;
     subredditMap.set(sub, existing);
   }
 
@@ -67,12 +84,18 @@ async function apifyRedditSearch(query: string): Promise<PlatformSearchResult> {
         description: `r/${sub} — active Reddit community discussing ${query}. ${subPosts.length} recent posts found.`,
         conversation_categories: generateCategories(`reddit-${sub}`),
         trending_topics: generateTopics(`reddit-${sub}`, [query]),
-        trending_content: subPosts.slice(0, 6).map((p) => ({
+        trending_content: subPosts.slice(0, 6).map((p) => {
+          const comments = p.numberOfComments ?? p.numComments ?? p.commentsCount ?? 0;
+          const upvotes = p.score ?? p.upvotes ?? 0;
+          return {
           title: p.title ?? "Reddit post",
-          url: p.url ?? `https://www.reddit.com/r/${sub}/search/?q=${encodeURIComponent(query)}`,
-          engagement: (p.score ?? 0) + (p.numberOfComments ?? 0) * 5,
+          url: p.permalink
+            ? `https://www.reddit.com${p.permalink}`
+            : (p.url ?? p.link ?? `https://www.reddit.com/r/${sub}/search/?q=${encodeURIComponent(query)}`),
+          engagement: upvotes + comments * 5,
           type: "post" as const,
-        })),
+          };
+        }),
         top_voices: [],
         last_updated: new Date().toISOString(),
       };
@@ -86,9 +109,12 @@ async function apifyRedditSearch(query: string): Promise<PlatformSearchResult> {
  */
 async function apifyGetRedditCommunity(communityId: string): Promise<CommunityData | null> {
   const sub = communityId.replace(/^reddit_r_/, "").replace(/^reddit_r\//, "");
-  const posts = await runActor<ApifyRedditPost>("apify/reddit-scraper", {
+  const posts = await runActor<ApifyRedditPost>("trudax/reddit-scraper-lite", {
     startUrls: [{ url: `https://www.reddit.com/r/${sub}/hot/` }],
     maxItems: 20,
+    maxPostCount: 20,
+    skipComments: true,
+    proxy: { useApifyProxy: true, apifyProxyGroups: ["RESIDENTIAL"] },
   }, 90);
 
   if (!posts.length) return null;

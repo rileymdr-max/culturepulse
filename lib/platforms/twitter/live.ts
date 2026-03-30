@@ -28,17 +28,29 @@ interface ApifyTweet {
   text?: string;
   fullText?: string;
   url?: string;
+  // apidojo/tweet-scraper metric fields
   likeCount?: number;
   retweetCount?: number;
   replyCount?: number;
   viewCount?: number;
-  hashtags?: string[];
+  // apidojo uses "tweetBy" for the author object
+  tweetBy?: {
+    userName?: string;
+    displayName?: string;
+    followers?: number;
+    profileUrl?: string;
+    isVerified?: boolean;
+  };
+  // legacy "author" field kept for compatibility
   author?: {
     userName?: string;
     displayName?: string;
     followers?: number;
     profileUrl?: string;
   };
+  // hashtags is a flat string[] in apidojo output
+  hashtags?: string[];
+  entities?: { hashtags?: { tag: string }[] };
 }
 
 /**
@@ -48,9 +60,9 @@ interface ApifyTweet {
 async function apifyTwitterSearch(query: string): Promise<PlatformSearchResult> {
   const tweets = await runActor<ApifyTweet>("apidojo/tweet-scraper", {
     searchTerms: [query],
-    maxTweets: 50,
-    queryType: "Latest",
-    lang: "en",
+    maxItems: 50,
+    sort: "Latest",
+    tweetLanguage: "en",
   }, 90);
 
   if (!tweets.length) throw new Error("Apify Twitter returned no results");
@@ -79,12 +91,14 @@ function mapApifyTweetsToCluster(query: string, tweets: ApifyTweet[]): Community
   );
 
   // Deduplicate authors and sort by followers
-  const authorMap = new Map<string, ApifyTweet["author"] & { followers: number }>();
+  // apidojo uses "tweetBy", fall back to "author" for compatibility
+  const authorMap = new Map<string, { userName: string; displayName?: string; followers: number; profileUrl?: string }>();
   for (const t of tweets) {
-    if (!t.author?.userName) continue;
-    const existing = authorMap.get(t.author.userName);
-    if (!existing || (t.author.followers ?? 0) > existing.followers) {
-      authorMap.set(t.author.userName, { ...t.author, followers: t.author.followers ?? 0 });
+    const a = t.tweetBy ?? t.author;
+    if (!a?.userName) continue;
+    const existing = authorMap.get(a.userName);
+    if (!existing || (a.followers ?? 0) > existing.followers) {
+      authorMap.set(a.userName, { ...a, userName: a.userName, followers: a.followers ?? 0 });
     }
   }
 
@@ -116,9 +130,14 @@ function mapApifyTweetsToCluster(query: string, tweets: ApifyTweet[]): Community
     });
 
   // Aggregate hashtag frequencies
+  // apidojo returns hashtags as string[], legacy returns entities.hashtags[].tag
   const hashtagCounts: Record<string, number> = {};
   for (const tweet of tweets) {
-    for (const tag of tweet.hashtags ?? []) {
+    const tags: string[] = [
+      ...(tweet.hashtags ?? []),
+      ...(tweet.entities?.hashtags?.map((h) => h.tag) ?? []),
+    ];
+    for (const tag of tags) {
       hashtagCounts[tag] = (hashtagCounts[tag] ?? 0) + 1;
     }
   }
