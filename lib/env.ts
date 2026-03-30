@@ -97,7 +97,7 @@ export function isPlatformLive(
       // Live via official OAuth keys OR via Apify scraper (no keys needed)
       return !!(env.REDDIT_CLIENT_ID && env.REDDIT_CLIENT_SECRET) || !!env.APIFY_API_TOKEN;
     case "twitter":
-      return !!env.TWITTER_BEARER_TOKEN;
+      return !!env.TWITTER_BEARER_TOKEN || !!env.APIFY_API_TOKEN;
     case "tiktok":
       // Live via Apify scraper (no TikTok API key needed) or official Research API
       return !!(env.APIFY_API_TOKEN || (env.TIKTOK_CLIENT_KEY && env.TIKTOK_CLIENT_SECRET));

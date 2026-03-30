@@ -72,6 +72,43 @@ interface ApifyInstagramPost {
   locationName?: string;
 }
 
+interface ApifyInstagramProfile {
+  username?: string;
+  fullName?: string;
+  biography?: string;
+  followersCount?: number;
+  followsCount?: number;
+  postsCount?: number;
+  profilePicUrl?: string;
+  externalUrl?: string;
+  isVerified?: boolean;
+}
+
+/**
+ * Fetches real Instagram profile data for top post authors via the profile scraper.
+ * Enriches community top_voices with real follower counts.
+ */
+async function fetchTopVoicesFromProfiles(usernames: string[]): Promise<CommunityData["top_voices"]> {
+  if (!usernames.length) return [];
+  try {
+    const profiles = await runActor<ApifyInstagramProfile>("apify/instagram-profile-scraper", {
+      usernames: usernames.slice(0, 5),
+    }, 60);
+
+    return profiles
+      .filter((p) => p.username)
+      .sort((a, b) => (b.followersCount ?? 0) - (a.followersCount ?? 0))
+      .map((p) => ({
+        name: p.fullName || p.username || "",
+        handle: `@${p.username}`,
+        followers: p.followersCount ?? 0,
+        url: `https://www.instagram.com/${p.username}/`,
+      }));
+  } catch {
+    return [];
+  }
+}
+
 /**
  * Searches Instagram via Apify hashtag scraper — no Meta approval needed.
  */
@@ -93,6 +130,14 @@ async function apifyInstagramSearch(query: string): Promise<PlatformSearchResult
     0
   );
 
+  // Collect unique post authors to enrich with real profile data
+  const authorUsernames = Array.from(
+    new Set(posts.map((p) => p.ownerUsername).filter((u): u is string => !!u))
+  ).slice(0, 5);
+
+  // Fetch real profile data for top authors in parallel with building the community
+  const topVoices = await fetchTopVoicesFromProfiles(authorUsernames);
+
   const community: CommunityData = {
     platform: "instagram",
     community_id: `instagram_${hashtag}`,
@@ -107,7 +152,7 @@ async function apifyInstagramSearch(query: string): Promise<PlatformSearchResult
       engagement: (p.likesCount ?? 0) + (p.commentsCount ?? 0) * 5 + (p.videoViewCount ?? 0),
       type: (p.type === "Video" ? "reel" : "post") as "reel" | "post",
     })),
-    top_voices: [],
+    top_voices: topVoices,
     last_updated: new Date().toISOString(),
   };
 

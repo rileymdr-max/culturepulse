@@ -16,9 +16,133 @@
  */
 
 import type { CommunityData, PlatformSearchResult, TrendingContent, TopVoice } from "../types";
-import { generateCategories, generateTopics } from "../mock-helpers";
+import { generateCategories, generateTopics, seededRng, randInt } from "../mock-helpers";
+import { runActor } from "@/lib/apify";
 
 const X_API_BASE = "https://api.twitter.com/2";
+
+// ─── Apify Twitter types ──────────────────────────────────────────────────────
+
+interface ApifyTweet {
+  id?: string;
+  text?: string;
+  fullText?: string;
+  url?: string;
+  likeCount?: number;
+  retweetCount?: number;
+  replyCount?: number;
+  viewCount?: number;
+  hashtags?: string[];
+  author?: {
+    userName?: string;
+    displayName?: string;
+    followers?: number;
+    profileUrl?: string;
+  };
+}
+
+/**
+ * Searches X/Twitter via Apify — no Twitter API key needed.
+ * Uses the apidojo/tweet-scraper actor.
+ */
+async function apifyTwitterSearch(query: string): Promise<PlatformSearchResult> {
+  const tweets = await runActor<ApifyTweet>("apidojo/tweet-scraper", {
+    searchTerms: [query],
+    maxTweets: 50,
+    queryType: "Latest",
+    lang: "en",
+  }, 90);
+
+  if (!tweets.length) throw new Error("Apify Twitter returned no results");
+
+  const community = mapApifyTweetsToCluster(query, tweets);
+  return { communities: [community], isLive: true };
+}
+
+/**
+ * Fetches a Twitter community by ID via Apify.
+ */
+async function apifyGetTwitterCommunity(communityId: string): Promise<CommunityData | null> {
+  const tag = communityId.replace(/^twitter_/, "");
+  try {
+    const result = await apifyTwitterSearch(tag);
+    return result.communities[0] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function mapApifyTweetsToCluster(query: string, tweets: ApifyTweet[]): CommunityData {
+  const totalEngagement = tweets.reduce(
+    (s, t) => s + (t.likeCount ?? 0) + (t.retweetCount ?? 0) * 2 + (t.replyCount ?? 0),
+    0
+  );
+
+  // Deduplicate authors and sort by followers
+  const authorMap = new Map<string, ApifyTweet["author"] & { followers: number }>();
+  for (const t of tweets) {
+    if (!t.author?.userName) continue;
+    const existing = authorMap.get(t.author.userName);
+    if (!existing || (t.author.followers ?? 0) > existing.followers) {
+      authorMap.set(t.author.userName, { ...t.author, followers: t.author.followers ?? 0 });
+    }
+  }
+
+  const topVoices: TopVoice[] = Array.from(authorMap.values())
+    .sort((a, b) => b.followers - a.followers)
+    .slice(0, 5)
+    .map((u) => ({
+      name: u.displayName ?? u.userName ?? "",
+      handle: `@${u.userName}`,
+      followers: u.followers,
+      url: u.profileUrl ?? `https://x.com/${u.userName}`,
+    }));
+
+  const trendingContent: TrendingContent[] = tweets
+    .sort((a, b) => {
+      const eA = (a.likeCount ?? 0) + (a.retweetCount ?? 0) * 2;
+      const eB = (b.likeCount ?? 0) + (b.retweetCount ?? 0) * 2;
+      return eB - eA;
+    })
+    .slice(0, 6)
+    .map((t) => {
+      const text = t.fullText ?? t.text ?? "";
+      return {
+        title: text.slice(0, 120) + (text.length > 120 ? "…" : ""),
+        url: t.url ?? `https://x.com/search?q=${encodeURIComponent(query)}`,
+        engagement: (t.likeCount ?? 0) + (t.retweetCount ?? 0) * 2,
+        type: "tweet" as const,
+      };
+    });
+
+  // Aggregate hashtag frequencies
+  const hashtagCounts: Record<string, number> = {};
+  for (const tweet of tweets) {
+    for (const tag of tweet.hashtags ?? []) {
+      hashtagCounts[tag] = (hashtagCounts[tag] ?? 0) + 1;
+    }
+  }
+
+  return {
+    platform: "twitter",
+    community_id: `twitter_${query.replace(/\s+/g, "")}`,
+    community_name: `#${query.replace(/\s+/g, "")}`,
+    community_size: totalEngagement,
+    description: `Live X/Twitter conversation cluster for #${query}. ${tweets.length} recent tweets analysed via Apify.`,
+    conversation_categories: generateCategories(`twitter-${query}`),
+    trending_topics: Object.entries(hashtagCounts)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 8)
+      .map(([tag, count]) => ({
+        topic: `#${tag}`,
+        volume: count * 1000,
+        velocity: Math.round(count * 12),
+      })),
+    trending_content: trendingContent,
+    top_voices: topVoices,
+    last_updated: new Date().toISOString(),
+  };
+}
 
 /**
  * Authenticated fetch against the X API v2.
@@ -44,6 +168,11 @@ async function xFetch(path: string): Promise<unknown> {
  * unique hashtag in the results as a community cluster.
  */
 export async function liveTwitterSearch(query: string): Promise<PlatformSearchResult> {
+  // Use Apify path when no Bearer Token is present but Apify token is available
+  if (!process.env.TWITTER_BEARER_TOKEN && process.env.APIFY_API_TOKEN) {
+    return apifyTwitterSearch(query);
+  }
+
   const encoded = encodeURIComponent(`${query} -is:retweet lang:en`);
   const data = (await xFetch(
     `/tweets/search/recent?query=${encoded}&max_results=100` +
@@ -60,6 +189,11 @@ export async function liveTwitterSearch(query: string): Promise<PlatformSearchRe
  * communityId format: "twitter_hashtag"
  */
 export async function liveGetTwitterCommunity(communityId: string): Promise<CommunityData | null> {
+  // Use Apify path when no Bearer Token is present but Apify token is available
+  if (!process.env.TWITTER_BEARER_TOKEN && process.env.APIFY_API_TOKEN) {
+    return apifyGetTwitterCommunity(communityId);
+  }
+
   const tag = communityId.replace(/^twitter_/, "");
   try {
     const encoded = encodeURIComponent(`#${tag} -is:retweet lang:en`);
