@@ -16,6 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useCommunity } from "@/hooks/use-community";
 import { useTracked, useTrackCommunity, useUntrackCommunity, useCaptureSnapshot } from "@/hooks/use-tracked";
 import { SpikePanel } from "@/components/spike-panel";
+import { AdIntelPanel } from "@/components/ad-intel-panel";
 import { formatNumber } from "@/lib/utils";
 
 interface PageProps {
@@ -200,6 +201,19 @@ export default function CommunityDetailPage({ params }: PageProps) {
               </CardHeader>
               <CardContent>
                 <TopVoicesList voices={community.top_voices} />
+              </CardContent>
+            </Card>
+
+            {/* Ad Intelligence — Meta Ad Library for this topic */}
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">Ad Intelligence</CardTitle>
+                <p className="text-xs text-muted-foreground">
+                  Brands running Meta ads targeting this audience · via Meta Ad Library
+                </p>
+              </CardHeader>
+              <CardContent>
+                <AdIntelPanel query={community.community_name.replace(/^[#r\/]+/, "")} />
               </CardContent>
             </Card>
 
