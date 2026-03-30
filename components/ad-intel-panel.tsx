@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { ExternalLink, Megaphone, Loader2, AlertCircle, BadgeCheck } from "lucide-react";
 import { useAdIntel } from "@/hooks/use-ad-intel";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -12,13 +13,14 @@ interface AdIntelPanelProps {
 
 export function AdIntelPanel({ query }: AdIntelPanelProps) {
   const { data, isLoading, error } = useAdIntel(query);
+  const [activeTab, setActiveTab] = useState<"meta" | "tiktok">("meta");
 
   if (isLoading) {
     return (
       <div className="space-y-3">
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          Scanning Meta Ad Library…
+          Scanning Meta & TikTok Ad Libraries…
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {[...Array(4)].map((_, i) => (
@@ -47,29 +49,74 @@ export function AdIntelPanel({ query }: AdIntelPanelProps) {
     );
   }
 
-  if (!data.ads.length) {
-    return (
-      <p className="text-sm text-muted-foreground py-2">
-        No ads found in the Meta Ad Library for this topic.
-      </p>
-    );
-  }
+  const metaAds = data.meta ?? [];
+  const tiktokAds = data.tiktok ?? [];
+  const activeAds = activeTab === "meta" ? metaAds : tiktokAds;
 
   return (
-    <div className="space-y-3">
-      <p className="text-xs text-muted-foreground">
-        {data.ads.length} ads found targeting "{query}" — sourced from the public Meta Ad Library.
-      </p>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        {data.ads.map((ad, i) => (
-          <AdCard key={i} ad={ad} />
-        ))}
+    <div className="space-y-4">
+      {/* Platform tabs */}
+      <div className="flex items-center gap-1 border-b border-border">
+        <TabButton
+          label={`Meta / Instagram${metaAds.length ? ` · ${metaAds.length}` : ""}`}
+          active={activeTab === "meta"}
+          onClick={() => setActiveTab("meta")}
+        />
+        <TabButton
+          label={`TikTok${tiktokAds.length ? ` · ${tiktokAds.length}` : ""}`}
+          active={activeTab === "tiktok"}
+          onClick={() => setActiveTab("tiktok")}
+        />
       </div>
+
+      {activeAds.length === 0 ? (
+        <p className="text-sm text-muted-foreground py-2">
+          No {activeTab === "meta" ? "Meta" : "TikTok"} ads found for this topic.
+        </p>
+      ) : (
+        <>
+          <p className="text-xs text-muted-foreground">
+            {activeAds.length} ads targeting "{query}" · sourced from the public{" "}
+            {activeTab === "meta" ? "Meta Ad Library" : "TikTok Ad Library"}.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {activeAds.map((ad, i) => (
+              <AdCard key={i} ad={ad} platform={activeTab} />
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 }
 
-function AdCard({ ad }: { ad: AdIntelItem }) {
+function TabButton({
+  label,
+  active,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`px-3 py-2 text-xs font-medium border-b-2 -mb-px transition-colors ${
+        active
+          ? "border-foreground text-foreground"
+          : "border-transparent text-muted-foreground hover:text-foreground"
+      }`}
+    >
+      {label}
+    </button>
+  );
+}
+
+function AdCard({ ad, platform }: { ad: AdIntelItem; platform: "meta" | "tiktok" }) {
+  const accentColor = platform === "tiktok" ? "text-pink-400" : "text-blue-400";
+  const accentBg = platform === "tiktok" ? "bg-pink-400/10" : "bg-blue-400/10";
+
   return (
     <a
       href={ad.adLibraryUrl}
@@ -80,7 +127,7 @@ function AdCard({ ad }: { ad: AdIntelItem }) {
       {/* Header */}
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-1.5 min-w-0">
-          <Megaphone className="h-3.5 w-3.5 shrink-0 text-blue-400" />
+          <Megaphone className={`h-3.5 w-3.5 shrink-0 ${accentColor}`} />
           <span className="text-xs font-semibold text-foreground truncate">
             {ad.advertiser}
           </span>
@@ -109,7 +156,7 @@ function AdCard({ ad }: { ad: AdIntelItem }) {
       {/* Footer */}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-auto pt-1">
         {ad.callToAction && (
-          <span className="text-[10px] font-medium text-blue-400 bg-blue-400/10 rounded px-1.5 py-0.5">
+          <span className={`text-[10px] font-medium ${accentColor} ${accentBg} rounded px-1.5 py-0.5`}>
             {ad.callToAction}
           </span>
         )}
@@ -125,7 +172,11 @@ function AdCard({ ad }: { ad: AdIntelItem }) {
         )}
         {ad.startDate && (
           <span className="text-[10px] text-muted-foreground">
-            Since {new Date(ad.startDate).toLocaleDateString("en-US", { month: "short", year: "numeric" })}
+            Since{" "}
+            {new Date(ad.startDate).toLocaleDateString("en-US", {
+              month: "short",
+              year: "numeric",
+            })}
           </span>
         )}
       </div>

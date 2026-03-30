@@ -110,13 +110,52 @@ function mapAd(ad: ApifyFbAd): AdIntelItem {
   };
 }
 
+// ─── TikTok Ad Library types ──────────────────────────────────────────────────
+
+interface ApifyTikTokAd {
+  advertiserName?: string;
+  advertiserId?: string;
+  adId?: string;
+  adUrl?: string;
+  videoUrl?: string;
+  coverImageUrl?: string;
+  adText?: string;
+  landingPageUrl?: string;
+  impressions?: string; // e.g. "1000-5000"
+  region?: string[];
+  firstShownDate?: string;
+  lastShownDate?: string;
+  isActive?: boolean;
+  sponsorName?: string;
+  objective?: string;
+}
+
+function mapTikTokAd(ad: ApifyTikTokAd): AdIntelItem {
+  return {
+    title: ad.adText?.slice(0, 120) || ad.sponsorName || ad.advertiserName || "TikTok ad",
+    advertiser: ad.advertiserName ?? ad.sponsorName ?? "Unknown advertiser",
+    adLibraryUrl:
+      ad.adUrl ??
+      (ad.adId
+        ? `https://library.tiktok.com/ads?query=${ad.adId}&query_type=2`
+        : "https://library.tiktok.com/ads"),
+    body: ad.adText ? ad.adText.slice(0, 200) : undefined,
+    callToAction: ad.objective,
+    destinationUrl: ad.landingPageUrl,
+    impressions: ad.impressions,
+    startDate: ad.firstShownDate,
+    isActive: ad.isActive ?? true,
+    platforms: ["tiktok"],
+  };
+}
+
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 /**
  * Fetches Meta Ad Library results for a given search term.
  * Returns up to `limit` ad items (default 12).
  */
-export async function fetchAdIntel(
+export async function fetchMetaAdIntel(
   query: string,
   limit = 12
 ): Promise<AdIntelItem[]> {
@@ -129,4 +168,43 @@ export async function fetchAdIntel(
   }, 90);
 
   return ads.slice(0, limit).map(mapAd);
+}
+
+/**
+ * Fetches TikTok Ad Library results for a given search term.
+ * Uses data_xplorer/tiktok-ads-library-pay-per-event (~$0.001/result).
+ * Returns up to `limit` ad items (default 12).
+ */
+export async function fetchTikTokAdIntel(
+  query: string,
+  limit = 12
+): Promise<AdIntelItem[]> {
+  const ads = await runActor<ApifyTikTokAd>("data_xplorer/tiktok-ads-library-pay-per-event", {
+    query,
+    queryType: "1", // keyword search
+    region: "all",
+    maxAds: limit,
+    fetchDetails: true,
+  }, 90);
+
+  return ads.slice(0, limit).map(mapTikTokAd);
+}
+
+/**
+ * Fetches ad intel from both Meta and TikTok in parallel.
+ * Gracefully skips whichever source fails.
+ */
+export async function fetchAdIntel(
+  query: string,
+  limit = 12
+): Promise<{ meta: AdIntelItem[]; tiktok: AdIntelItem[] }> {
+  const [metaResult, tiktokResult] = await Promise.allSettled([
+    fetchMetaAdIntel(query, limit),
+    fetchTikTokAdIntel(query, limit),
+  ]);
+
+  return {
+    meta: metaResult.status === "fulfilled" ? metaResult.value : [],
+    tiktok: tiktokResult.status === "fulfilled" ? tiktokResult.value : [],
+  };
 }
