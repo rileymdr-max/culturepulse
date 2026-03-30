@@ -50,7 +50,7 @@ function CategoryRadar({ communities }: { communities: CommunityData[] }) {
     c.conversation_categories.forEach((cat) => allLabels.add(cat.label))
   );
 
-  const data = [...allLabels].slice(0, 8).map((label) => {
+  const data = Array.from(allLabels).slice(0, 8).map((label) => {
     const entry: Record<string, string | number> = { label };
     communities.forEach((c) => {
       const cat = c.conversation_categories.find((ct) => ct.label === label);
