@@ -47,10 +47,7 @@ const envSchema = z.object({
   FACEBOOK_APP_ID: emptyStringToUndefined,
   FACEBOOK_APP_SECRET: emptyStringToUndefined,
 
-  // Apify — optional, enables real scraping for audience intelligence
-  APIFY_API_TOKEN: emptyStringToUndefined,
-
-  // Apify scraping — optional, enables TikTok + Audience Intelligence live data
+  // Apify — optional, enables TikTok + Audience Intelligence live data
   APIFY_API_TOKEN: emptyStringToUndefined,
 
   // Rate limiting (Upstash) — optional, in-memory fallback used when absent
