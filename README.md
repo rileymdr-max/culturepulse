@@ -308,3 +308,4 @@ Set `FORCE_MOCK_DATA="true"` in `.env.local` to make all platforms use mock data
 ## Environment variable reference
 
 See [`.env.example`](./.env.example) for the complete annotated list of all variables.
+# culturepulse
