@@ -44,29 +44,56 @@ interface RssItem {
   likes?: number;
 }
 
+// Browser-like headers to avoid bot detection
+const BROWSER_HEADERS = {
+  "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+  "Accept": "application/json, text/plain, */*",
+  "Accept-Language": "en-US,en;q=0.9",
+  "Referer": "https://substack.com/",
+};
+
+// Alternative endpoint formats to try in order
+const SEARCH_ENDPOINTS = [
+  (q: string) => `https://substack.com/api/v1/search/publications?query=${encodeURIComponent(q)}&limit=5`,
+  (q: string) => `https://substack.com/api/v1/reader/feed/search?query=${encodeURIComponent(q)}&limit=5`,
+  (q: string) => `https://substack.com/api/v1/search?q=${encodeURIComponent(q)}&type=publication&limit=5`,
+];
+
 /**
  * Searches Substack publications matching the query.
- * Falls back gracefully if the undocumented endpoint changes.
+ * Tries multiple endpoint formats to handle API changes gracefully.
  */
 export async function liveSubstackSearch(query: string): Promise<PlatformSearchResult> {
-  const url = `${SUBSTACK_SEARCH_API}?query=${encodeURIComponent(query)}&limit=5`;
-  const response = await fetch(url, {
-    headers: { "User-Agent": "CulturePulse/1.0" },
-    next: { revalidate: 600 }, // 10-minute cache
-  });
+  let lastError: Error | null = null;
 
-  if (!response.ok) {
-    throw new Error(`Substack search failed: ${response.status}`);
+  for (const buildUrl of SEARCH_ENDPOINTS) {
+    try {
+      const response = await fetch(buildUrl(query), {
+        headers: BROWSER_HEADERS,
+        next: { revalidate: 600 },
+      });
+
+      if (!response.ok) {
+        lastError = new Error(`Substack search failed: ${response.status}`);
+        continue;
+      }
+
+      const data = (await response.json()) as SubstackSearchResponse;
+      const publications = data.publications ?? [];
+
+      if (publications.length === 0) continue;
+
+      const communities = await Promise.all(
+        publications.slice(0, 3).map((pub) => mapPublication(pub, query))
+      );
+
+      return { communities, isLive: true };
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+    }
   }
 
-  const data = (await response.json()) as SubstackSearchResponse;
-  const publications = data.publications ?? [];
-
-  const communities = await Promise.all(
-    publications.slice(0, 3).map((pub) => mapPublication(pub, query))
-  );
-
-  return { communities, isLive: true };
+  throw lastError ?? new Error("All Substack search endpoints failed");
 }
 
 /**
@@ -92,7 +119,7 @@ export async function liveGetSubstackCommunity(communityId: string): Promise<Com
 async function fetchRssFeed(slug: string): Promise<RssItem[]> {
   const feedUrl = `https://${slug}.substack.com/feed`;
   const response = await fetch(feedUrl, {
-    headers: { "User-Agent": "CulturePulse/1.0" },
+    headers: BROWSER_HEADERS,
     next: { revalidate: 300 },
   });
 
