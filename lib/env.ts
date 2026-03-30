@@ -50,6 +50,9 @@ const envSchema = z.object({
   // Apify — optional, enables real scraping for audience intelligence
   APIFY_API_TOKEN: emptyStringToUndefined,
 
+  // Apify scraping — optional, enables TikTok + Audience Intelligence live data
+  APIFY_API_TOKEN: emptyStringToUndefined,
+
   // Rate limiting (Upstash) — optional, in-memory fallback used when absent
   UPSTASH_REDIS_REST_URL: emptyUrl,
   UPSTASH_REDIS_REST_TOKEN: emptyStringToUndefined,
@@ -98,7 +101,8 @@ export function isPlatformLive(
     case "twitter":
       return !!env.TWITTER_BEARER_TOKEN;
     case "tiktok":
-      return !!(env.TIKTOK_CLIENT_KEY && env.TIKTOK_CLIENT_SECRET);
+      // Live via Apify scraper (no TikTok API key needed) or official Research API
+      return !!(env.APIFY_API_TOKEN || (env.TIKTOK_CLIENT_KEY && env.TIKTOK_CLIENT_SECRET));
     case "instagram":
       return !!(
         env.INSTAGRAM_ACCESS_TOKEN && env.INSTAGRAM_BUSINESS_ACCOUNT_ID
