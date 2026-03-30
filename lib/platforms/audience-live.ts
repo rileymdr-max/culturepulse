@@ -396,14 +396,20 @@ async function scrapeInstagram(handle: string): Promise<AudienceResult> {
 // Runs Twitter + TikTok in parallel, merges community lists, deduplicates.
 
 async function scrapeAll(handle: string): Promise<AudienceResult> {
-  const [twitterResult, tiktokResult] = await Promise.allSettled([
+  // Run all four scrapers in parallel — no platform is prioritised over another.
+  // Scrapers that fail (handle doesn't exist on that platform) are silently skipped.
+  const [twitterResult, tiktokResult, redditResult, instagramResult] = await Promise.allSettled([
     scrapeTwitter(handle, "all"),
     scrapeTikTok(handle),
+    scrapeReddit(handle),
+    scrapeInstagram(handle),
   ]);
 
   const results: AudienceResult[] = [];
   if (twitterResult.status === "fulfilled") results.push(twitterResult.value);
   if (tiktokResult.status === "fulfilled") results.push(tiktokResult.value);
+  if (redditResult.status === "fulfilled") results.push(redditResult.value);
+  if (instagramResult.status === "fulfilled") results.push(instagramResult.value);
 
   // If both failed, throw so the caller falls back to mock
   if (results.length === 0) throw new Error("All platform scrapers failed");
