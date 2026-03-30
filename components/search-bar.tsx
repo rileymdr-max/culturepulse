@@ -56,7 +56,7 @@ export function SearchBar({
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!query.trim()) return;
-    onSearch(query.trim(), [...selected] as PlatformId[]);
+    onSearch(query.trim(), Array.from(selected) as PlatformId[]);
   }
 
   function clearQuery() {
