@@ -1,43 +1,23 @@
 /**
  * Reddit platform module.
- * Automatically routes to live API or mock based on env configuration.
+ * Only returns real data when REDDIT_CLIENT_ID + REDDIT_CLIENT_SECRET are set.
+ * Returns empty results when not configured — no mock fallback.
  */
 
 import type { CommunityData, PlatformModule, PlatformSearchInput, PlatformSearchResult } from "../types";
 import { isPlatformLive } from "@/lib/env";
-import { mockRedditSearch, mockGetRedditCommunity } from "./mock";
 import { liveRedditSearch, liveGetRedditCommunity } from "./live";
 
 export const redditModule: PlatformModule = {
   platform: "reddit",
 
-  /**
-   * Search for subreddits matching the query.
-   * Falls back to mock data if Reddit credentials are not configured.
-   */
   async search(input: PlatformSearchInput): Promise<PlatformSearchResult> {
-    if (isPlatformLive("reddit")) {
-      try {
-        return await liveRedditSearch(input.query);
-      } catch (err) {
-        console.warn("[reddit] Live fetch failed, falling back to mock:", err);
-      }
-    }
-    return mockRedditSearch(input.query);
+    if (!isPlatformLive("reddit")) return { communities: [], isLive: false };
+    return liveRedditSearch(input.query);
   },
 
-  /**
-   * Fetch full data for a single Reddit community.
-   * @param communityId - Format: "reddit_r/subredditName"
-   */
   async getCommunity(communityId: string): Promise<CommunityData | null> {
-    if (isPlatformLive("reddit")) {
-      try {
-        return await liveGetRedditCommunity(communityId);
-      } catch (err) {
-        console.warn("[reddit] Live getCommunity failed, falling back to mock:", err);
-      }
-    }
-    return mockGetRedditCommunity(communityId);
+    if (!isPlatformLive("reddit")) return null;
+    return liveGetRedditCommunity(communityId);
   },
 };

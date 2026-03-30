@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { CommunityData } from "@/lib/platforms/types";
+import type { PlatformStatus } from "@/lib/platforms";
 
 interface SearchParams {
   query: string;
@@ -14,6 +15,7 @@ interface SearchResult {
   communities: CommunityData[];
   sources: Record<string, boolean>;
   total: number;
+  platformStatuses: PlatformStatus[];
 }
 
 /**

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { Bookmark, Zap, AlertCircle } from "lucide-react";
+import { Bookmark, Zap, AlertCircle, CheckCircle2, Clock } from "lucide-react";
 import { NavHeader } from "@/components/nav-header";
 import { SearchBar } from "@/components/search-bar";
 import { CommunityCard } from "@/components/community-card";
@@ -13,6 +13,7 @@ import { PlatformBadge } from "@/components/platform-badge";
 import { useTrending } from "@/hooks/use-trending";
 import { useSearch } from "@/hooks/use-search";
 import type { CommunityData } from "@/lib/platforms/types";
+import type { PlatformStatus } from "@/lib/platforms";
 
 export default function DashboardPage() {
   const [savedOpen, setSavedOpen] = useState(false);
@@ -69,6 +70,9 @@ export default function DashboardPage() {
             isLoading={isSearching}
           />
         </div>
+
+        {/* Platform status bar */}
+        <PlatformStatusBar statuses={searchData?.platformStatuses} />
 
         {/* Error state */}
         {searchError && (
@@ -197,6 +201,58 @@ export default function DashboardPage() {
         onClose={() => setSavedOpen(false)}
         onSearchSelect={handleSavedSelect}
       />
+    </div>
+  );
+}
+
+// ─── Platform Status Bar ──────────────────────────────────────────────────────
+
+function PlatformStatusBar({ statuses }: { statuses?: PlatformStatus[] }) {
+  const [expanded, setExpanded] = useState(false);
+
+  if (!statuses) return null;
+
+  const live = statuses.filter((s) => s.live);
+  const pending = statuses.filter((s) => !s.live);
+
+  return (
+    <div className="mb-6 rounded-lg border border-border bg-card px-4 py-3 text-sm">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div className="flex items-center gap-3 flex-wrap">
+          <span className="text-muted-foreground text-xs font-medium">Data sources:</span>
+          <div className="flex items-center gap-2 flex-wrap">
+            {live.map((s) => (
+              <span key={s.platform} className="inline-flex items-center gap-1 text-xs text-green-400 font-medium">
+                <CheckCircle2 className="h-3 w-3" />
+                {s.label}
+              </span>
+            ))}
+            {pending.map((s) => (
+              <span key={s.platform} className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                <Clock className="h-3 w-3" />
+                {s.label}
+              </span>
+            ))}
+          </div>
+        </div>
+        <button
+          onClick={() => setExpanded((e) => !e)}
+          className="text-xs text-muted-foreground hover:text-foreground transition-colors shrink-0"
+        >
+          {expanded ? "Hide details" : `${pending.length} pending`}
+        </button>
+      </div>
+
+      {expanded && pending.length > 0 && (
+        <div className="mt-3 pt-3 border-t border-border space-y-1.5">
+          {pending.map((s) => (
+            <div key={s.platform} className="flex items-center justify-between text-xs">
+              <span className="text-muted-foreground">{s.label}</span>
+              <span className="text-muted-foreground/60">{s.reason}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

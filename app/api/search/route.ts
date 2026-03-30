@@ -14,7 +14,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireSession, enforceRateLimit, badRequest, serverError } from "@/lib/api-helpers";
-import { searchPlatforms, PLATFORM_NAMES, type Platform } from "@/lib/platforms";
+import { searchPlatforms, PLATFORM_NAMES, getPlatformStatuses, type Platform } from "@/lib/platforms";
 
 const searchSchema = z.object({
   query: z.string().min(1).max(200).trim(),
@@ -59,6 +59,7 @@ export async function POST(req: NextRequest) {
       communities,
       sources,
       total: communities.length,
+      platformStatuses: getPlatformStatuses(),
     });
   } catch (err) {
     console.error("[api/search]", err);

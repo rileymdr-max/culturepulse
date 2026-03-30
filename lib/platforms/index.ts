@@ -15,8 +15,58 @@ import { substackModule } from "./substack";
 import { tiktokModule } from "./tiktok";
 import { instagramModule } from "./instagram";
 import { facebookModule } from "./facebook";
+import { isPlatformLive } from "@/lib/env";
 
 export type { CommunityData, PlatformSearchResult } from "./types";
+
+// ─── Platform status ──────────────────────────────────────────────────────────
+
+export type PlatformStatus = {
+  platform: Platform;
+  live: boolean;
+  label: string;
+  reason?: string; // shown when not live
+};
+
+export function getPlatformStatuses(): PlatformStatus[] {
+  return [
+    {
+      platform: "tiktok",
+      live: isPlatformLive("tiktok"),
+      label: "TikTok",
+      reason: "Add APIFY_API_TOKEN to enable",
+    },
+    {
+      platform: "substack",
+      live: true,
+      label: "Substack",
+    },
+    {
+      platform: "reddit",
+      live: isPlatformLive("reddit"),
+      label: "Reddit",
+      reason: "Waiting on Reddit app approval",
+    },
+    {
+      platform: "twitter",
+      live: isPlatformLive("twitter"),
+      label: "X / Twitter",
+      reason: "Requires Basic API plan ($100/mo)",
+    },
+    {
+      platform: "instagram",
+      live: isPlatformLive("instagram"),
+      label: "Instagram",
+      reason: "Waiting on Meta app approval",
+    },
+    {
+      platform: "facebook",
+      live: isPlatformLive("facebook"),
+      label: "Facebook",
+      reason: "Waiting on Meta app approval",
+    },
+  ];
+}
 
 // ─── Platform registry ────────────────────────────────────────────────────────
 
