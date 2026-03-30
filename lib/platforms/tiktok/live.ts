@@ -125,10 +125,11 @@ function mapVideosToCommunity(query: string, videos: ApifyTikTokVideo[]): Commun
     .sort((a, b) => (b.fans ?? 0) - (a.fans ?? 0))
     .slice(0, 5)
     .map((creator) => ({
-      name: creator.name ?? creator.nickName ?? "Unknown",
-      handle: `@${creator.nickName ?? "unknown"}`,
+      // nickName = display name, name = @username (used in URLs)
+      name: creator.nickName ?? creator.name ?? "Unknown",
+      handle: `@${creator.name ?? creator.nickName ?? "unknown"}`,
       followers: creator.fans ?? 0,
-      url: `https://www.tiktok.com/@${creator.nickName ?? ""}`,
+      url: `https://www.tiktok.com/@${creator.name ?? creator.nickName ?? ""}`,
     }));
 
   // Trending content — top videos by engagement
