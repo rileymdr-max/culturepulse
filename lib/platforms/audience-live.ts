@@ -1,13 +1,15 @@
 /**
  * Live audience intelligence using Apify scrapers.
  *
- * Each platform has its own Apify actor and signal-extraction logic:
- *   - Twitter   → apify/twitter-scraper    → hashtags from tweets
- *   - Reddit    → apify/reddit-scraper     → subreddits from user posts (direct!)
- *   - TikTok    → clockworks/tiktok-scraper → hashtags from videos
- *   - Instagram → apify/instagram-scraper  → hashtags from posts
+ * Each platform scrapes BRAND MENTIONS (what the audience says about the brand),
+ * not the brand's own posts — this gives us audience identity signals, not brand voice.
+ *
+ *   - Twitter   → apify/twitter-scraper    → tweets mentioning @handle
+ *   - Reddit    → apify/reddit-scraper     → subreddits where handle is mentioned
+ *   - TikTok    → clockworks/tiktok-scraper → videos tagged #handle
+ *   - Instagram → apify/instagram-scraper  → posts tagged #handle
  *   - Facebook / Substack → mock (no reliable public scraper)
- *   - All       → Twitter signal mapped across all platforms
+ *   - All       → all four scrapers in parallel, merged
  *
  * Falls back to mock automatically on any Apify error.
  */
@@ -49,6 +51,25 @@ interface ApifyInstagramPost {
   likesCount?: number;
   ownersipInfo?: { followersCount?: number };
   ownerFollowersCount?: number;
+}
+
+interface ApifyYouTubeVideo {
+  title?: string;
+  description?: string;
+  hashtags?: string[];
+  viewCount?: number;
+  likeCount?: number;
+  channelName?: string;
+  numberOfSubscribers?: number;
+}
+
+interface ApifyPinResult {
+  title?: string;
+  description?: string;
+  boardName?: string;
+  boardCategories?: string[];
+  saves?: number;
+  repinCount?: number;
 }
 
 // ─── Topic → community mapping ────────────────────────────────────────────────
@@ -237,11 +258,12 @@ function buildResult(
 // ─── Twitter scraper ──────────────────────────────────────────────────────────
 
 async function scrapeTwitter(handle: string, platformFilter: string): Promise<AudienceResult> {
+  // Search for tweets mentioning @handle — audience talking about the brand, not brand's own tweets
   const tweets = await runActor<ApifyTweet>("apify/twitter-scraper", {
-    searchTerms: [`from:${handle}`],
+    searchTerms: [`@${handle}`],
     maxItems: 100,
     queryType: "Latest",
-  }, 90);
+  }, 45);
 
   if (tweets.length === 0) throw new Error("No tweets found");
 
@@ -271,7 +293,7 @@ async function scrapeReddit(handle: string): Promise<AudienceResult> {
   const posts = await runActor<ApifyRedditPost>("apify/reddit-scraper", {
     startUrls: [{ url: `https://www.reddit.com/user/${handle}/submitted/` }],
     maxItems: 50,
-  }, 90);
+  }, 45);
 
   if (posts.length === 0) throw new Error("No Reddit posts found");
 
@@ -340,13 +362,14 @@ async function scrapeReddit(handle: string): Promise<AudienceResult> {
 // ─── TikTok scraper ───────────────────────────────────────────────────────────
 
 async function scrapeTikTok(handle: string): Promise<AudienceResult> {
+  // Search videos tagged #handle — audience creating content about the brand
   const videos = await runActor<ApifyTikTokVideo>("clockworks/tiktok-scraper", {
-    profiles: [`https://www.tiktok.com/@${handle}`],
+    hashtags: [handle],
     resultsPerPage: 30,
     shouldDownloadVideos: false,
     shouldDownloadCovers: false,
     shouldDownloadSubtitles: false,
-  }, 90);
+  }, 45);
 
   if (videos.length === 0) throw new Error("No TikTok videos found");
 
@@ -369,10 +392,11 @@ async function scrapeTikTok(handle: string): Promise<AudienceResult> {
 // ─── Instagram scraper ────────────────────────────────────────────────────────
 
 async function scrapeInstagram(handle: string): Promise<AudienceResult> {
+  // Search posts tagged #handle — audience posting about the brand
   const posts = await runActor<ApifyInstagramPost>("apify/instagram-scraper", {
-    usernames: [handle],
+    hashtags: [handle],
     resultsLimit: 30,
-  }, 90);
+  }, 45);
 
   if (posts.length === 0) throw new Error("No Instagram posts found");
 
@@ -392,17 +416,77 @@ async function scrapeInstagram(handle: string): Promise<AudienceResult> {
   return buildResult(handle, "instagram", scored, followerCount || 10_000, 10);
 }
 
+// ─── YouTube scraper ──────────────────────────────────────────────────────────
+// Searches for videos mentioning the brand — YouTube comments/titles reveal
+// which subculture communities are talking about them.
+
+async function scrapeYouTube(handle: string): Promise<AudienceResult> {
+  const videos = await runActor<ApifyYouTubeVideo>("streamers/youtube-scraper", {
+    searchQueries: [handle],
+    maxResults: 20,
+    sortingOrder: "relevance",
+  }, 45);
+
+  if (videos.length === 0) throw new Error("No YouTube videos found");
+
+  const signals: string[] = [];
+  let subscriberCount = 0;
+
+  for (const video of videos) {
+    const tags = video.hashtags?.map((h) => h.toLowerCase().replace(/^#/, "")) ?? [];
+    const titleWords = (video.title ?? "").toLowerCase().split(/\W+/).filter((w) => w.length > 3);
+    const descWords = (video.description ?? "").toLowerCase().split(/\W+/).filter((w) => w.length > 4).slice(0, 20);
+    signals.push(...tags, ...titleWords, ...descWords);
+    if (!subscriberCount) subscriberCount = video.numberOfSubscribers ?? 0;
+  }
+
+  if (signals.length === 0) throw new Error("No signals from YouTube videos");
+
+  const scored = scoreCommunities(signals, "all");
+  return buildResult(handle, "youtube", scored, subscriberCount || 25_000, 10);
+}
+
+// ─── Pinterest scraper ────────────────────────────────────────────────────────
+// Pinterest board names are direct subculture signals — "Quiet Luxury",
+// "Dark Academia", "Van Life" etc. map 1:1 to cultural identity clusters.
+
+async function scrapePinterest(handle: string): Promise<AudienceResult> {
+  const pins = await runActor<ApifyPinResult>("silentflow/pinterest-scraper-ppr", {
+    searchQueries: [handle],
+    maxItems: 30,
+    includeDetails: false,
+  }, 45);
+
+  if (pins.length === 0) throw new Error("No Pinterest pins found");
+
+  const signals: string[] = [];
+
+  for (const pin of pins) {
+    // Board names are the richest signal on Pinterest
+    const boardWords = (pin.boardName ?? "").toLowerCase().split(/\W+/).filter((w) => w.length > 2);
+    const titleWords = (pin.title ?? "").toLowerCase().split(/\W+/).filter((w) => w.length > 3);
+    const descWords = (pin.description ?? "").toLowerCase().split(/\W+/).filter((w) => w.length > 4).slice(0, 10);
+    const cats = (pin.boardCategories ?? []).map((c) => c.toLowerCase());
+    signals.push(...boardWords, ...titleWords, ...descWords, ...cats);
+  }
+
+  if (signals.length === 0) throw new Error("No signals from Pinterest pins");
+
+  const scored = scoreCommunities(signals, "all");
+  return buildResult(handle, "pinterest", scored, 10_000, 10);
+}
+
 // ─── All-platforms scraper ────────────────────────────────────────────────────
-// Runs Twitter + TikTok in parallel, merges community lists, deduplicates.
+// Runs all six scrapers in parallel, merges community lists, deduplicates.
 
 async function scrapeAll(handle: string): Promise<AudienceResult> {
-  // Run all four scrapers in parallel — no platform is prioritised over another.
-  // Scrapers that fail (handle doesn't exist on that platform) are silently skipped.
-  const [twitterResult, tiktokResult, redditResult, instagramResult] = await Promise.allSettled([
+  const [twitterResult, tiktokResult, redditResult, instagramResult, youtubeResult, pinterestResult] = await Promise.allSettled([
     scrapeTwitter(handle, "all"),
     scrapeTikTok(handle),
     scrapeReddit(handle),
     scrapeInstagram(handle),
+    scrapeYouTube(handle),
+    scrapePinterest(handle),
   ]);
 
   const results: AudienceResult[] = [];
@@ -410,6 +494,8 @@ async function scrapeAll(handle: string): Promise<AudienceResult> {
   if (tiktokResult.status === "fulfilled") results.push(tiktokResult.value);
   if (redditResult.status === "fulfilled") results.push(redditResult.value);
   if (instagramResult.status === "fulfilled") results.push(instagramResult.value);
+  if (youtubeResult.status === "fulfilled") results.push(youtubeResult.value);
+  if (pinterestResult.status === "fulfilled") results.push(pinterestResult.value);
 
   // If both failed, throw so the caller falls back to mock
   if (results.length === 0) throw new Error("All platform scrapers failed");
@@ -440,6 +526,67 @@ async function scrapeAll(handle: string): Promise<AudienceResult> {
   };
 }
 
+// ─── Niche trending content ───────────────────────────────────────────────────
+// Scrape trending content for a specific hashtag/subculture for the Signal Board.
+
+export interface TrendingItem {
+  platform: string;
+  text: string;
+  author: string;
+  engagement: number;
+  tags: string[];
+}
+
+export async function getTrendingNicheContent(
+  hashtag: string,
+  platform: "tiktok" | "twitter" | "instagram" | "all" = "tiktok"
+): Promise<TrendingItem[]> {
+  const tag = hashtag.replace(/^#/, "");
+  const items: TrendingItem[] = [];
+
+  try {
+    if (platform === "tiktok" || platform === "all") {
+      const videos = await runActor<ApifyTikTokVideo>("clockworks/tiktok-scraper", {
+        hashtags: [tag],
+        resultsPerPage: 20,
+        shouldDownloadVideos: false,
+        shouldDownloadCovers: false,
+        shouldDownloadSubtitles: false,
+      }, 45);
+      for (const v of videos) {
+        items.push({
+          platform: "tiktok",
+          text: v.text ?? "",
+          author: v.authorMeta?.name ?? "unknown",
+          engagement: (v.diggCount ?? 0) + (v.playCount ?? 0) / 100,
+          tags: v.hashtags?.map((h) => h.name) ?? [],
+        });
+      }
+    }
+
+    if (platform === "twitter" || platform === "all") {
+      const tweets = await runActor<ApifyTweet>("apify/twitter-scraper", {
+        searchTerms: [`#${tag}`],
+        maxItems: 20,
+        queryType: "Top",
+      }, 45);
+      for (const t of tweets) {
+        items.push({
+          platform: "twitter",
+          text: t.full_text ?? t.text ?? "",
+          author: (t.author as { userName?: string } | undefined)?.userName ?? "unknown",
+          engagement: t.author?.public_metrics?.followers_count ?? 0,
+          tags: t.entities?.hashtags?.map((h) => h.text) ?? [],
+        });
+      }
+    }
+  } catch (err) {
+    console.warn(`[audience-live] getTrendingNicheContent failed for #${tag}:`, err);
+  }
+
+  return items.sort((a, b) => b.engagement - a.engagement);
+}
+
 // ─── Main export ──────────────────────────────────────────────────────────────
 
 export async function getLiveAudience(
@@ -456,6 +603,10 @@ export async function getLiveAudience(
         return await scrapeTikTok(normalized);
       case "instagram":
         return await scrapeInstagram(normalized);
+      case "youtube":
+        return await scrapeYouTube(normalized);
+      case "pinterest":
+        return await scrapePinterest(normalized);
       case "twitter":
         return await scrapeTwitter(normalized, "twitter");
       case "all":

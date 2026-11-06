@@ -78,7 +78,7 @@ export function SavedPanel({ open, onClose, onSearchSelect }: SavedPanelProps) {
                       onClose();
                     }}
                   >
-                    <p className="text-sm font-medium text-foreground group-hover:text-blue-300 transition-colors truncate">
+                    <p className="text-sm font-medium text-foreground group-hover:text-indigo-400 transition-colors truncate">
                       {s.label ?? s.query}
                     </p>
                     {s.label && (

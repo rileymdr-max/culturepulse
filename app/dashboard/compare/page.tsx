@@ -149,7 +149,7 @@ function CompareColumn({ community }: { community: CommunityData }) {
 
       <Link
         href={`/dashboard/community/${encodeURIComponent(community.community_id)}`}
-        className="text-xs text-blue-400 hover:text-blue-300 text-center transition-colors"
+        className="text-xs text-indigo-500 hover:text-indigo-400 text-center transition-colors"
       >
         View full profile →
       </Link>
@@ -186,7 +186,7 @@ function ComparePageInner() {
             Back to search
           </Link>
           <div className="flex items-center gap-2">
-            <GitCompare className="h-5 w-5 text-blue-400" />
+            <GitCompare className="h-5 w-5 text-indigo-500" />
             <h1 className="text-xl font-bold text-foreground">
               Comparing {communities.length} Communities
             </h1>
@@ -200,7 +200,7 @@ function ComparePageInner() {
             <p className="text-muted-foreground">
               Select at least 2 communities from the search page to compare.
             </p>
-            <Link href="/dashboard" className="mt-4 inline-block text-blue-400 hover:text-blue-300 text-sm">
+            <Link href="/dashboard" className="mt-4 inline-block text-indigo-500 hover:text-indigo-400 text-sm">
               Go to search →
             </Link>
           </div>

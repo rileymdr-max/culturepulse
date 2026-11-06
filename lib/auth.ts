@@ -52,20 +52,31 @@ export const authOptions: NextAuthOptions = {
           email: user.email,
           name: user.name,
           image: user.image,
+          plan: user.plan,
         };
       },
     }),
   ],
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger }) {
       if (user) {
         token.id = user.id;
+        token.plan = (user as { plan?: string }).plan ?? "free";
+      }
+      // Refresh plan on session update (e.g., after Stripe webhook updates the DB)
+      if (trigger === "update" && token.id) {
+        const fresh = await prisma.user.findUnique({
+          where: { id: token.id as string },
+          select: { plan: true },
+        });
+        if (fresh) token.plan = fresh.plan;
       }
       return token;
     },
     async session({ session, token }) {
       if (session.user) {
-        session.user.id = token.id as string;
+        session.user.id    = token.id as string;
+        session.user.plan  = (token.plan as string) ?? "free";
       }
       return session;
     },

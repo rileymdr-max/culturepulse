@@ -12,6 +12,8 @@ export const AUDIENCE_PLATFORMS = [
   "twitter",
   "tiktok",
   "instagram",
+  "youtube",
+  "pinterest",
   "facebook",
   "substack",
 ] as const;

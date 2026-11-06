@@ -47,12 +47,26 @@ const envSchema = z.object({
   FACEBOOK_APP_ID: emptyStringToUndefined,
   FACEBOOK_APP_SECRET: emptyStringToUndefined,
 
+  // Anthropic — required for AI subculture generation
+  ANTHROPIC_API_KEY: emptyStringToUndefined,
+
   // Apify — optional, enables TikTok + Audience Intelligence live data
   APIFY_API_TOKEN: emptyStringToUndefined,
+
+  // Cron secret — secures the /api/monitors/run endpoint on Vercel
+  CRON_SECRET: emptyStringToUndefined,
 
   // Rate limiting (Upstash) — optional, in-memory fallback used when absent
   UPSTASH_REDIS_REST_URL: emptyUrl,
   UPSTASH_REDIS_REST_TOKEN: emptyStringToUndefined,
+
+  // Stripe — optional, billing features unavailable when absent
+  STRIPE_SECRET_KEY:      emptyStringToUndefined,
+  STRIPE_WEBHOOK_SECRET:  emptyStringToUndefined,
+  STRIPE_PRICE_STARTER:   emptyStringToUndefined,
+  STRIPE_PRICE_PRO:       emptyStringToUndefined,
+  STRIPE_PRICE_AGENCY:    emptyStringToUndefined,
+  NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: emptyStringToUndefined,
 
   // Force mock data regardless of API key presence
   FORCE_MOCK_DATA: z

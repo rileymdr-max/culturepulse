@@ -18,7 +18,7 @@ export async function GET() {
     TIKTOK_CLIENT_KEY: !!process.env.TIKTOK_CLIENT_KEY,
     INSTAGRAM_ACCESS_TOKEN: !!process.env.INSTAGRAM_ACCESS_TOKEN,
     FACEBOOK_ACCESS_TOKEN: !!process.env.FACEBOOK_ACCESS_TOKEN,
-    FORCE_MOCK_DATA: !!process.env.FORCE_MOCK_DATA,
+    FORCE_MOCK_DATA: process.env.FORCE_MOCK_DATA === "true",
     DATABASE_URL: !!process.env.DATABASE_URL,
     NEXTAUTH_SECRET: !!process.env.NEXTAUTH_SECRET,
   };

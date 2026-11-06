@@ -44,7 +44,7 @@ export function TrendingContentGrid({ content }: TrendingContentGridProps) {
                 </div>
 
                 {/* Title */}
-                <p className="text-sm text-foreground line-clamp-3 leading-relaxed flex-1 group-hover:text-blue-300 transition-colors">
+                <p className="text-sm text-foreground line-clamp-3 leading-relaxed flex-1 group-hover:text-indigo-400 transition-colors">
                   {item.title}
                 </p>
 
@@ -54,7 +54,7 @@ export function TrendingContentGrid({ content }: TrendingContentGridProps) {
                     <Heart className="h-3 w-3" />
                     {formatNumber(item.engagement)}
                   </span>
-                  <ExternalLink className="h-3.5 w-3.5 text-muted-foreground group-hover:text-blue-400 transition-colors" />
+                  <ExternalLink className="h-3.5 w-3.5 text-muted-foreground group-hover:text-indigo-500 transition-colors" />
                 </div>
               </CardContent>
             </Card>

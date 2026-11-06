@@ -88,7 +88,19 @@ export default function DashboardPage() {
             <p className="text-sm text-muted-foreground mb-4">Searching across platforms…</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {[...Array(8)].map((_, i) => (
-                <Skeleton key={i} className="h-52 rounded-xl" />
+                <div key={i} className="rounded-xl border border-border p-4 h-52 flex flex-col gap-3">
+                  <div className="flex items-center justify-between">
+                    <Skeleton className="h-5 w-16 rounded-full" />
+                    <Skeleton className="h-4 w-10 rounded" />
+                  </div>
+                  <Skeleton className="h-5 w-40" />
+                  <Skeleton className="h-3.5 w-full" />
+                  <Skeleton className="h-3.5 w-5/6" />
+                  <div className="mt-auto space-y-1.5">
+                    <Skeleton className="h-3 w-28" />
+                    <Skeleton className="h-3 w-20" />
+                  </div>
+                </div>
               ))}
             </div>
           </div>
@@ -157,6 +169,33 @@ export default function DashboardPage() {
         {/* Trending (shown before any search) */}
         {showTrending && (
           <div>
+            {/* Quick-start prompt chips */}
+            {!isTrendingLoading && (trendingData?.communities ?? []).length === 0 && (
+              <div className="mb-8 rounded-xl border border-border bg-card p-6">
+                <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-3">Try searching for</p>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    "Cottagecore aesthetic",
+                    "Dark academia",
+                    "Van life community",
+                    "Thrift flipping",
+                    "Quiet luxury fashion",
+                    "Sourdough baking",
+                    "DIY skincare",
+                    "Mushroom foraging",
+                  ].map((q) => (
+                    <button
+                      key={q}
+                      onClick={() => search({ query: q, platforms: [] })}
+                      className="px-3 py-1.5 text-sm rounded-full border border-border bg-muted/50 text-muted-foreground hover:text-foreground hover:border-indigo-500/50 hover:bg-indigo-500/5 transition-all duration-150"
+                    >
+                      {q}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="flex items-center gap-2 mb-4">
               <Zap className="h-4 w-4 text-yellow-400" />
               <h2 className="text-sm font-semibold text-foreground">Globally Trending</h2>
@@ -168,10 +207,22 @@ export default function DashboardPage() {
             {isTrendingLoading ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {[...Array(8)].map((_, i) => (
-                  <Skeleton key={i} className="h-52 rounded-xl" />
+                  <div key={i} className="rounded-xl border border-border p-4 h-52 flex flex-col gap-3">
+                    <div className="flex items-center justify-between">
+                      <Skeleton className="h-5 w-16 rounded-full" />
+                      <Skeleton className="h-4 w-10 rounded" />
+                    </div>
+                    <Skeleton className="h-5 w-40" />
+                    <Skeleton className="h-3.5 w-full" />
+                    <Skeleton className="h-3.5 w-5/6" />
+                    <div className="mt-auto space-y-1.5">
+                      <Skeleton className="h-3 w-28" />
+                      <Skeleton className="h-3 w-20" />
+                    </div>
+                  </div>
                 ))}
               </div>
-            ) : (
+            ) : (trendingData?.communities ?? []).length > 0 ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {(trendingData?.communities ?? []).map((community) => (
                   <CommunityCard
@@ -183,7 +234,7 @@ export default function DashboardPage() {
                   />
                 ))}
               </div>
-            )}
+            ) : null}
           </div>
         )}
       </main>

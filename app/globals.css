@@ -3,36 +3,36 @@
 @tailwind utilities;
 
 @layer base {
-  /* ── Light mode ─────────────────────────────────────────────────────────── */
+  /* ── Light mode (Signal White) ──────────────────────────────────────────── */
   :root {
-    --background: 210 40% 98%;
-    --foreground: 222 47% 11%;
+    --background: 225 25% 97%;       /* pale blue-gray page surface */
+    --foreground: 222 84% 11%;       /* near-black navy */
 
-    --muted: 210 40% 93%;
+    --muted: 220 20% 93%;
     --muted-foreground: 215 16% 47%;
 
-    --accent: 210 40% 90%;
-    --accent-foreground: 222 47% 11%;
+    --accent: 238 100% 96%;          /* very light indigo tint — active nav pill bg */
+    --accent-foreground: 239 72% 54%; /* indigo — active nav pill text */
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
+    --popover-foreground: 222 84% 11%;
 
-    --border: 214 32% 85%;
-    --input: 214 32% 85%;
+    --border: 220 20% 88%;
+    --input: 220 20% 88%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
+    --card: 0 0% 100%;               /* pure white cards */
+    --card-foreground: 222 84% 11%;
 
-    --primary: 222 47% 11%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 239 72% 54%;          /* indigo #4f46e5 */
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 210 40% 93%;
-    --secondary-foreground: 222 47% 11%;
+    --secondary: 220 20% 93%;
+    --secondary-foreground: 222 84% 11%;
 
     --destructive: 0 84% 60%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive-foreground: 0 0% 100%;
 
-    --ring: 215 20% 65%;
+    --ring: 239 72% 54%;
 
     --radius: 0.5rem;
   }
@@ -78,6 +78,32 @@
     @apply bg-background text-foreground;
     font-feature-settings: "rlig" 1, "calt" 1;
   }
+}
+
+/* Skeleton shimmer */
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
+}
+
+.animate-shimmer {
+  background: linear-gradient(
+    90deg,
+    hsl(var(--muted)) 0%,
+    hsl(var(--accent)) 50%,
+    hsl(var(--muted)) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
+}
+
+/* Hide scrollbar while keeping scroll behavior */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
 }
 
 /* Custom scrollbar */

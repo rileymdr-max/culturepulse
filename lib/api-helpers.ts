@@ -44,6 +44,11 @@ export function serverError(message = "Internal server error"): NextResponse {
   return NextResponse.json({ error: message }, { status: 500 });
 }
 
+/** Returns a 402 response if the user's plan is below the required tier. */
+export function paymentRequired(message = "Upgrade your plan to access this feature."): NextResponse {
+  return NextResponse.json({ error: message, code: "PLAN_LIMIT" }, { status: 402 });
+}
+
 export function tooManyRequests(retryAfterSeconds = 60): NextResponse {
   return NextResponse.json(
     { error: "Too many requests. Please slow down." },

@@ -34,7 +34,7 @@ export function TopVoicesList({ voices }: TopVoicesListProps) {
           className="flex items-center gap-3 p-3 rounded-lg border border-border hover:border-blue-800/60 hover:bg-accent/30 transition-colors group"
         >
           {/* Avatar placeholder */}
-          <div className="h-10 w-10 rounded-full bg-gradient-to-br from-blue-900 to-purple-900 border border-border flex items-center justify-center text-xs font-bold text-blue-300 shrink-0">
+          <div className="h-10 w-10 rounded-full bg-gradient-to-br from-blue-900 to-purple-900 border border-border flex items-center justify-center text-xs font-bold text-indigo-400 shrink-0">
             {voice.avatar ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
@@ -49,7 +49,7 @@ export function TopVoicesList({ voices }: TopVoicesListProps) {
 
           {/* Info */}
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-foreground truncate group-hover:text-blue-300 transition-colors">
+            <p className="text-sm font-medium text-foreground truncate group-hover:text-indigo-400 transition-colors">
               {voice.name}
             </p>
             <p className="text-xs text-muted-foreground truncate">{voice.handle}</p>
@@ -61,7 +61,7 @@ export function TopVoicesList({ voices }: TopVoicesListProps) {
             {formatNumber(voice.followers)}
           </div>
 
-          <ExternalLink className="h-3.5 w-3.5 text-muted-foreground group-hover:text-blue-400 transition-colors shrink-0" />
+          <ExternalLink className="h-3.5 w-3.5 text-muted-foreground group-hover:text-indigo-500 transition-colors shrink-0" />
         </a>
       ))}
     </div>

@@ -22,7 +22,7 @@ export const maxDuration = 90;
 
 const bodySchema = z.object({
   handle: z.string().min(1).max(100).trim(),
-  platform: z.enum(["all", "reddit", "twitter", "tiktok", "instagram", "facebook", "substack"]),
+  platform: z.enum(["all", "reddit", "twitter", "tiktok", "instagram", "youtube", "pinterest", "facebook", "substack"]),
 });
 
 export async function POST(req: NextRequest) {
@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
   }
 
   const { handle, platform } = parsed.data;
-  const useApify = !!process.env.APIFY_API_TOKEN && !process.env.FORCE_MOCK_DATA;
+  const useApify = !!process.env.APIFY_API_TOKEN && process.env.FORCE_MOCK_DATA !== "true";
 
   try {
     const result = useApify

@@ -14,5 +14,14 @@ export default async function DashboardLayout({
   const session = await getServerSession(authOptions);
   if (!session) redirect("/login");
 
-  return <>{children}</>;
+  return (
+    <>
+      {children}
+      <footer className="border-t border-border/40 py-4 px-6 text-center">
+        <p className="text-[11px] text-muted-foreground/50">
+          Intelligence profiles and content briefs are generated with the assistance of Claude by Anthropic.
+        </p>
+      </footer>
+    </>
+  );
 }

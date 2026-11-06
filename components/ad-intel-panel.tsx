@@ -114,8 +114,8 @@ function TabButton({
 }
 
 function AdCard({ ad, platform }: { ad: AdIntelItem; platform: "meta" | "tiktok" }) {
-  const accentColor = platform === "tiktok" ? "text-pink-400" : "text-blue-400";
-  const accentBg = platform === "tiktok" ? "bg-pink-400/10" : "bg-blue-400/10";
+  const accentColor = platform === "tiktok" ? "text-pink-400" : "text-indigo-500";
+  const accentBg = platform === "tiktok" ? "bg-pink-400/10" : "bg-indigo-500/10";
 
   return (
     <a

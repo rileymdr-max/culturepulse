@@ -19,17 +19,21 @@ const PLATFORM_LABELS: Record<string, string> = {
   twitter: "X / Twitter",
   tiktok: "TikTok",
   instagram: "Instagram",
+  youtube: "YouTube",
+  pinterest: "Pinterest",
   facebook: "Facebook",
   substack: "Substack",
 };
 
 // Platform-specific handle format hints
 const PLATFORM_HINTS: Record<string, { placeholder: string; prefix: string; note?: string }> = {
-  all:       { placeholder: "handle", prefix: "@", note: "Scrapes Twitter, TikTok, Reddit, and Instagram simultaneously — platforms where the handle isn't found are skipped automatically" },
+  all:       { placeholder: "handle", prefix: "@", note: "Scrapes Twitter, TikTok, Reddit, Instagram, YouTube, and Pinterest simultaneously — platforms where the handle isn't found are skipped automatically" },
   twitter:   { placeholder: "twitterhandle", prefix: "@" },
   reddit:    { placeholder: "username", prefix: "u/", note: "Enter your Reddit username without u/" },
   tiktok:    { placeholder: "tiktokhandle", prefix: "@" },
   instagram: { placeholder: "instagramhandle", prefix: "@" },
+  youtube:   { placeholder: "channelname", prefix: "", note: "Searches YouTube for videos mentioning this brand" },
+  pinterest: { placeholder: "brandname", prefix: "", note: "Searches Pinterest pins and boards mentioning this brand" },
   facebook:  { placeholder: "profilename", prefix: "", note: "Facebook has no public scraper — returns estimated data" },
   substack:  { placeholder: "substackhandle", prefix: "@", note: "Substack uses estimated data" },
 };
@@ -185,7 +189,7 @@ export default function AudiencePage() {
             {/* Community cards */}
             <div className="space-y-3">
               <h2 className="text-sm font-semibold text-foreground">
-                Top communities for <span className="text-blue-400">{data.handle}</span>
+                Top communities for <span className="text-indigo-500">{data.handle}</span>
               </h2>
               {data.communities.map((community) => (
                 <AudienceCommunityCard key={community.community_id} community={community} />
@@ -231,10 +235,10 @@ import type { AudienceCommunity } from "@/lib/platforms/audience";
 function AudienceCommunityCard({ community }: { community: AudienceCommunity }) {
   const barColor =
     community.overlap_pct >= 40
-      ? "bg-blue-500"
+      ? "bg-indigo-500"
       : community.overlap_pct >= 20
-      ? "bg-blue-400/70"
-      : "bg-blue-400/40";
+      ? "bg-indigo-500/70"
+      : "bg-indigo-500/40";
 
   return (
     <Card className="hover:border-border/80 transition-colors">
@@ -288,7 +292,7 @@ function AudienceCommunityCard({ community }: { community: AudienceCommunity }) 
               </p>
               <Link
                 href={`/dashboard/community/${encodeURIComponent(community.community_id)}`}
-                className="inline-flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 transition-colors"
+                className="inline-flex items-center gap-1 text-xs text-indigo-500 hover:text-indigo-400 transition-colors"
               >
                 View community
                 <ChevronRight className="h-3 w-3" />
