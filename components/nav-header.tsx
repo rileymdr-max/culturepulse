@@ -56,7 +56,7 @@ export function NavHeader({ onOpenSaved, compareCount = 0, onOpenCompare }: NavH
           {navLinks.map((link) => {
             if ("adminOnly" in link && link.adminOnly && session?.user?.email !== "rileymdr@gmail.com") return null;
             if ("agencyOnly" in link && link.agencyOnly && currentPlan !== "agency") return null;
-            const active = link.exact ? pathname === link.href : pathname.startsWith(link.href);
+            const active = "exact" in link && link.exact ? pathname === link.href : pathname.startsWith(link.href);
             return (
               <Link
                 key={link.href}
