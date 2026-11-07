@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { ArrowLeft, Palette, Globe, CheckCircle, Loader2, AlertCircle, Eye } from "lucide-react";
 import Link from "next/link";
@@ -24,6 +24,14 @@ const PRESET_COLORS = [
 ];
 
 export default function BrandingPage() {
+  return (
+    <Suspense>
+      <BrandingPageInner />
+    </Suspense>
+  );
+}
+
+function BrandingPageInner() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const workspaceId = searchParams.get("id") ?? "";

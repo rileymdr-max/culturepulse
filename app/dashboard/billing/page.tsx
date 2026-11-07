@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   CheckCircle, AlertCircle, CreditCard, Zap, ArrowRight,
@@ -160,6 +160,14 @@ function PlanCard({ planId, currentPlanId }: { planId: PlanId; currentPlanId: Pl
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function BillingPage() {
+  return (
+    <Suspense>
+      <BillingPageInner />
+    </Suspense>
+  );
+}
+
+function BillingPageInner() {
   const searchParams = useSearchParams();
   const [banner, setBanner] = useState<"success" | "canceled" | null>(null);
 
