@@ -22,15 +22,14 @@ export function NavHeader({ onOpenSaved, compareCount = 0, onOpenCompare }: NavH
   const plan = PLANS[currentPlan];
 
   const navLinks = [
-    { href: "/dashboard", label: "Search", exact: true },
+    { href: "/dashboard/search", label: "Search" },
     { href: "/dashboard/subcultures", label: "Library" },
     { href: "/dashboard/monitors", label: "Signals" },
     { href: "/dashboard/briefs", label: "Briefs" },
     { href: "/dashboard/compare", label: "Compare" },
-    { href: "/dashboard/audience", label: "Audience" },
-    { href: "/dashboard/brand-audit", label: "Brand Audit" },
-    { href: "/dashboard/tracked", label: "Tracked" },
+    { href: "/dashboard/brand-audit", label: "Audience Audit" },
     { href: "/dashboard/workspace", label: "Workspace", agencyOnly: true },
+    { href: "/dashboard/admin", label: "Admin", adminOnly: true },
   ];
 
   return (
@@ -55,6 +54,7 @@ export function NavHeader({ onOpenSaved, compareCount = 0, onOpenCompare }: NavH
         {/* Nav links */}
         <nav className="flex items-center gap-1 flex-1 overflow-x-auto scrollbar-hide">
           {navLinks.map((link) => {
+            if ("adminOnly" in link && link.adminOnly && session?.user?.email !== "rileymdr@gmail.com") return null;
             if ("agencyOnly" in link && link.agencyOnly && currentPlan !== "agency") return null;
             const active = link.exact ? pathname === link.href : pathname.startsWith(link.href);
             return (

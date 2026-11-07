@@ -1,309 +1,203 @@
 "use client";
 
-import { useState, useCallback } from "react";
-import { Bookmark, Zap, AlertCircle, CheckCircle2, Clock } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useSession } from "next-auth/react";
+import Link from "next/link";
+import {
+  Search,
+  Radio,
+  Users,
+  BookOpen,
+  FileText,
+  ArrowRight,
+  Clock,
+  TrendingUp,
+  Layers,
+} from "lucide-react";
 import { NavHeader } from "@/components/nav-header";
-import { SearchBar } from "@/components/search-bar";
-import { CommunityCard } from "@/components/community-card";
-import { CompareBar } from "@/components/compare-bar";
-import { SavedPanel } from "@/components/saved-panel";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Button } from "@/components/ui/button";
-import { PlatformBadge } from "@/components/platform-badge";
-import { useTrending } from "@/hooks/use-trending";
-import { useSearch } from "@/hooks/use-search";
-import type { CommunityData } from "@/lib/platforms/types";
-import type { PlatformStatus } from "@/lib/platforms";
 
-export default function DashboardPage() {
-  const [savedOpen, setSavedOpen] = useState(false);
-  const [compareList, setCompareList] = useState<CommunityData[]>([]);
-  const [saveFeedback, setSaveFeedback] = useState<"idle" | "saving" | "saved">("idle");
+const RECENT_SEARCHES_KEY = "speedbag:recent-searches";
+const AUDIT_SESSION_KEY = "culturepulse-audience-audit";
 
-  const { search, data: searchData, isLoading: isSearching, error: searchError, lastParams, saveSearch } = useSearch();
-  const { data: trendingData, isLoading: isTrendingLoading } = useTrending(12);
+function getRecentSearches(): string[] {
+  try {
+    return JSON.parse(localStorage.getItem(RECENT_SEARCHES_KEY) ?? "[]");
+  } catch { return []; }
+}
 
-  const communities = searchData?.communities ?? [];
-  const showTrending = !searchData && !isSearching;
+function hasActiveAudit(): boolean {
+  try {
+    const raw = sessionStorage.getItem(AUDIT_SESSION_KEY);
+    if (!raw) return false;
+    const parsed = JSON.parse(raw);
+    return !!(parsed?.audit || parsed?.audience);
+  } catch { return false; }
+}
 
-  // ── Compare management ──────────────────────────────────────────────────────
-  const toggleCompare = useCallback((community: CommunityData) => {
-    setCompareList((prev) => {
-      const exists = prev.some((c) => c.community_id === community.community_id);
-      if (exists) return prev.filter((c) => c.community_id !== community.community_id);
-      if (prev.length >= 4) return prev;
-      return [...prev, community];
-    });
+function getGreeting(name?: string | null): string {
+  const hour = new Date().getHours();
+  const time = hour < 12 ? "morning" : hour < 17 ? "afternoon" : "evening";
+  const first = name?.split(" ")[0];
+  return first ? `Good ${time}, ${first}` : `Good ${time}`;
+}
+
+const ACTIONS = [
+  {
+    href: "/dashboard/search",
+    icon: Search,
+    label: "New Search",
+    description: "Find micro-communities across Reddit, X, TikTok, and more",
+    accent: "indigo",
+  },
+  {
+    href: "/dashboard/brand-audit",
+    icon: Users,
+    label: "Audience Audit",
+    description: "Map a brand's subculture DNA and surface new community fits",
+    accent: "violet",
+  },
+  {
+    href: "/dashboard/monitors",
+    icon: Radio,
+    label: "Signals",
+    description: "Track trends and momentum across your monitored communities",
+    accent: "emerald",
+  },
+  {
+    href: "/dashboard/briefs",
+    icon: FileText,
+    label: "Briefs",
+    description: "Generate and review content briefs from your signal data",
+    accent: "amber",
+  },
+  {
+    href: "/dashboard/subcultures",
+    icon: Layers,
+    label: "Library",
+    description: "Browse and manage the full subculture profile collection",
+    accent: "sky",
+  },
+] as const;
+
+type Accent = (typeof ACTIONS)[number]["accent"];
+
+const ACCENT_STYLES: Record<Accent, { card: string; icon: string; arrow: string }> = {
+  indigo: {
+    card: "hover:border-indigo-500/40 hover:bg-indigo-500/5",
+    icon: "bg-indigo-500/15 text-indigo-400",
+    arrow: "text-indigo-400",
+  },
+  violet: {
+    card: "hover:border-violet-500/40 hover:bg-violet-500/5",
+    icon: "bg-violet-500/15 text-violet-400",
+    arrow: "text-violet-400",
+  },
+  emerald: {
+    card: "hover:border-emerald-500/40 hover:bg-emerald-500/5",
+    icon: "bg-emerald-500/15 text-emerald-400",
+    arrow: "text-emerald-400",
+  },
+  amber: {
+    card: "hover:border-amber-500/40 hover:bg-amber-500/5",
+    icon: "bg-amber-500/15 text-amber-400",
+    arrow: "text-amber-400",
+  },
+  sky: {
+    card: "hover:border-sky-500/40 hover:bg-sky-500/5",
+    icon: "bg-sky-500/15 text-sky-400",
+    arrow: "text-sky-400",
+  },
+};
+
+export default function WelcomePage() {
+  const { data: session } = useSession();
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  const [auditActive, setAuditActive] = useState(false);
+
+  useEffect(() => {
+    setRecentSearches(getRecentSearches().slice(0, 4));
+    setAuditActive(hasActiveAudit());
   }, []);
 
-  // ── Save current search ─────────────────────────────────────────────────────
-  const handleSave = async () => {
-    setSaveFeedback("saving");
-    await saveSearch();
-    setSaveFeedback("saved");
-    setTimeout(() => setSaveFeedback("idle"), 2000);
-  };
-
-  // ── Restore saved search ────────────────────────────────────────────────────
-  const handleSavedSelect = (query: string, platforms: string[]) => {
-    search({ query, platforms });
-  };
+  const greeting = getGreeting(session?.user?.name ?? session?.user?.email);
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      <NavHeader
-        onOpenSaved={() => setSavedOpen(true)}
-        compareCount={compareList.length}
-      />
+      <NavHeader />
 
-      <main className="flex-1 max-w-screen-xl mx-auto w-full px-4 sm:px-6 py-8 pb-24">
-        {/* Search section */}
-        <div className="mb-8">
-          <h1 className="text-2xl font-bold text-foreground mb-1">
-            Discover Micro-Communities
+      <main className="flex-1 max-w-screen-lg mx-auto w-full px-4 sm:px-6 py-10 sm:py-16">
+        {/* Greeting */}
+        <div className="mb-10">
+          <h1 className="text-3xl sm:text-4xl font-bold text-foreground tracking-tight">
+            {greeting}
           </h1>
-          <p className="text-muted-foreground text-sm mb-6">
-            Search any subculture, niche, or interest across Reddit, X, TikTok, Instagram, Facebook, and Substack.
+          <p className="mt-2 text-muted-foreground">
+            Where would you like to start?
           </p>
-          <SearchBar
-            onSearch={(query, platforms) => search({ query, platforms })}
-            isLoading={isSearching}
-          />
         </div>
 
-        {/* Platform status bar */}
-        <PlatformStatusBar statuses={searchData?.platformStatuses} />
-
-        {/* Error state */}
-        {searchError && (
-          <div className="rounded-lg border border-red-800 bg-red-950/30 px-4 py-3 text-sm text-red-400 flex items-center gap-2 mb-6">
-            <AlertCircle className="h-4 w-4 shrink-0" />
-            {searchError.message}
-          </div>
-        )}
-
-        {/* Loading skeletons */}
-        {isSearching && (
-          <div>
-            <p className="text-sm text-muted-foreground mb-4">Searching across platforms…</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {[...Array(8)].map((_, i) => (
-                <div key={i} className="rounded-xl border border-border p-4 h-52 flex flex-col gap-3">
-                  <div className="flex items-center justify-between">
-                    <Skeleton className="h-5 w-16 rounded-full" />
-                    <Skeleton className="h-4 w-10 rounded" />
-                  </div>
-                  <Skeleton className="h-5 w-40" />
-                  <Skeleton className="h-3.5 w-full" />
-                  <Skeleton className="h-3.5 w-5/6" />
-                  <div className="mt-auto space-y-1.5">
-                    <Skeleton className="h-3 w-28" />
-                    <Skeleton className="h-3 w-20" />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Search results */}
-        {!isSearching && communities.length > 0 && (
-          <div>
-            <div className="flex items-center justify-between mb-4 gap-4 flex-wrap">
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">
-                  {communities.length} communities found for
-                </span>
-                <span className="text-sm font-medium text-foreground">
-                  "{searchData?.query}"
-                </span>
-                {/* Platform source indicators */}
-                <div className="flex gap-1">
-                  {Object.entries(searchData?.sources ?? {}).map(([platform, live]) => (
-                    <PlatformBadge
-                      key={platform}
-                      platform={platform}
-                      showDot={live}
-                      className={live ? "" : "opacity-50"}
-                    />
-                  ))}
-                </div>
-              </div>
-
-              {/* Save search button */}
-              {lastParams && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-1.5"
-                  onClick={handleSave}
-                  disabled={saveFeedback !== "idle"}
-                >
-                  <Bookmark className="h-3.5 w-3.5" />
-                  {saveFeedback === "saving" ? "Saving…" : saveFeedback === "saved" ? "Saved!" : "Save search"}
-                </Button>
-              )}
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {communities.map((community) => (
-                <CommunityCard
-                  key={community.community_id}
-                  community={community}
-                  isSelected={compareList.some((c) => c.community_id === community.community_id)}
-                  onToggleCompare={toggleCompare}
-                  compareDisabled={compareList.length >= 4}
-                />
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* No results */}
-        {!isSearching && searchData && communities.length === 0 && (
-          <div className="text-center py-16">
-            <p className="text-muted-foreground">No communities found. Try a different query.</p>
-          </div>
-        )}
-
-        {/* Trending (shown before any search) */}
-        {showTrending && (
-          <div>
-            {/* Quick-start prompt chips */}
-            {!isTrendingLoading && (trendingData?.communities ?? []).length === 0 && (
-              <div className="mb-8 rounded-xl border border-border bg-card p-6">
-                <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-3">Try searching for</p>
-                <div className="flex flex-wrap gap-2">
-                  {[
-                    "Cottagecore aesthetic",
-                    "Dark academia",
-                    "Van life community",
-                    "Thrift flipping",
-                    "Quiet luxury fashion",
-                    "Sourdough baking",
-                    "DIY skincare",
-                    "Mushroom foraging",
-                  ].map((q) => (
-                    <button
-                      key={q}
-                      onClick={() => search({ query: q, platforms: [] })}
-                      className="px-3 py-1.5 text-sm rounded-full border border-border bg-muted/50 text-muted-foreground hover:text-foreground hover:border-indigo-500/50 hover:bg-indigo-500/5 transition-all duration-150"
-                    >
-                      {q}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
+        {/* Continue section — only shown when there's something to continue */}
+        {(auditActive || recentSearches.length > 0) && (
+          <section className="mb-10">
             <div className="flex items-center gap-2 mb-4">
-              <Zap className="h-4 w-4 text-yellow-400" />
-              <h2 className="text-sm font-semibold text-foreground">Globally Trending</h2>
-              {isTrendingLoading && (
-                <span className="text-xs text-muted-foreground">Loading…</span>
+              <Clock className="h-4 w-4 text-muted-foreground" />
+              <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                Continue where you left off
+              </h2>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {auditActive && (
+                <Link
+                  href="/dashboard/brand-audit"
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-violet-500/30 bg-violet-500/10 text-sm text-violet-300 hover:bg-violet-500/15 hover:border-violet-500/50 transition-all duration-150"
+                >
+                  <TrendingUp className="h-3.5 w-3.5" />
+                  Resume Audience Audit
+                  <ArrowRight className="h-3 w-3 opacity-60" />
+                </Link>
               )}
+              {recentSearches.map((q) => (
+                <Link
+                  key={q}
+                  href={`/dashboard/search?q=${encodeURIComponent(q)}`}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-border bg-muted/40 text-sm text-muted-foreground hover:text-foreground hover:border-indigo-500/30 hover:bg-indigo-500/5 transition-all duration-150"
+                >
+                  <Search className="h-3.5 w-3.5" />
+                  {q}
+                </Link>
+              ))}
             </div>
-
-            {isTrendingLoading ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {[...Array(8)].map((_, i) => (
-                  <div key={i} className="rounded-xl border border-border p-4 h-52 flex flex-col gap-3">
-                    <div className="flex items-center justify-between">
-                      <Skeleton className="h-5 w-16 rounded-full" />
-                      <Skeleton className="h-4 w-10 rounded" />
-                    </div>
-                    <Skeleton className="h-5 w-40" />
-                    <Skeleton className="h-3.5 w-full" />
-                    <Skeleton className="h-3.5 w-5/6" />
-                    <div className="mt-auto space-y-1.5">
-                      <Skeleton className="h-3 w-28" />
-                      <Skeleton className="h-3 w-20" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (trendingData?.communities ?? []).length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {(trendingData?.communities ?? []).map((community) => (
-                  <CommunityCard
-                    key={community.community_id}
-                    community={community}
-                    isSelected={compareList.some((c) => c.community_id === community.community_id)}
-                    onToggleCompare={toggleCompare}
-                    compareDisabled={compareList.length >= 4}
-                  />
-                ))}
-              </div>
-            ) : null}
-          </div>
+          </section>
         )}
+
+        {/* Primary action grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {ACTIONS.map((action) => {
+            const styles = ACCENT_STYLES[action.accent];
+            const Icon = action.icon;
+            return (
+              <Link
+                key={action.href}
+                href={action.href}
+                className={`group flex flex-col gap-4 p-5 rounded-xl border border-border bg-card transition-all duration-200 ${styles.card}`}
+              >
+                <div className="flex items-start justify-between">
+                  <div className={`p-2.5 rounded-lg ${styles.icon}`}>
+                    <Icon className="h-5 w-5" />
+                  </div>
+                  <ArrowRight className={`h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity mt-0.5 ${styles.arrow}`} />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-foreground mb-1">{action.label}</h3>
+                  <p className="text-sm text-muted-foreground leading-relaxed">
+                    {action.description}
+                  </p>
+                </div>
+              </Link>
+            );
+          })}
+        </div>
       </main>
-
-      {/* Compare floating bar */}
-      <CompareBar
-        communities={compareList}
-        onRemove={(id) => setCompareList((prev) => prev.filter((c) => c.community_id !== id))}
-        onClear={() => setCompareList([])}
-      />
-
-      {/* Saved searches panel */}
-      <SavedPanel
-        open={savedOpen}
-        onClose={() => setSavedOpen(false)}
-        onSearchSelect={handleSavedSelect}
-      />
-    </div>
-  );
-}
-
-// ─── Platform Status Bar ──────────────────────────────────────────────────────
-
-function PlatformStatusBar({ statuses }: { statuses?: PlatformStatus[] }) {
-  const [expanded, setExpanded] = useState(false);
-
-  if (!statuses) return null;
-
-  const live = statuses.filter((s) => s.live);
-  const pending = statuses.filter((s) => !s.live);
-
-  return (
-    <div className="mb-6 rounded-lg border border-border bg-card px-4 py-3 text-sm">
-      <div className="flex items-center justify-between gap-2 flex-wrap">
-        <div className="flex items-center gap-3 flex-wrap">
-          <span className="text-muted-foreground text-xs font-medium">Data sources:</span>
-          <div className="flex items-center gap-2 flex-wrap">
-            {live.map((s) => (
-              <span key={s.platform} className="inline-flex items-center gap-1 text-xs text-green-400 font-medium">
-                <CheckCircle2 className="h-3 w-3" />
-                {s.label}
-              </span>
-            ))}
-            {pending.map((s) => (
-              <span key={s.platform} className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                <Clock className="h-3 w-3" />
-                {s.label}
-              </span>
-            ))}
-          </div>
-        </div>
-        <button
-          onClick={() => setExpanded((e) => !e)}
-          className="text-xs text-muted-foreground hover:text-foreground transition-colors shrink-0"
-        >
-          {expanded ? "Hide details" : `${pending.length} pending`}
-        </button>
-      </div>
-
-      {expanded && pending.length > 0 && (
-        <div className="mt-3 pt-3 border-t border-border space-y-1.5">
-          {pending.map((s) => (
-            <div key={s.platform} className="flex items-center justify-between text-xs">
-              <span className="text-muted-foreground">{s.label}</span>
-              <span className="text-muted-foreground/60">{s.reason}</span>
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   );
 }
