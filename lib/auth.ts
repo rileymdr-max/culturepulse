@@ -10,6 +10,7 @@ import { PrismaAdapter } from "@auth/prisma-adapter";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { getEffectivePlan } from "@/lib/admin";
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -75,8 +76,8 @@ export const authOptions: NextAuthOptions = {
     },
     async session({ session, token }) {
       if (session.user) {
-        session.user.id    = token.id as string;
-        session.user.plan  = (token.plan as string) ?? "free";
+        session.user.id   = token.id as string;
+        session.user.plan = getEffectivePlan(session.user.email, (token.plan as string) ?? "free");
       }
       return session;
     },
