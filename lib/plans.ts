@@ -102,6 +102,14 @@ export const PLANS: Record<PlanId, Plan> = {
 
 export const PLAN_ORDER: PlanId[] = ["free", "starter", "pro", "agency"];
 
+const ADMIN_EMAIL = "rileymdr@gmail.com";
+
+/** Returns "agency" for the admin user so all plan checks pass at every layer. */
+export function getEffectivePlan(email: string | null | undefined, dbPlan: string): PlanId {
+  if (email === ADMIN_EMAIL) return "agency";
+  return dbPlan as PlanId;
+}
+
 export function getPlan(planId: string): Plan {
   return PLANS[planId as PlanId] ?? PLANS.free;
 }

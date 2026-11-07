@@ -1,7 +1,9 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { NextResponse } from "next/server";
-import type { PlanId } from "@/lib/plans";
+import { getEffectivePlan } from "@/lib/plans";
+
+export { getEffectivePlan };
 
 const ADMIN_EMAIL = "rileymdr@gmail.com";
 
@@ -21,10 +23,4 @@ export async function requireAdmin(): Promise<
 
 export function isAdmin(email?: string | null): boolean {
   return email === ADMIN_EMAIL;
-}
-
-/** Returns "agency" for the admin user so all plan checks pass. */
-export function getEffectivePlan(email: string | null | undefined, dbPlan: string): PlanId {
-  if (isAdmin(email)) return "agency";
-  return dbPlan as PlanId;
 }

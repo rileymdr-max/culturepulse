@@ -10,7 +10,7 @@ import { PrismaAdapter } from "@auth/prisma-adapter";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { getEffectivePlan } from "@/lib/admin";
+import { getEffectivePlan } from "@/lib/plans";
 
 const loginSchema = z.object({
   email: z.string().email(),
