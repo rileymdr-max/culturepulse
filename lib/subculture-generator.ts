@@ -25,7 +25,6 @@ const PROFILE_TOOL = {
   name: "generate_subculture_profile",
   description:
     "Generate a complete, operationally accurate subculture intelligence profile for Speedbag",
-  strict: true,
   input_schema: {
     type: "object",
     additionalProperties: false,
@@ -242,7 +241,6 @@ export async function generateSubcultureProfile(
   const stream = client.messages.stream({
     model: "claude-opus-5-5",
     max_tokens: 8000,
-    thinking: { type: "adaptive" },
     system: SYSTEM_PROMPT,
     tools: [PROFILE_TOOL],
     messages: [
