@@ -3,7 +3,7 @@ import { z } from "zod";
 import { requireSession, badRequest, serverError, paymentRequired } from "@/lib/api-helpers";
 import { canGenerateBrief } from "@/lib/plans";
 import { getEffectivePlan } from "@/lib/admin";
-import { prisma } from "@/lib/prisma";
+import { prisma, withDbRetry } from "@/lib/prisma";
 import { generateContentBrief, type BriefTopPost } from "@/lib/content-intelligence";
 import { computeAccelerationSignal } from "@/lib/acceleration";
 
@@ -57,22 +57,32 @@ export async function POST(req: NextRequest) {
   const { subcultureId, subcultureSlug, monitorId } = parsed.data;
 
   try {
-    const user = await prisma.user.findUnique({ where: { id: session.user.id }, select: { plan: true } });
-    if (!user) return serverError("User not found.");
-
-    if (!canGenerateBrief(getEffectivePlan(session.user.email, user.plan))) {
-      return paymentRequired("Content brief generation is available on Starter and above. Upgrade to generate briefs.");
+    // Admin always gets agency plan — skip DB lookup for plan check
+    const effectivePlan = getEffectivePlan(session.user.email, "free");
+    if (effectivePlan === "free") {
+      // Non-admin: look up actual plan from DB
+      const user = await withDbRetry(() =>
+        prisma.user.findUnique({ where: { id: session.user.id }, select: { plan: true } })
+      );
+      if (!user) return serverError("User not found.");
+      if (!canGenerateBrief(user.plan)) {
+        return paymentRequired("Content brief generation is available on Starter and above. Upgrade to generate briefs.");
+      }
     }
 
-    let subculture = subcultureId
-      ? await prisma.subculture.findUnique({ where: { id: subcultureId } })
-      : await prisma.subculture.findUnique({ where: { slug: subcultureSlug! } });
+    let subculture = await withDbRetry(() =>
+      subcultureId
+        ? prisma.subculture.findUnique({ where: { id: subcultureId } })
+        : prisma.subculture.findUnique({ where: { slug: subcultureSlug! } })
+    );
     // Fallback: if slug didn't match (Claude may generate slugs that differ from DB), try name search
     if (!subculture && subcultureSlug) {
       const nameGuess = subcultureSlug.replace(/-/g, " ");
-      subculture = await prisma.subculture.findFirst({
-        where: { name: { contains: nameGuess, mode: "insensitive" } },
-      });
+      subculture = await withDbRetry(() =>
+        prisma.subculture.findFirst({
+          where: { name: { contains: nameGuess, mode: "insensitive" } },
+        })
+      );
     }
     if (!subculture) return NextResponse.json({ error: "Subculture not found" }, { status: 404 });
 
@@ -115,7 +125,7 @@ export async function POST(req: NextRequest) {
 
     const generated = await generateContentBrief(subculture, signalContext);
 
-    const brief = await prisma.contentBrief.create({
+    const brief = await withDbRetry(() => prisma.contentBrief.create({
       data: {
         userId: session.user.id,
         subcultureId: subculture.id,
@@ -134,7 +144,7 @@ export async function POST(req: NextRequest) {
           select: { id: true, name: true, slug: true, category: true },
         },
       },
-    });
+    }));
 
     console.log(`[briefs] Created "${brief.headline}" for ${subculture.name}`);
     return NextResponse.json({ brief }, { status: 201 });

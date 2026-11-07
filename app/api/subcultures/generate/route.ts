@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireSession, badRequest, serverError } from "@/lib/api-helpers";
 import { generateSubcultureProfile } from "@/lib/subculture-generator";
-import { prisma } from "@/lib/prisma";
+import { prisma, withDbRetry } from "@/lib/prisma";
 
 // Claude generation + DB write can take up to 90 seconds
 export const maxDuration = 120;
@@ -39,14 +39,14 @@ export async function POST(req: NextRequest) {
     }
 
     // Return existing profile if slug already exists (idempotent)
-    const existing = await prisma.subculture.findUnique({
-      where: { slug: profile.slug },
-    });
+    const existing = await withDbRetry(() =>
+      prisma.subculture.findUnique({ where: { slug: profile.slug } })
+    );
     if (existing) {
       return NextResponse.json({ subculture: existing, saved: false, existing: true });
     }
 
-    const subculture = await prisma.subculture.create({
+    const subculture = await withDbRetry(() => prisma.subculture.create({
       data: {
         slug: profile.slug,
         name: profile.name,
@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
         generatedByAi: true,
         reviewedBy: null,
       },
-    });
+    }));
 
     console.log(`[subcultures/generate] Created "${subculture.name}" (${subculture.id})`);
 
