@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireSession, badRequest, serverError, paymentRequired } from "@/lib/api-helpers";
 import { canGenerateBrief } from "@/lib/plans";
-import { isAdmin } from "@/lib/admin";
+import { getEffectivePlan } from "@/lib/admin";
 import { prisma } from "@/lib/prisma";
 import { generateContentBrief, type BriefTopPost } from "@/lib/content-intelligence";
 import { computeAccelerationSignal } from "@/lib/acceleration";
@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
     const user = await prisma.user.findUnique({ where: { id: session.user.id }, select: { plan: true } });
     if (!user) return serverError("User not found.");
 
-    if (!isAdmin(session.user.email) && !canGenerateBrief(user.plan)) {
+    if (!canGenerateBrief(getEffectivePlan(session.user.email, user.plan))) {
       return paymentRequired("Content brief generation is available on Starter and above. Upgrade to generate briefs.");
     }
 

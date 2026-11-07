@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireSession, badRequest, serverError, paymentRequired } from "@/lib/api-helpers";
 import { canCreateMonitor } from "@/lib/plans";
+import { getEffectivePlan } from "@/lib/admin";
 import { prisma } from "@/lib/prisma";
 import { computeAccelerationSignal } from "@/lib/acceleration";
 
@@ -67,7 +68,7 @@ export async function POST(req: NextRequest) {
     if (!user) return serverError("User not found.");
 
     const currentCount = await prisma.monitor.count({ where: { userId: session.user.id } });
-    if (!canCreateMonitor(user.plan, currentCount)) {
+    if (!canCreateMonitor(getEffectivePlan(session.user.email, user.plan), currentCount)) {
       return paymentRequired(
         `You've reached the monitor limit for your ${user.plan} plan. Upgrade to add more monitors.`
       );

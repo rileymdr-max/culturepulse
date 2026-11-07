@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireSession, badRequest, serverError, paymentRequired } from "@/lib/api-helpers";
 import { prisma } from "@/lib/prisma";
 import { canCreateWorkspace } from "@/lib/plans";
+import { getEffectivePlan } from "@/lib/admin";
 
 const createSchema = z.object({
   name: z.string().min(2).max(60),
@@ -56,7 +57,7 @@ export async function POST(req: NextRequest) {
 
     const existing = await prisma.workspace.count({ where: { ownerId: session.user.id } });
 
-    if (!canCreateWorkspace(user.plan, existing)) {
+    if (!canCreateWorkspace(getEffectivePlan(session.user.email, user.plan), existing)) {
       return paymentRequired("Workspaces are available on the Agency plan. Upgrade to create a workspace.");
     }
 
