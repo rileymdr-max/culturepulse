@@ -16,9 +16,9 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const { ran, failed } = await runAllActiveMonitors();
-    console.log(`[monitors/run] ran=${ran} failed=${failed}`);
-    return NextResponse.json({ ran, failed, ranAt: new Date().toISOString() });
+    const { ran, failed, skipped } = await runAllActiveMonitors();
+    console.log(`[monitors/run] ran=${ran} failed=${failed} skipped=${skipped}`);
+    return NextResponse.json({ ran, failed, skipped, ranAt: new Date().toISOString() });
   } catch (err) {
     console.error("[monitors/run]", err);
     return NextResponse.json({ error: "Run failed" }, { status: 500 });

@@ -132,23 +132,35 @@ export async function runMonitor(
   });
 }
 
-export async function runAllActiveMonitors(): Promise<{ ran: number; failed: number }> {
+// Run monitors sequentially so Apify actor concurrency stays predictable
+// and we don't exhaust the Vercel function timeout with parallel runs.
+export async function runAllActiveMonitors(): Promise<{ ran: number; failed: number; skipped: number }> {
   const monitors = await prisma.monitor.findMany({
     where: { status: "active" },
     include: { subculture: true },
+    orderBy: { lastRunAt: "asc" }, // oldest first so stale ones are prioritised
   });
 
   let ran = 0;
   let failed = 0;
+  let skipped = 0;
+  const startedAt = Date.now();
+  const BUDGET_MS = 240_000; // leave 60s buffer inside the 300s maxDuration
 
-  const results = await Promise.allSettled(monitors.map((m) => runMonitor(m)));
-  for (const r of results) {
-    if (r.status === "fulfilled") ran++;
-    else {
+  for (const m of monitors) {
+    if (Date.now() - startedAt > BUDGET_MS) {
+      skipped++;
+      console.warn(`[monitor-engine] budget exceeded — skipping ${m.id}`);
+      continue;
+    }
+    try {
+      await runMonitor(m);
+      ran++;
+    } catch (err) {
       failed++;
-      console.error("[monitor-engine] run failed:", r.reason);
+      console.error(`[monitor-engine] run failed for ${m.id}:`, err);
     }
   }
 
-  return { ran, failed };
+  return { ran, failed, skipped };
 }

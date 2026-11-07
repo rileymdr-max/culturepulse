@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import {
   TrendingUp, TrendingDown, Minus, Trash2, Pause, Play,
-  AlertCircle, BookOpen, ChevronRight, Zap, Radio, FileText, Loader2, RefreshCw,
+  AlertCircle, BookOpen, ChevronRight, Zap, Radio, FileText, Loader2, RefreshCw, Clock,
 } from "lucide-react";
 import Link from "next/link";
 import {
@@ -25,6 +25,7 @@ import {
   type MonitorTopPost,
 } from "@/hooks/use-monitors";
 import { useCreateBrief } from "@/hooks/use-briefs";
+import { useQueryClient } from "@tanstack/react-query";
 
 // ─── Score tier helpers ──────────────────────────────────────────────────────
 
@@ -373,9 +374,42 @@ function MonitorCard({ monitor }: { monitor: MonitorData }) {
 
 type SortKey = "score" | "velocity" | "added";
 
+function useNextCronRun(): string {
+  // Cron runs every 6h at :00 — compute time until next slot
+  const now = new Date();
+  const nextHour = Math.ceil(now.getUTCHours() / 6) * 6;
+  const next = new Date(now);
+  next.setUTCHours(nextHour % 24, 0, 0, 0);
+  if (next <= now) next.setUTCDate(next.getUTCDate() + 1);
+  const diffMs = next.getTime() - now.getTime();
+  const h = Math.floor(diffMs / 3_600_000);
+  const m = Math.floor((diffMs % 3_600_000) / 60_000);
+  return h > 0 ? `${h}h ${m}m` : `${m}m`;
+}
+
 export default function SignalBoardPage() {
-  const { data, isLoading, error } = useMonitors();
+  const { data, isLoading, error, refetch } = useMonitors();
   const [sort, setSort] = useState<SortKey>("score");
+  const [isRunningAll, setIsRunningAll] = useState(false);
+  const [runAllResult, setRunAllResult] = useState<{ ran: number; failed: number; skipped: number } | null>(null);
+  const queryClient = useQueryClient();
+  const nextRun = useNextCronRun();
+
+  const handleRunAll = useCallback(async () => {
+    setIsRunningAll(true);
+    setRunAllResult(null);
+    try {
+      const res = await fetch("/api/monitors/run");
+      const json = await res.json();
+      setRunAllResult(json);
+      await refetch();
+      queryClient.invalidateQueries({ queryKey: ["monitors"] });
+    } catch {
+      setRunAllResult({ ran: 0, failed: 1, skipped: 0 });
+    } finally {
+      setIsRunningAll(false);
+    }
+  }, [refetch, queryClient]);
 
   const monitors = [...(data?.monitors ?? [])];
 
@@ -408,27 +442,63 @@ export default function SignalBoardPage() {
             </p>
           </div>
 
-          {/* Sort controls */}
-          {monitors.length > 1 && (
-            <div className="flex items-center gap-1 text-xs">
-              <span className="text-muted-foreground mr-1">Sort:</span>
-              {(["score", "velocity", "added"] as SortKey[]).map((k) => (
-                <button
-                  key={k}
-                  onClick={() => setSort(k)}
-                  className={cn(
-                    "px-2.5 py-1 rounded-md border transition-colors capitalize",
-                    sort === k
-                      ? "bg-accent text-foreground border-border"
-                      : "text-muted-foreground border-transparent hover:border-border/50"
-                  )}
-                >
-                  {k === "score" ? "Breakout Score" : k === "velocity" ? "Velocity" : "Date Added"}
-                </button>
-              ))}
+          {/* Run all + next cron */}
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground/60">
+              <Clock className="h-3 w-3" />
+              <span>Next auto-run in {nextRun}</span>
             </div>
-          )}
+            {monitors.length > 0 && (
+              <Button
+                variant="outline" size="sm"
+                className="gap-1.5 text-xs"
+                disabled={isRunningAll}
+                onClick={handleRunAll}
+              >
+                {isRunningAll
+                  ? <><Loader2 className="h-3.5 w-3.5 animate-spin" />Running all…</>
+                  : <><RefreshCw className="h-3.5 w-3.5" />Run all now</>
+                }
+              </Button>
+            )}
+          </div>
         </div>
+
+        {/* Run all result banner */}
+        {runAllResult && (
+          <div className={cn(
+            "flex items-center gap-2 text-sm px-4 py-2.5 rounded-lg border",
+            runAllResult.failed > 0
+              ? "bg-red-500/5 border-red-500/20 text-red-400"
+              : "bg-green-500/5 border-green-500/20 text-green-400"
+          )}>
+            <RefreshCw className="h-3.5 w-3.5 shrink-0" />
+            Ran {runAllResult.ran} monitor{runAllResult.ran !== 1 ? "s" : ""}
+            {runAllResult.failed > 0 && ` · ${runAllResult.failed} failed`}
+            {runAllResult.skipped > 0 && ` · ${runAllResult.skipped} skipped (budget)`}
+          </div>
+        )}
+
+        {/* Sort controls */}
+        {monitors.length > 1 && (
+          <div className="flex items-center gap-1 text-xs">
+            <span className="text-muted-foreground mr-1">Sort:</span>
+            {(["score", "velocity", "added"] as SortKey[]).map((k) => (
+              <button
+                key={k}
+                onClick={() => setSort(k)}
+                className={cn(
+                  "px-2.5 py-1 rounded-md border transition-colors capitalize",
+                  sort === k
+                    ? "bg-accent text-foreground border-border"
+                    : "text-muted-foreground border-transparent hover:border-border/50"
+                )}
+              >
+                {k === "score" ? "Breakout Score" : k === "velocity" ? "Velocity" : "Date Added"}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Error */}
         {error && (
