@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { runActor } from "@/lib/apify";
+import { sendBreakoutAlert } from "@/lib/email";
 import type { Subculture, Monitor } from "@prisma/client";
 
 interface ApifyRedditPost {
@@ -110,6 +111,9 @@ export function computeAccelerationScore(counts: number[]): number {
   return Math.round(((latest - avg) / avg) * 100);
 }
 
+const BREAKOUT_THRESHOLD = 70;
+const BREAKOUT_COOLDOWN_HOURS = 24;
+
 export async function runMonitor(
   monitor: Monitor & { subculture: Subculture }
 ): Promise<void> {
@@ -126,10 +130,57 @@ export async function runMonitor(
     }
   }
 
+  // Compute breakout score from last 8 snapshots per platform
+  const recentSnapshots = await prisma.monitorSnapshot.findMany({
+    where: { monitorId: monitor.id },
+    orderBy: { capturedAt: "desc" },
+    take: 8,
+  });
+
+  const engagements = recentSnapshots.map((s) => s.engagement);
+  const breakoutScore = computeAccelerationScore(engagements);
+
   await prisma.monitor.update({
     where: { id: monitor.id },
     data: { lastRunAt: new Date() },
   });
+
+  // Send breakout alert if score ≥ threshold and not sent in the last 24 hours
+  if (breakoutScore >= BREAKOUT_THRESHOLD) {
+    const cooloffMs = BREAKOUT_COOLDOWN_HOURS * 60 * 60 * 1000;
+    const lastAlert = (monitor as Monitor & { lastBreakoutAlertAt?: Date | null }).lastBreakoutAlertAt;
+    const cooloffPassed = !lastAlert || Date.now() - lastAlert.getTime() > cooloffMs;
+
+    if (cooloffPassed) {
+      try {
+        const user = await prisma.user.findUnique({ where: { id: monitor.userId }, select: { email: true, name: true } });
+        if (user?.email) {
+          const topSnap = recentSnapshots[0];
+          const topPosts = topSnap?.topPosts as { title: string; url: string; score: number }[] | null;
+          const topPost = topPosts?.[0];
+
+          await sendBreakoutAlert({
+            toEmail: user.email,
+            toName: user.name ?? "there",
+            subcultureName: monitor.subculture.name,
+            breakoutScore,
+            platforms: monitor.platforms,
+            topPost,
+          });
+
+          await prisma.monitor.update({
+            where: { id: monitor.id },
+            data: { lastBreakoutAlertAt: new Date() },
+          });
+
+          console.log(`[monitor-engine] breakout alert sent for ${monitor.id} (score ${breakoutScore})`);
+        }
+      } catch (err) {
+        // Don't fail the whole run if email fails
+        console.error(`[monitor-engine] breakout alert failed for ${monitor.id}:`, err);
+      }
+    }
+  }
 }
 
 // Run monitors sequentially so Apify actor concurrency stays predictable

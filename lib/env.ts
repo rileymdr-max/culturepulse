@@ -56,6 +56,10 @@ const envSchema = z.object({
   // Cron secret — secures the /api/monitors/run endpoint on Vercel
   CRON_SECRET: emptyStringToUndefined,
 
+  // Resend — optional, email alerts/digests unavailable when absent
+  RESEND_API_KEY: emptyStringToUndefined,
+  RESEND_FROM: emptyStringToUndefined,
+
   // Rate limiting (Upstash) — optional, in-memory fallback used when absent
   UPSTASH_REDIS_REST_URL: emptyUrl,
   UPSTASH_REDIS_REST_TOKEN: emptyStringToUndefined,
