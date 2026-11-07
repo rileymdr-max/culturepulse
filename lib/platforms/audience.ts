@@ -20,6 +20,22 @@ export const AUDIENCE_PLATFORMS = [
 
 export type AudiencePlatform = (typeof AUDIENCE_PLATFORMS)[number];
 
+/** Per-platform handle overrides. `default` is used as fallback for any unspecified platform. */
+export interface HandleMap {
+  default: string;
+  twitter?: string;
+  instagram?: string;
+  tiktok?: string;
+  reddit?: string;
+  youtube?: string;
+  pinterest?: string;
+}
+
+/** Returns the right handle for a given platform, falling back to default. */
+export function handleFor(handles: HandleMap, platform: Exclude<AudiencePlatform, "all" | "facebook" | "substack">): string {
+  return (handles[platform] ?? handles.default).replace(/^[@u\/]+/, "").toLowerCase();
+}
+
 export interface AudienceCommunity {
   community_id: string;
   community_name: string;

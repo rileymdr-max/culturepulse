@@ -3,7 +3,7 @@
 import { useState } from "react";
 import {
   TrendingUp, TrendingDown, Minus, Trash2, Pause, Play,
-  AlertCircle, BookOpen, ChevronRight, Zap, Radio, FileText, Loader2,
+  AlertCircle, BookOpen, ChevronRight, Zap, Radio, FileText, Loader2, RefreshCw,
 } from "lucide-react";
 import Link from "next/link";
 import {
@@ -19,6 +19,7 @@ import {
   useMonitors,
   useDeleteMonitor,
   usePauseMonitor,
+  useRunMonitor,
   type MonitorData,
   type AccelerationSignal,
   type MonitorTopPost,
@@ -168,6 +169,7 @@ function StrengthBar({ value }: { value: number }) {
 function MonitorCard({ monitor }: { monitor: MonitorData }) {
   const { mutate: deleteMonitor, isPending: isDeleting } = useDeleteMonitor();
   const { mutate: setStatus, isPending: isToggling } = usePauseMonitor();
+  const { mutate: runNow, isPending: isRunning } = useRunMonitor();
   const { mutate: createBrief, isPending: isGeneratingBrief, data: briefResult } = useCreateBrief();
   const [confirmDelete, setConfirmDelete] = useState(false);
 
@@ -308,6 +310,18 @@ function MonitorCard({ monitor }: { monitor: MonitorData }) {
               <BookOpen className="h-3.5 w-3.5" />Profile
             </Button>
           </Link>
+
+          <Button
+            variant="ghost" size="sm" className="gap-1.5 text-xs"
+            disabled={isRunning || !isActive}
+            onClick={() => runNow(monitor.id)}
+            title={!isActive ? "Resume monitor to run" : undefined}
+          >
+            {isRunning
+              ? <><Loader2 className="h-3.5 w-3.5 animate-spin" />Running…</>
+              : <><RefreshCw className="h-3.5 w-3.5" />Run now</>
+            }
+          </Button>
 
           {/* Generate Brief */}
           {briefResult?.brief ? (

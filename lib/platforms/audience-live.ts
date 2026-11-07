@@ -15,8 +15,8 @@
  */
 
 import { runActor } from "@/lib/apify";
-import type { AudienceResult, AudiencePlatform } from "./audience";
-import { getMockAudience } from "./audience";
+import type { AudienceResult, AudiencePlatform, HandleMap } from "./audience";
+import { getMockAudience, handleFor } from "./audience";
 import { seededRng, randInt } from "./mock-helpers";
 
 // ─── Apify response shapes ────────────────────────────────────────────────────
@@ -290,60 +290,63 @@ async function scrapeTwitter(handle: string, platformFilter: string): Promise<Au
 // Reddit gives us DIRECT subreddit signals from the user's actual posts.
 
 async function scrapeReddit(handle: string): Promise<AudienceResult> {
+  // Search Reddit for posts MENTIONING the brand — same approach as Twitter.
+  // The subreddits where those posts appear tell us where the brand's audience lives.
   const posts = await runActor<ApifyRedditPost>("apify/reddit-scraper", {
-    startUrls: [{ url: `https://www.reddit.com/user/${handle}/submitted/` }],
-    maxItems: 50,
+    startUrls: [{ url: `https://www.reddit.com/search/?q=${encodeURIComponent(handle)}&type=link&sort=relevance` }],
+    maxItems: 100,
   }, 45);
 
-  if (posts.length === 0) throw new Error("No Reddit posts found");
+  if (posts.length === 0) throw new Error("No Reddit mentions found");
 
-  // Count posts per subreddit — direct community membership signal
+  // Count how many brand-mention posts appear in each subreddit
   const subredditCounts: Record<string, number> = {};
   const titleSignals: string[] = [];
 
   for (const post of posts) {
     const sub = (post.subreddit ?? post.community ?? "").toLowerCase().replace(/^r\//, "");
     if (sub) subredditCounts[sub] = (subredditCounts[sub] ?? 0) + 1;
-    if (post.title) titleSignals.push(...post.title.toLowerCase().split(/\W+/));
+    if (post.title) titleSignals.push(...post.title.toLowerCase().split(/\W+/).filter((w) => w.length > 3));
   }
 
-  // Build communities from subreddit counts (these are real)
+  const totalPosts = posts.length;
+  const rng = seededRng(`reddit-live-${handle}`);
+
+  // Each subreddit that mentions the brand is an audience community
   const directCommunities = Object.entries(subredditCounts)
     .sort(([, a], [, b]) => b - a)
     .slice(0, 8)
-    .map(([sub, count], i) => {
-      const total = posts.length;
-      const overlapPct = Math.round((count / total) * 70);
+    .map(([sub, count]) => {
+      const overlapPct = Math.max(4, Math.round((count / totalPosts) * 75));
       return {
         community_id: `reddit_r_${sub}`,
         community_name: `r/${sub}`,
         platform: "reddit",
         community_size: randInt(10_000, 2_000_000, seededRng(`reddit-${handle}-${sub}`)),
-        overlap_pct: Math.max(3, overlapPct),
-        estimated_overlap: Math.round((overlapPct / 100) * 50_000),
-        shared_topics: ["community discussion", "content sharing"],
-        description: `r/${sub} — a subreddit where u/${handle} actively posts content.`,
+        overlap_pct: overlapPct,
+        estimated_overlap: Math.round((overlapPct / 100) * totalPosts * 1_000),
+        shared_topics: ["brand discussion", "community recommendations"],
+        description: `r/${sub} — subreddit where people are actively talking about ${handle}.`,
       };
     });
 
-  // Also score cross-platform communities from title keywords
+  // Use title keywords to infer additional cross-platform topic clusters
   const scored = scoreCommunities(
     [...titleSignals, ...Object.keys(subredditCounts)],
     "all"
-  ).filter((c) => c.platform !== "reddit"); // avoid duplicating reddit results
+  ).filter((c) => c.platform !== "reddit");
 
-  const rng = seededRng(`reddit-live-${handle}`);
-  const crossPlatform = scored.slice(0, 6).map((c, i) => {
-    const overlapPct = Math.max(3, Math.round(30 * (1 - i * 0.1)));
+  const crossPlatform = scored.slice(0, 4).map((c, i) => {
+    const overlapPct = Math.max(3, Math.round(28 * (1 - i * 0.12)));
     return {
       community_id: c.id,
       community_name: c.name,
       platform: c.platform,
       community_size: randInt(c.size_min, c.size_max, rng),
       overlap_pct: overlapPct,
-      estimated_overlap: Math.round((overlapPct / 100) * 50_000),
+      estimated_overlap: Math.round((overlapPct / 100) * totalPosts * 1_000),
       shared_topics: (SHARED_TOPIC_LABELS[c.clusterKey] ?? ["content strategy"]).slice(0, 2),
-      description: `Community where u/${handle}'s Reddit audience is also active.`,
+      description: `Community active in the same topics as ${handle}'s Reddit audience.`,
     };
   });
 
@@ -351,9 +354,9 @@ async function scrapeReddit(handle: string): Promise<AudienceResult> {
     .sort((a, b) => b.overlap_pct - a.overlap_pct);
 
   return {
-    handle: `u/${handle}`,
+    handle,
     platform: "reddit",
-    estimated_total_audience: 50_000,
+    estimated_total_audience: totalPosts * 1_000,
     communities,
     analyzed_at: new Date().toISOString(),
   };
@@ -362,14 +365,40 @@ async function scrapeReddit(handle: string): Promise<AudienceResult> {
 // ─── TikTok scraper ───────────────────────────────────────────────────────────
 
 async function scrapeTikTok(handle: string): Promise<AudienceResult> {
-  // Search videos tagged #handle — audience creating content about the brand
-  const videos = await runActor<ApifyTikTokVideo>("clockworks/tiktok-scraper", {
-    hashtags: [handle],
-    resultsPerPage: 30,
-    shouldDownloadVideos: false,
-    shouldDownloadCovers: false,
-    shouldDownloadSubtitles: false,
-  }, 45);
+  // Primary: videos tagged #handle — best signal for well-known brands
+  let videos: ApifyTikTokVideo[] = [];
+  try {
+    videos = await runActor<ApifyTikTokVideo>("clockworks/tiktok-scraper", {
+      hashtags: [handle],
+      resultsPerPage: 30,
+      shouldDownloadVideos: false,
+      shouldDownloadCovers: false,
+      shouldDownloadSubtitles: false,
+    }, 45);
+  } catch {
+    // ignore — keyword search below acts as fallback
+  }
+
+  // Fallback: keyword search for the brand name in captions/titles.
+  // Catches niche brands where #handle hashtag has low usage.
+  if (videos.length < 10) {
+    try {
+      const keywordVideos = await runActor<ApifyTikTokVideo>("clockworks/tiktok-scraper", {
+        searchQueries: [handle],
+        resultsPerPage: 30,
+        shouldDownloadVideos: false,
+        shouldDownloadCovers: false,
+        shouldDownloadSubtitles: false,
+      }, 45);
+      // Merge, deduplicate by text content
+      const seen = new Set(videos.map((v) => v.text ?? ""));
+      for (const v of keywordVideos) {
+        if (!seen.has(v.text ?? "")) { videos.push(v); seen.add(v.text ?? ""); }
+      }
+    } catch {
+      // ignore
+    }
+  }
 
   if (videos.length === 0) throw new Error("No TikTok videos found");
 
@@ -479,15 +508,18 @@ async function scrapePinterest(handle: string): Promise<AudienceResult> {
 // ─── All-platforms scraper ────────────────────────────────────────────────────
 // Runs all six scrapers in parallel, merges community lists, deduplicates.
 
-async function scrapeAll(handle: string): Promise<AudienceResult> {
-  const [twitterResult, tiktokResult, redditResult, instagramResult, youtubeResult, pinterestResult] = await Promise.allSettled([
-    scrapeTwitter(handle, "all"),
-    scrapeTikTok(handle),
-    scrapeReddit(handle),
-    scrapeInstagram(handle),
-    scrapeYouTube(handle),
-    scrapePinterest(handle),
-  ]);
+async function scrapeAll(handles: HandleMap, excluded: Set<string>): Promise<AudienceResult> {
+  const scrapers: Promise<AudienceResult>[] = [
+    excluded.has("twitter")   ? Promise.reject("excluded") : scrapeTwitter(handleFor(handles, "twitter"), "all"),
+    excluded.has("tiktok")    ? Promise.reject("excluded") : scrapeTikTok(handleFor(handles, "tiktok")),
+    excluded.has("reddit")    ? Promise.reject("excluded") : scrapeReddit(handleFor(handles, "reddit")),
+    excluded.has("instagram") ? Promise.reject("excluded") : scrapeInstagram(handleFor(handles, "instagram")),
+    excluded.has("youtube")   ? Promise.reject("excluded") : scrapeYouTube(handleFor(handles, "youtube")),
+    excluded.has("pinterest") ? Promise.reject("excluded") : scrapePinterest(handleFor(handles, "pinterest")),
+  ];
+
+  const [twitterResult, tiktokResult, redditResult, instagramResult, youtubeResult, pinterestResult] =
+    await Promise.allSettled(scrapers);
 
   const results: AudienceResult[] = [];
   if (twitterResult.status === "fulfilled") results.push(twitterResult.value);
@@ -511,14 +543,36 @@ async function scrapeAll(handle: string): Promise<AudienceResult> {
     }
   }
 
-  const merged = Array.from(communityMap.values())
-    .sort((a, b) => b.overlap_pct - a.overlap_pct)
-    .slice(0, 18);
+  // Cap each platform at 4 communities and interleave (round-robin) so no single
+  // platform dominates the signal fed to Claude — Twitter in particular can flood
+  // results given its historically large dataset even as actual usage has declined.
+  const byPlatform = new Map<string, typeof communityMap extends Map<string, infer V> ? V[] : never>();
+  for (const c of communityMap.values()) {
+    const bucket = byPlatform.get(c.platform) ?? [];
+    bucket.push(c);
+    byPlatform.set(c.platform, bucket);
+  }
+  for (const [platform, bucket] of byPlatform) {
+    byPlatform.set(platform, bucket.sort((a, b) => b.overlap_pct - a.overlap_pct).slice(0, 4));
+  }
+
+  // Round-robin across platforms so the merged list is balanced
+  const platformQueues = Array.from(byPlatform.values());
+  const merged: (typeof communityMap extends Map<string, infer V> ? V : never)[] = [];
+  let i = 0;
+  while (merged.length < 18) {
+    let added = false;
+    for (const queue of platformQueues) {
+      if (queue[i]) { merged.push(queue[i]); added = true; }
+    }
+    if (!added) break;
+    i++;
+  }
 
   const totalAudience = Math.max(...results.map((r) => r.estimated_total_audience));
 
   return {
-    handle: `@${handle}`,
+    handle: `@${handles.default}`,
     platform: "all",
     estimated_total_audience: totalAudience,
     communities: merged,
@@ -590,27 +644,33 @@ export async function getTrendingNicheContent(
 // ─── Main export ──────────────────────────────────────────────────────────────
 
 export async function getLiveAudience(
-  handle: string,
-  platform: AudiencePlatform
+  handles: HandleMap,
+  platform: AudiencePlatform,
+  excludedPlatforms: string[] = []
 ): Promise<AudienceResult> {
-  const normalized = handle.replace(/^[@u\/]+/, "").toLowerCase();
+  const normalized = handles.default.replace(/^[@u\/]+/, "").toLowerCase();
+  const normedHandles: HandleMap = {
+    ...handles,
+    default: normalized,
+  };
+  const excluded = new Set(excludedPlatforms);
 
   try {
     switch (platform) {
       case "reddit":
-        return await scrapeReddit(normalized);
+        return await scrapeReddit(handleFor(normedHandles, "reddit"));
       case "tiktok":
-        return await scrapeTikTok(normalized);
+        return await scrapeTikTok(handleFor(normedHandles, "tiktok"));
       case "instagram":
-        return await scrapeInstagram(normalized);
+        return await scrapeInstagram(handleFor(normedHandles, "instagram"));
       case "youtube":
-        return await scrapeYouTube(normalized);
+        return await scrapeYouTube(handleFor(normedHandles, "youtube"));
       case "pinterest":
-        return await scrapePinterest(normalized);
+        return await scrapePinterest(handleFor(normedHandles, "pinterest"));
       case "twitter":
-        return await scrapeTwitter(normalized, "twitter");
+        return await scrapeTwitter(handleFor(normedHandles, "twitter"), "twitter");
       case "all":
-        return await scrapeAll(normalized);
+        return await scrapeAll(normedHandles, excluded);
       default:
         // Facebook / Substack — no reliable public scraper, use mock
         console.warn(`[audience-live] No live scraper for ${platform}, using mock`);

@@ -99,3 +99,14 @@ export function usePauseMonitor() {
   });
 }
 
+export function useRunMonitor() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      fetchJson<{ monitor: MonitorData }>(`/api/monitors/${id}/run`, { method: "POST" }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["monitors"] });
+    },
+  });
+}
+

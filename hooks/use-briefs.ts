@@ -62,7 +62,7 @@ export function useBrief(id: string) {
 export function useCreateBrief() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: { subcultureId: string; monitorId?: string }) =>
+    mutationFn: (body: { subcultureId?: string; subcultureSlug?: string; monitorId?: string }) =>
       fetchJson<{ brief: BriefSummary }>("/api/briefs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

@@ -1,15 +1,15 @@
 "use client";
 
 import { useMutation } from "@tanstack/react-query";
-import type { AudienceResult, AudiencePlatform } from "@/lib/platforms/audience";
+import type { AudienceResult, AudiencePlatform, HandleMap } from "@/lib/platforms/audience";
 
 export function useAudience() {
-  return useMutation<AudienceResult, Error, { handle: string; platform: AudiencePlatform }>({
-    mutationFn: async ({ handle, platform }) => {
+  return useMutation<AudienceResult, Error, { handles: HandleMap; platform: AudiencePlatform; excludedPlatforms?: string[] }>({
+    mutationFn: async ({ handles, platform, excludedPlatforms = [] }) => {
       const res = await fetch("/api/audience", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ handle, platform }),
+        body: JSON.stringify({ handles, platform, excludedPlatforms }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));

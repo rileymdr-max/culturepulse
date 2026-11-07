@@ -75,6 +75,7 @@ model User {
   briefs              ContentBrief[]
   ownedWorkspaces     Workspace[]
   workspaceMemberships WorkspaceMember[]
+  auditLogs           AuditLog[]
 }
 
 // ─── Saved Searches ──────────────────────────────────────────────────────────
@@ -289,6 +290,24 @@ model WorkspaceInvite {
 
   @@index([workspaceId])
   @@index([token])
+}
+
+// ─── Audience Audit Log ───────────────────────────────────────────────────────
+// Every brand audit run is saved here for admin review and history.
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String
+  handle    String
+  platform  String
+  result    Json     // full BrandAuditResult
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([handle])
+  @@index([createdAt])
 }
 
 model MonitorSnapshot {

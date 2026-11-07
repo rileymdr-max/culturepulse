@@ -14,7 +14,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { getLiveAudience } from "./platforms/audience-live";
 import { getMockAudience } from "./platforms/audience";
 import type { BrandAuditResult, MatchedSubculture, DiscoveredSubculture } from "./types/brand-audit";
-import type { AudienceResult } from "./platforms/audience";
+import type { AudienceResult, HandleMap } from "./platforms/audience";
 
 const client = new Anthropic();
 
@@ -95,19 +95,24 @@ const AUDIT_TOOL: Anthropic.Tool = {
 // ─── Signal formatter ─────────────────────────────────────────────────────────
 
 function formatSignals(handle: string, audience: AudienceResult): string {
-  const topCommunities = audience.communities
-    .slice(0, 12)
-    .map((c, i) => `  ${i + 1}. ${c.community_name} (${c.platform}) — ${c.overlap_pct}% overlap — Topics: ${c.shared_topics.join(", ")}`)
-    .join("\n");
-
-  const platformCounts: Record<string, number> = {};
+  // Group communities by platform so Claude sees a balanced view
+  const byPlatform = new Map<string, typeof audience.communities>();
   for (const c of audience.communities) {
-    platformCounts[c.platform] = (platformCounts[c.platform] ?? 0) + 1;
+    const bucket = byPlatform.get(c.platform) ?? [];
+    bucket.push(c);
+    byPlatform.set(c.platform, bucket);
   }
-  const platformBreakdown = Object.entries(platformCounts)
-    .sort((a, b) => b[1] - a[1])
-    .map(([p, n]) => `${p} (${n} communities)`)
-    .join(", ");
+
+  const platformSections = Array.from(byPlatform.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([platform, communities]) => {
+      const lines = communities
+        .slice(0, 4)
+        .map((c) => `    • ${c.community_name} — ${c.overlap_pct}% overlap — Topics: ${c.shared_topics.join(", ")}`)
+        .join("\n");
+      return `  ${platform.toUpperCase()}:\n${lines}`;
+    })
+    .join("\n\n");
 
   const allTopics = audience.communities.flatMap((c) => c.shared_topics);
   const topicCounts: Record<string, number> = {};
@@ -118,14 +123,18 @@ function formatSignals(handle: string, audience: AudienceResult): string {
     .map(([t]) => t)
     .join(", ");
 
+  const platformList = Array.from(byPlatform.entries())
+    .map(([p, cs]) => `${p} (${cs.length} communities)`)
+    .join(", ");
+
   return `BRAND: @${handle}
 ESTIMATED AUDIENCE: ${audience.estimated_total_audience.toLocaleString()}
-PLATFORM DISTRIBUTION: ${platformBreakdown}
+PLATFORMS WITH DATA: ${platformList}
 
-TOP AUDIENCE COMMUNITIES (ranked by overlap):
-${topCommunities}
+AUDIENCE COMMUNITIES BY PLATFORM (each platform weighted equally):
+${platformSections}
 
-RECURRING TOPIC SIGNALS: ${topTopics}`;
+CROSS-PLATFORM TOPIC SIGNALS: ${topTopics}`;
 }
 
 // ─── Claude analysis ──────────────────────────────────────────────────────────
@@ -146,15 +155,15 @@ async function analyzeWithClaude(
 
 Your job: analyze a brand's audience signals and produce a precise, insightful subculture audit.
 
-MATCHED SUBCULTURES (5–8): Identify established cultural segments this audience clearly belongs to. Draw from the full cultural landscape: fashion aesthetics (quiet luxury, dark academia, streetwear, clean girl, cottagecore), wellness/lifestyle (biohackers, slow living, plant-based, fitness culture), gaming/digital (gamers, tech bros, crypto natives, indie hackers), outdoor/adventure (van life, trail runners, surfers, ski bums), music/arts (indie heads, hyperpop, vinyl collectors), food culture (home chefs, fermenters, restaurant hoppers), and beyond. Be culturally precise — reference actual subculture vocabulary, not broad demographics.
+PLATFORM BALANCE (critical): Data is provided per platform. Weight each platform's signals equally regardless of data volume. Twitter/X has seen a significant user decline since 2022 — do NOT let Twitter communities dominate your analysis. Instagram and TikTok now carry more cultural weight for most consumer brands. If TikTok, Instagram, or Reddit signals are present, they should drive at least half your subculture matches.
 
-DISCOVERED SUBCULTURES (2–3): Surface emerging cultural clusters the signals reveal that haven't been formally catalogued. Look for:
-- Unusual signal combinations that cross traditional category lines
-- Micro-niches within larger trends that this brand uniquely attracts
-- Hybrid identities forming at the intersection of multiple communities
-- Emerging aesthetics or lifestyle orientations without an established name
+GENERIC DEFAULTS TO AVOID: "AI entrepreneurs", "tech bros", "indie hackers", "startup culture", and similar tech-Twitter archetypes should only appear if the brand's Instagram/TikTok/Reddit signals strongly support them — NOT because they appear in Twitter data. These are overfit patterns that show up in nearly every audit when Twitter is over-weighted. Push past them.
 
-Match percentages must be realistic and vary significantly — not everything is 70%+.`,
+MATCHED SUBCULTURES (5–8): Identify established cultural segments this audience clearly belongs to. Draw from the full cultural landscape: fashion aesthetics (quiet luxury, dark academia, streetwear, clean girl, cottagecore, gorpcore, old money), wellness/lifestyle (biohackers, slow living, plant-based, fitness culture, raw wellness), gaming/digital (gamers, speedrunners, cozy gamers, esports fans), outdoor/adventure (van life, trail runners, surfers, ski bums, wild swimmers), music/arts (indie heads, hyperpop, vinyl collectors, bedroom pop), food culture (home chefs, fermenters, restaurant hoppers, deli maximalists), beauty (skintellectuals, glass skin, clean beauty, maximalist makeup), and beyond. Be specific to this brand — no two brands should share the same list.
+
+DISCOVERED SUBCULTURES (2–3): Surface emerging cultural clusters the signals reveal that haven't been formally catalogued. Look for unusual signal combinations that cross traditional category lines, micro-niches unique to this brand's audience, and hybrid identities forming at the intersection of multiple communities.
+
+Match percentages must be realistic and vary significantly — not everything is 70%+. A strong match for a niche subculture is more valuable than a weak match to a broad one.`,
     messages: [
       {
         role: "user",
@@ -309,10 +318,11 @@ function getMockAudit(handle: string): BrandAuditResult {
 // ─── Main export ──────────────────────────────────────────────────────────────
 
 export async function runBrandAudit(
-  handle: string,
-  platform: "all" | "twitter" | "instagram" | "tiktok" | "reddit" | "youtube" | "pinterest" = "all"
+  handles: HandleMap,
+  platform: "all" | "twitter" | "instagram" | "tiktok" | "reddit" | "youtube" | "pinterest" = "all",
+  excludedPlatforms: string[] = []
 ): Promise<BrandAuditResult> {
-  const normalized = handle.replace(/^[@u\/]+/, "").toLowerCase();
+  const normalized = handles.default.replace(/^[@u\/]+/, "").toLowerCase();
   const useApify = !!process.env.APIFY_API_TOKEN && process.env.FORCE_MOCK_DATA !== "true";
 
   // Step 1: get audience signals
@@ -321,7 +331,7 @@ export async function runBrandAudit(
 
   try {
     audience = useApify
-      ? await getLiveAudience(normalized, platform)
+      ? await getLiveAudience(handles, platform, excludedPlatforms)
       : getMockAudience(normalized, platform);
     gotLiveAudience = useApify;
   } catch (err) {

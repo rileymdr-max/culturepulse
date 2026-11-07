@@ -10,7 +10,13 @@ import { NextResponse } from "next/server";
 import { isPlatformLive } from "@/lib/env";
 
 export async function GET() {
+  const anthropicKey = process.env.ANTHROPIC_API_KEY ?? "";
+  const anthropicKeyInfo = anthropicKey
+    ? { present: true, prefix: anthropicKey.slice(0, 14), length: anthropicKey.length }
+    : { present: false, prefix: null, length: 0 };
+
   const vars = {
+    ANTHROPIC_API_KEY: anthropicKeyInfo,
     APIFY_API_TOKEN: !!process.env.APIFY_API_TOKEN,
     REDDIT_CLIENT_ID: !!process.env.REDDIT_CLIENT_ID,
     REDDIT_CLIENT_SECRET: !!process.env.REDDIT_CLIENT_SECRET,

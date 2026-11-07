@@ -1,12 +1,13 @@
 /**
  * POST /api/brand-audit
  *
- * Analyzes a brand's social audience and returns a subculture audit:
- *   - Matched subcultures from the existing library
- *   - Newly discovered subcultures not yet in any profile
+ * Analyzes a brand's social audience and returns a subculture audit.
  *
  * Body:
- *   { handle: string, platform?: "all" | "twitter" | "instagram" | "tiktok" | "reddit" | "youtube" | "pinterest" }
+ *   {
+ *     handles: { default: string; twitter?: string; instagram?: string; tiktok?: string; reddit?: string; youtube?: string; pinterest?: string },
+ *     platform?: "all" | "twitter" | "instagram" | "tiktok" | "reddit" | "youtube" | "pinterest"
+ *   }
  *
  * Response:
  *   BrandAuditResult
@@ -16,13 +17,27 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireSession, enforceRateLimit, badRequest, serverError } from "@/lib/api-helpers";
 import { runBrandAudit } from "@/lib/brand-audit";
+import { prisma } from "@/lib/prisma";
 
 // Allow up to 120s — Apify scraping (45s) + Claude analysis (30s) + buffer
 export const maxDuration = 120;
 
+const handleField = z.string().min(1).max(100).trim();
+
+const platformEnum = z.enum(["twitter", "instagram", "tiktok", "reddit", "youtube", "pinterest"]);
+
 const bodySchema = z.object({
-  handle: z.string().min(1).max(100).trim(),
+  handles: z.object({
+    default: handleField,
+    twitter: handleField.optional(),
+    instagram: handleField.optional(),
+    tiktok: handleField.optional(),
+    reddit: handleField.optional(),
+    youtube: handleField.optional(),
+    pinterest: handleField.optional(),
+  }),
   platform: z.enum(["all", "twitter", "instagram", "tiktok", "reddit", "youtube", "pinterest"]).default("all"),
+  excludedPlatforms: z.array(platformEnum).optional().default([]),
 });
 
 export async function POST(req: NextRequest) {
@@ -44,10 +59,21 @@ export async function POST(req: NextRequest) {
     return badRequest("Invalid request body.", parsed.error.flatten());
   }
 
-  const { handle, platform } = parsed.data;
+  const { handles, platform, excludedPlatforms } = parsed.data;
 
   try {
-    const result = await runBrandAudit(handle, platform);
+    const result = await runBrandAudit(handles, platform, excludedPlatforms);
+
+    // Fire-and-forget: save audit to history (don't block the response)
+    prisma.auditLog.create({
+      data: {
+        userId: session.user.id,
+        handle: handles.default,
+        platform,
+        result: result as object,
+      },
+    }).catch((e) => console.error("[api/brand-audit] Failed to save audit log:", e));
+
     return NextResponse.json(result);
   } catch (err) {
     console.error("[api/brand-audit] Unhandled error:", err);
