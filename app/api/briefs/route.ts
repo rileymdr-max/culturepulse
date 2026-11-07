@@ -9,8 +9,11 @@ import { computeAccelerationSignal } from "@/lib/acceleration";
 export const maxDuration = 120;
 
 const createSchema = z.object({
-  subcultureId: z.string().min(1),
+  subcultureId: z.string().min(1).optional(),
+  subcultureSlug: z.string().min(1).optional(),
   monitorId: z.string().optional(),
+}).refine((d) => d.subcultureId || d.subcultureSlug, {
+  message: "Either subcultureId or subcultureSlug is required",
 });
 
 export async function GET(req: NextRequest) {
@@ -50,7 +53,7 @@ export async function POST(req: NextRequest) {
   const parsed = createSchema.safeParse(body);
   if (!parsed.success) return badRequest("Invalid request body.", parsed.error.flatten());
 
-  const { subcultureId, monitorId } = parsed.data;
+  const { subcultureId, subcultureSlug, monitorId } = parsed.data;
 
   try {
     const user = await prisma.user.findUnique({ where: { id: session.user.id }, select: { plan: true } });
@@ -60,7 +63,16 @@ export async function POST(req: NextRequest) {
       return paymentRequired("Content brief generation is available on Starter and above. Upgrade to generate briefs.");
     }
 
-    const subculture = await prisma.subculture.findUnique({ where: { id: subcultureId } });
+    let subculture = subcultureId
+      ? await prisma.subculture.findUnique({ where: { id: subcultureId } })
+      : await prisma.subculture.findUnique({ where: { slug: subcultureSlug! } });
+    // Fallback: if slug didn't match (Claude may generate slugs that differ from DB), try name search
+    if (!subculture && subcultureSlug) {
+      const nameGuess = subcultureSlug.replace(/-/g, " ");
+      subculture = await prisma.subculture.findFirst({
+        where: { name: { contains: nameGuess, mode: "insensitive" } },
+      });
+    }
     if (!subculture) return NextResponse.json({ error: "Subculture not found" }, { status: 404 });
 
     // Build signal context if a monitorId was provided
@@ -105,7 +117,7 @@ export async function POST(req: NextRequest) {
     const brief = await prisma.contentBrief.create({
       data: {
         userId: session.user.id,
-        subcultureId,
+        subcultureId: subculture.id,
         monitorId: monitorId ?? null,
         headline: generated.headline,
         urgency: generated.urgency,

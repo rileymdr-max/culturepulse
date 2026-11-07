@@ -1,16 +1,19 @@
 "use client";
 
-import { useState } from "react";
-import { Search, Sparkles, Users, Layers, AlertCircle, ChevronRight, TrendingUp, Zap } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Search, Sparkles, Users, Layers, AlertCircle, ChevronRight, TrendingUp, Zap, ChevronDown, Plus, CheckCircle2, Loader2, FileText } from "lucide-react";
 import Link from "next/link";
 import { NavHeader } from "@/components/nav-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useBrandAudit } from "@/hooks/use-brand-audit";
+import { useAudience } from "@/hooks/use-audience";
+import { useCreateBrief } from "@/hooks/use-briefs";
 import { formatNumber } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import type { BrandAuditResult, MatchedSubculture, DiscoveredSubculture } from "@/lib/types/brand-audit";
+import type { AudienceResult, HandleMap } from "@/lib/platforms/audience";
 
 const PLATFORMS = [
   { value: "all", label: "All Platforms" },
@@ -22,16 +25,96 @@ const PLATFORMS = [
   { value: "pinterest", label: "Pinterest" },
 ] as const;
 
+type PlatformKey = "twitter" | "instagram" | "tiktok" | "reddit" | "youtube" | "pinterest";
+
+const OVERRIDE_PLATFORMS: { key: PlatformKey; label: string; placeholder: string }[] = [
+  { key: "twitter",   label: "X / Twitter", placeholder: "e.g. nike" },
+  { key: "instagram", label: "Instagram",   placeholder: "e.g. nikesportswear" },
+  { key: "tiktok",    label: "TikTok",      placeholder: "e.g. nikefootball" },
+  { key: "reddit",    label: "Reddit",      placeholder: "e.g. nike" },
+  { key: "youtube",   label: "YouTube",     placeholder: "e.g. nikefootball" },
+  { key: "pinterest", label: "Pinterest",   placeholder: "e.g. nike" },
+];
+
+const SESSION_KEY = "culturepulse-audience-audit";
+
 export default function BrandAuditPage() {
   const [handle, setHandle] = useState("");
   const [platform, setPlatform] = useState<string>("all");
-  const { mutate, data, isPending, error, isSuccess } = useBrandAudit();
+  const [showOverrides, setShowOverrides] = useState(false);
+  const [overrides, setOverrides] = useState<Partial<Record<PlatformKey, string>>>({});
+  const [excluded, setExcluded] = useState<Set<PlatformKey>>(new Set());
+  const [cachedAudit, setCachedAudit] = useState<BrandAuditResult | null>(null);
+  const [cachedAudience, setCachedAudience] = useState<AudienceResult | null>(null);
+
+  const { mutate: runAudit, data: auditData, isPending: auditPending, error: auditError, isSuccess: auditDone } = useBrandAudit();
+  const { mutate: runAudience, data: audienceData, isPending: audiencePending, isSuccess: audienceDone } = useAudience();
+
+  const isPending = auditPending || audiencePending;
+  const error = auditError;
+
+  // Restore last result from sessionStorage on mount
+  useEffect(() => {
+    try {
+      const saved = sessionStorage.getItem(SESSION_KEY);
+      if (saved) {
+        const { audit, audience } = JSON.parse(saved) as { audit?: BrandAuditResult; audience?: AudienceResult };
+        if (audit) setCachedAudit(audit);
+        if (audience) setCachedAudience(audience);
+      }
+    } catch {}
+  }, []);
+
+  // Persist to sessionStorage whenever fresh results arrive
+  useEffect(() => {
+    if (!auditData && !audienceData) return;
+    try {
+      const existing = JSON.parse(sessionStorage.getItem(SESSION_KEY) ?? "{}");
+      sessionStorage.setItem(SESSION_KEY, JSON.stringify({
+        ...existing,
+        ...(auditData ? { audit: auditData } : {}),
+        ...(audienceData ? { audience: audienceData } : {}),
+      }));
+      if (auditData) setCachedAudit(auditData);
+      if (audienceData) setCachedAudience(audienceData);
+    } catch {}
+  }, [auditData, audienceData]);
+
+  function handleClearResults() {
+    try { sessionStorage.removeItem(SESSION_KEY); } catch {}
+    setCachedAudit(null);
+    setCachedAudience(null);
+  }
+
+  const displayAudit = auditData ?? cachedAudit;
+  const displayAudience = audienceData ?? cachedAudience;
+  const isSuccess = auditDone || audienceDone || !!displayAudit || !!displayAudience;
+
+  function toggleExclude(key: PlatformKey) {
+    setExcluded((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  }
+
+  function buildHandleMap(): HandleMap {
+    const defaultHandle = handle.trim().replace(/^@/, "");
+    const map: HandleMap = { default: defaultHandle };
+    for (const { key } of OVERRIDE_PLATFORMS) {
+      const v = overrides[key]?.trim().replace(/^@/, "");
+      if (v) map[key] = v;
+    }
+    return map;
+  }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const trimmed = handle.trim().replace(/^@/, "");
-    if (!trimmed) return;
-    mutate({ handle: trimmed, platform });
+    if (!handle.trim()) return;
+    const handles = buildHandleMap();
+    const excludedPlatforms = Array.from(excluded);
+    runAudit({ handles, platform, excludedPlatforms });
+    runAudience({ handles, platform: platform as never, excludedPlatforms });
   }
 
   return (
@@ -42,7 +125,7 @@ export default function BrandAuditPage() {
 
         {/* Page header */}
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Brand Audit</h1>
+          <h1 className="text-2xl font-bold text-foreground">Audience Audit</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Enter any brand&apos;s social handle to discover which subcultures define their audience — and uncover ones nobody has mapped yet.
           </p>
@@ -69,12 +152,12 @@ export default function BrandAuditPage() {
               </Button>
             </div>
             <p className="text-xs text-muted-foreground">
-              Works best with Twitter/X handles. Instagram and TikTok also supported.
+              Enter the brand&apos;s handle — use the same one across platforms, or set per-platform handles below.
             </p>
           </div>
 
           {/* Platform selector */}
-          <div className="space-y-1.5">
+          <div className="space-y-2">
             <label className="text-sm font-medium text-foreground">Platform</label>
             <div className="flex flex-wrap gap-2">
               {PLATFORMS.map((p) => (
@@ -93,6 +176,84 @@ export default function BrandAuditPage() {
                 </button>
               ))}
             </div>
+
+            {/* Exclude platforms — only relevant when running "all" */}
+            {platform === "all" && (
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                <span className="text-[11px] text-muted-foreground">Exclude:</span>
+                {OVERRIDE_PLATFORMS.map(({ key, label }) => {
+                  const isExcluded = excluded.has(key);
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => toggleExclude(key)}
+                      className={cn(
+                        "px-2.5 py-0.5 rounded-full text-[11px] font-medium border transition-colors",
+                        isExcluded
+                          ? "bg-red-500/10 text-red-500 border-red-500/30 line-through"
+                          : "bg-background text-muted-foreground border-border hover:border-red-400/50 hover:text-red-400"
+                      )}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+                {excluded.size > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setExcluded(new Set())}
+                    className="text-[11px] text-muted-foreground hover:text-foreground underline transition-colors"
+                  >
+                    clear
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Per-platform handle overrides */}
+          <div>
+            <button
+              type="button"
+              onClick={() => setShowOverrides((v) => !v)}
+              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", showOverrides && "rotate-180")} />
+              Per-platform handles
+              {Object.values(overrides).some(Boolean) && (
+                <span className="ml-1 px-1.5 py-0.5 rounded-full bg-indigo-500/15 text-indigo-500 text-[10px] font-bold">
+                  {Object.values(overrides).filter(Boolean).length} overrides
+                </span>
+              )}
+            </button>
+
+            {showOverrides && (
+              <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {OVERRIDE_PLATFORMS.map(({ key, label, placeholder }) => {
+                  const isExcluded = excluded.has(key);
+                  return (
+                    <div key={key} className={cn("space-y-1", isExcluded && "opacity-40 pointer-events-none")}>
+                      <div className="flex items-center gap-1.5">
+                        <label className="text-[11px] font-medium text-muted-foreground">{label}</label>
+                        {isExcluded && <span className="text-[10px] text-red-500 font-medium">(excluded)</span>}
+                      </div>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground select-none">@</span>
+                        <input
+                          type="text"
+                          value={overrides[key] ?? ""}
+                          onChange={(e) => setOverrides((prev) => ({ ...prev, [key]: e.target.value }))}
+                          placeholder={overrides[key] ? "" : (handle.trim().replace(/^@/, "") || placeholder)}
+                          disabled={isExcluded}
+                          className="w-full pl-6 pr-3 py-1.5 rounded-md border border-input bg-background text-xs text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed"
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </form>
 
@@ -105,10 +266,15 @@ export default function BrandAuditPage() {
         )}
 
         {/* Loading state */}
-        {isPending && <AuditSkeleton />}
+        {(auditPending || audiencePending) && <AuditSkeleton />}
 
-        {/* Results */}
-        {isSuccess && data && !isPending && <AuditResults data={data} />}
+        {/* Results — show each section as it arrives, or from session cache */}
+        {!auditPending && displayAudit && (
+          <AuditResults data={displayAudit} isCached={!auditDone} onClear={handleClearResults} />
+        )}
+        {!audiencePending && displayAudience && (
+          <CommunityBreakdown data={displayAudience} />
+        )}
 
         {/* Empty state */}
         {!isPending && !isSuccess && !error && (
@@ -131,28 +297,39 @@ export default function BrandAuditPage() {
 
 // ─── Results ──────────────────────────────────────────────────────────────────
 
-function AuditResults({ data }: { data: BrandAuditResult }) {
-  const strong = data.matched_subcultures.filter((s) => s.match_strength === "strong");
-  const others = data.matched_subcultures.filter((s) => s.match_strength !== "strong");
-
+function AuditResults({ data, isCached, onClear }: { data: BrandAuditResult; isCached?: boolean; onClear?: () => void }) {
   return (
     <div className="space-y-8">
       {/* Data freshness indicator */}
       <div className="flex items-center gap-2">
-        {data.live ? (
+        {isCached && (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-accent border border-border text-muted-foreground text-xs font-medium">
+            <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground" />
+            Session result
+          </span>
+        )}
+        {!isCached && data.live ? (
           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-green-500/10 border border-green-500/30 text-green-600 dark:text-green-400 text-xs font-medium">
             <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
             Live audience data via Apify
           </span>
-        ) : (
+        ) : !isCached ? (
           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-accent border border-border text-muted-foreground text-xs font-medium">
             <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground" />
             {data.fallback ? "Demo data (Apify unavailable)" : "Demo data"}
           </span>
-        )}
+        ) : null}
         <span className="text-xs text-muted-foreground">
           Analyzed {new Date(data.analyzed_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
         </span>
+        {isCached && onClear && (
+          <button
+            onClick={onClear}
+            className="ml-auto text-xs text-muted-foreground hover:text-foreground transition-colors underline"
+          >
+            Clear results
+          </button>
+        )}
       </div>
 
       {/* Stats row */}
@@ -235,6 +412,8 @@ function AuditResults({ data }: { data: BrandAuditResult }) {
 // ─── Matched subculture card ──────────────────────────────────────────────────
 
 function MatchedCard({ rank, sub }: { rank: number; sub: MatchedSubculture }) {
+  const { mutate: createBrief, isPending: isGeneratingBrief, data: briefResult, isError: isBriefError, reset: resetBrief } = useCreateBrief();
+
   const strengthColors = {
     strong: "text-indigo-500 bg-indigo-500/10 border-indigo-500/20",
     moderate: "text-blue-500 bg-blue-500/10 border-blue-500/20",
@@ -290,7 +469,7 @@ function MatchedCard({ rank, sub }: { rank: number; sub: MatchedSubculture }) {
             {/* Why */}
             <p className="text-xs text-muted-foreground leading-relaxed">{sub.why}</p>
 
-            {/* Signals + link */}
+            {/* Signals + actions */}
             <div className="flex items-center justify-between gap-2 flex-wrap">
               <div className="flex flex-wrap gap-1.5">
                 {sub.key_signals.map((s) => (
@@ -299,13 +478,44 @@ function MatchedCard({ rank, sub }: { rank: number; sub: MatchedSubculture }) {
                   </span>
                 ))}
               </div>
-              <Link
-                href={`/dashboard/subcultures/${sub.slug}`}
-                className="inline-flex items-center gap-1 text-xs text-indigo-500 hover:text-indigo-400 transition-colors flex-shrink-0"
-              >
-                View profile
-                <ChevronRight className="h-3 w-3" />
-              </Link>
+              <div className="flex items-center gap-3 flex-shrink-0">
+                {briefResult?.brief ? (
+                  <Link
+                    href={`/dashboard/briefs/${briefResult.brief.id}`}
+                    className="inline-flex items-center gap-1 text-xs text-indigo-500 hover:text-indigo-400 transition-colors font-medium"
+                  >
+                    <FileText className="h-3 w-3" />
+                    View brief
+                  </Link>
+                ) : isBriefError ? (
+                  <button
+                    onClick={() => { resetBrief(); createBrief({ subcultureSlug: sub.slug }); }}
+                    className="inline-flex items-center gap-1 text-xs text-red-500 hover:text-red-400 transition-colors"
+                  >
+                    <AlertCircle className="h-3 w-3" />
+                    Failed — retry?
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => createBrief({ subcultureSlug: sub.slug })}
+                    disabled={isGeneratingBrief}
+                    className="inline-flex items-center gap-1 text-xs text-indigo-500 hover:text-indigo-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isGeneratingBrief ? (
+                      <><Loader2 className="h-3 w-3 animate-spin" />Generating…</>
+                    ) : (
+                      <><FileText className="h-3 w-3" />Generate brief</>
+                    )}
+                  </button>
+                )}
+                <Link
+                  href={`/dashboard/subcultures/${sub.slug}`}
+                  className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  View profile
+                  <ChevronRight className="h-3 w-3" />
+                </Link>
+              </div>
             </div>
           </div>
         </div>
@@ -316,7 +526,38 @@ function MatchedCard({ rank, sub }: { rank: number; sub: MatchedSubculture }) {
 
 // ─── Discovered subculture card ───────────────────────────────────────────────
 
+type AddState = "idle" | "loading" | "done" | "error";
+
 function DiscoveredCard({ rank, sub }: { rank: number; sub: DiscoveredSubculture }) {
+  const [addState, setAddState] = useState<AddState>("idle");
+  const [savedSlug, setSavedSlug] = useState<string | null>(null);
+  const { mutate: createBrief, isPending: isGeneratingBrief, data: briefResult } = useCreateBrief();
+
+  async function handleAddToLibrary() {
+    setAddState("loading");
+    try {
+      const seed = [
+        sub.description,
+        `Key signals: ${sub.key_signals.join(", ")}.`,
+        `Why this is a new subculture: ${sub.why_new}`,
+      ].join(" ");
+
+      const res = await fetch("/api/subcultures/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: sub.name, seed, save: true }),
+      });
+
+      if (!res.ok) throw new Error("Failed");
+      const { subculture } = await res.json();
+      setSavedSlug(subculture?.slug ?? null);
+      setAddState("done");
+    } catch {
+      setAddState("error");
+      setTimeout(() => setAddState("idle"), 3000);
+    }
+  }
+
   return (
     <Card className="border-transparent bg-card/60 hover:bg-card transition-colors">
       <CardContent className="p-5">
@@ -356,7 +597,7 @@ function DiscoveredCard({ rank, sub }: { rank: number; sub: DiscoveredSubculture
               </p>
             </div>
 
-            {/* Signals + generate CTA */}
+            {/* Signals + actions */}
             <div className="flex items-center justify-between gap-2 flex-wrap">
               <div className="flex flex-wrap gap-1.5">
                 {sub.key_signals.map((s) => (
@@ -365,13 +606,61 @@ function DiscoveredCard({ rank, sub }: { rank: number; sub: DiscoveredSubculture
                   </span>
                 ))}
               </div>
-              <Link
-                href={`/dashboard/subcultures?generate=${encodeURIComponent(sub.name)}`}
-                className="inline-flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400 hover:opacity-80 transition-opacity flex-shrink-0 font-medium"
-              >
-                <Sparkles className="h-3 w-3" />
-                Generate profile
-              </Link>
+
+              <div className="flex items-center gap-2 flex-shrink-0">
+                {addState === "done" && savedSlug ? (
+                  <>
+                    <Link
+                      href={`/dashboard/subcultures/${savedSlug}`}
+                      className="inline-flex items-center gap-1 text-xs text-green-600 dark:text-green-400 font-medium hover:opacity-80 transition-opacity"
+                    >
+                      <CheckCircle2 className="h-3 w-3" />
+                      View profile
+                    </Link>
+                    {briefResult?.brief ? (
+                      <Link
+                        href={`/dashboard/briefs/${briefResult.brief.id}`}
+                        className="inline-flex items-center gap-1 text-xs text-indigo-500 hover:text-indigo-400 transition-colors font-medium"
+                      >
+                        <FileText className="h-3 w-3" />
+                        View brief
+                      </Link>
+                    ) : (
+                      <button
+                        onClick={() => createBrief({ subcultureSlug: savedSlug })}
+                        disabled={isGeneratingBrief}
+                        className="inline-flex items-center gap-1 text-xs text-indigo-500 hover:text-indigo-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {isGeneratingBrief ? (
+                          <><Loader2 className="h-3 w-3 animate-spin" />Generating…</>
+                        ) : (
+                          <><FileText className="h-3 w-3" />Generate brief</>
+                        )}
+                      </button>
+                    )}
+                  </>
+                ) : (
+                  <button
+                    onClick={handleAddToLibrary}
+                    disabled={addState === "loading"}
+                    className={cn(
+                      "inline-flex items-center gap-1 text-xs font-medium transition-opacity",
+                      addState === "error"
+                        ? "text-red-500"
+                        : "text-amber-600 dark:text-amber-400 hover:opacity-80",
+                      addState === "loading" && "opacity-60 cursor-not-allowed"
+                    )}
+                  >
+                    {addState === "loading" ? (
+                      <><Loader2 className="h-3 w-3 animate-spin" />Generating…</>
+                    ) : addState === "error" ? (
+                      <>Failed — retry?</>
+                    ) : (
+                      <><Plus className="h-3 w-3" />Add to library</>
+                    )}
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -395,6 +684,79 @@ function StatCard({ icon, label, value }: { icon: React.ReactNode; label: string
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+// ─── Community Breakdown (Apify raw audience data) ────────────────────────────
+
+function CommunityBreakdown({ data }: { data: AudienceResult }) {
+  if (!data.communities || data.communities.length === 0) return null;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2">
+        <Users className="h-4 w-4 text-emerald-500" />
+        <h2 className="text-sm font-semibold text-foreground">Where their audience hangs out</h2>
+        <span className="ml-auto text-xs text-muted-foreground">
+          {data.communities.length} communities · est. {formatNumber(data.estimated_total_audience)} followers
+        </span>
+      </div>
+      <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/[0.02] overflow-hidden divide-y divide-border">
+        {data.communities.map((c, i) => (
+          <div key={c.community_id ?? i} className="flex items-center gap-4 px-5 py-4 hover:bg-accent/40 transition-colors">
+            {/* Rank */}
+            <span className="text-sm font-bold text-muted-foreground/40 w-6 text-right shrink-0">{i + 1}</span>
+
+            {/* Name + platform */}
+            <div className="flex-1 min-w-0 space-y-0.5">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-sm font-medium text-foreground truncate">{c.community_name}</span>
+                <span className="text-[10px] font-medium text-muted-foreground bg-muted px-1.5 py-0.5 rounded capitalize">
+                  {c.platform}
+                </span>
+              </div>
+              {c.description && (
+                <p className="text-xs text-muted-foreground truncate">{c.description}</p>
+              )}
+              {c.shared_topics && c.shared_topics.length > 0 && (
+                <div className="flex flex-wrap gap-1 pt-0.5">
+                  {c.shared_topics.slice(0, 4).map((t) => (
+                    <span key={t} className="px-1.5 py-0.5 rounded-full bg-emerald-500/8 text-emerald-700 dark:text-emerald-400 border border-emerald-500/15 text-[10px] font-medium">
+                      {t}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Stats */}
+            <div className="shrink-0 text-right space-y-1">
+              {c.overlap_pct != null && (
+                <div>
+                  <span className="text-base font-bold text-foreground leading-none">{c.overlap_pct}%</span>
+                  <p className="text-[10px] text-muted-foreground">overlap</p>
+                </div>
+              )}
+              {c.community_size != null && (
+                <p className="text-[10px] text-muted-foreground">{formatNumber(c.community_size)} members</p>
+              )}
+            </div>
+
+            {/* Overlap bar */}
+            {c.overlap_pct != null && (
+              <div className="hidden sm:block w-20 shrink-0">
+                <div className="h-1.5 rounded-full bg-accent overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-emerald-500/70 transition-all"
+                    style={{ width: `${Math.min(c.overlap_pct, 100)}%` }}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 

@@ -9,7 +9,7 @@ export const maxDuration = 120;
 
 const generateSchema = z.object({
   name: z.string().min(1).max(100).trim(),
-  seed: z.string().max(500).optional(),
+  seed: z.string().max(2000).optional(),
   save: z.boolean().default(true),
 });
 
