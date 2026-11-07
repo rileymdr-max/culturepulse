@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { Bookmark, Clock, AlertCircle, CheckCircle2, Search } from "lucide-react";
 import { NavHeader } from "@/components/nav-header";
@@ -32,7 +32,16 @@ function saveRecentSearch(query: string) {
   } catch { /* storage unavailable */ }
 }
 
-export default function DashboardPage() {
+// Next.js 14 requires useSearchParams to be inside a Suspense boundary
+export default function SearchPage() {
+  return (
+    <Suspense>
+      <SearchPageInner />
+    </Suspense>
+  );
+}
+
+function SearchPageInner() {
   const searchParams = useSearchParams();
   const [savedOpen, setSavedOpen] = useState(false);
   const [compareList, setCompareList] = useState<CommunityData[]>([]);
@@ -270,7 +279,7 @@ export default function DashboardPage() {
   );
 }
 
-// ─── Platform Status Bar ──────────────────────────────────────────────────────
+// ─── Platform Status Bar ─────────────────────────────────────────────────────
 
 function PlatformStatusBar({ statuses }: { statuses?: PlatformStatus[] }) {
   const [expanded, setExpanded] = useState(false);
