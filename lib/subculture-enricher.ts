@@ -54,18 +54,7 @@ function extractKeyTerms(query: string): { primary: string; hashtags: string[] }
 }
 
 // ─── Reddit ───────────────────────────────────────────────────────────────────
-
-interface ApifyRedditPost {
-  title?: string;
-  parsedCommunityName?: string;
-  subreddit?: string;
-  communityName?: string;
-  score?: number;
-  numberOfComments?: number;
-  numComments?: number;
-  permalink?: string;
-  url?: string;
-}
+// Uses Reddit's public search JSON API — no Apify, no auth required.
 
 async function fetchSubredditSize(sub: string): Promise<number | undefined> {
   try {
@@ -84,34 +73,34 @@ async function fetchSubredditSize(sub: string): Promise<number | undefined> {
 async function enrichReddit(query: string): Promise<RedditSignal | undefined> {
   try {
     const { primary } = extractKeyTerms(query);
-    const posts = await runActor<ApifyRedditPost>("trudax/reddit-scraper-lite", {
-      searches: [primary],
-      searchPosts: true,
-      searchCommunities: false,
-      sort: "relevance",
-      maxItems: 40,
-      skipComments: true,
-      proxy: { useApifyProxy: true },
-    }, 50);
+    // Use Reddit's public search JSON API — no Apify needed, no auth required
+    const searchUrl =
+      `https://www.reddit.com/search.json?q=${encodeURIComponent(primary)}` +
+      `&sort=relevance&limit=50&type=link&t=year`;
+    const res = await fetch(searchUrl, {
+      headers: { "User-Agent": "CulturePulse/1.0 (signal enrichment)" },
+      signal: AbortSignal.timeout(12000),
+    });
+    if (!res.ok) throw new Error(`Reddit search HTTP ${res.status}`);
 
+    interface RawPost {
+      data: { title: string; subreddit: string; score: number; num_comments: number; permalink: string };
+    }
+    const json = await res.json() as { data?: { children?: RawPost[] } };
+    const posts = json?.data?.children ?? [];
     if (!posts.length) return undefined;
 
     // Group by subreddit
-    const subredditMap = new Map<string, { posts: ApifyRedditPost[]; engagement: number }>();
+    const subredditMap = new Map<string, { posts: RawPost[]; engagement: number }>();
     for (const p of posts) {
-      const sub = (p.parsedCommunityName ?? p.subreddit ?? p.communityName ?? "")
-        .replace(/^r\//, "")
-        .trim();
+      const sub = p.data.subreddit.replace(/^r\//, "").trim();
       if (!sub) continue;
-      const comments = p.numberOfComments ?? p.numComments ?? 0;
-      const score = p.score ?? 0;
       const entry = subredditMap.get(sub) ?? { posts: [], engagement: 0 };
       entry.posts.push(p);
-      entry.engagement += score + comments * 3;
+      entry.engagement += p.data.score + p.data.num_comments * 3;
       subredditMap.set(sub, entry);
     }
 
-    // Fetch real subscriber counts for top 5 subreddits in parallel
     const topSubs = Array.from(subredditMap.entries())
       .sort(([, a], [, b]) => b.engagement - a.engagement)
       .slice(0, 5);
@@ -127,24 +116,16 @@ async function enrichReddit(query: string): Promise<RedditSignal | undefined> {
       subscriber_count: subscriberCounts[i],
     }));
 
-    // Top posts sorted by score
     const topPosts: RedditPost[] = posts
-      .filter((p) => p.title)
-      .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
+      .sort((a, b) => b.data.score - a.data.score)
       .slice(0, 10)
-      .map((p) => {
-        const sub = (p.parsedCommunityName ?? p.subreddit ?? p.communityName ?? "unknown")
-          .replace(/^r\//, "");
-        return {
-          title: p.title!,
-          url: p.permalink
-            ? `https://www.reddit.com${p.permalink}`
-            : (p.url ?? `https://www.reddit.com/search/?q=${encodeURIComponent(query)}`),
-          subreddit: sub,
-          score: p.score ?? 0,
-          comments: p.numberOfComments ?? p.numComments ?? 0,
-        };
-      });
+      .map((p) => ({
+        title: p.data.title,
+        url: `https://www.reddit.com${p.data.permalink}`,
+        subreddit: p.data.subreddit,
+        score: p.data.score,
+        comments: p.data.num_comments,
+      }));
 
     return {
       communities,
@@ -177,11 +158,9 @@ async function enrichTikTok(query: string): Promise<TikTokSignal | undefined> {
     const searchQueries = [primary, ...hashtags.slice(0, 2)];
     const videos = await runActor<ApifyTikTokVideo>("clockworks/tiktok-scraper", {
       searchQueries,
-      resultsPerPage: 20,
-      maxResults: 25,
+      resultsPerPage: 25,
       shouldDownloadVideos: false,
       shouldDownloadCovers: false,
-      shouldDownloadSubtitles: false,
     }, 65);
 
     if (!videos.length) return undefined;
