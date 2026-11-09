@@ -34,7 +34,70 @@ export interface SubcultureBrandFitSignals {
   red_flags: string[];
 }
 
-// Matches the tool output schema (snake_case) before mapping to Prisma (camelCase)
+// ─── Live signal data (real scraped, per platform) ────────────────────────────
+
+export interface RedditPost {
+  title: string;
+  url: string;
+  subreddit: string;
+  score: number;
+  comments: number;
+}
+
+export interface RedditCommunity {
+  subreddit: string;
+  posts_found: number;
+  engagement: number;
+  subscriber_count?: number;
+}
+
+export interface RedditSignal {
+  communities: RedditCommunity[];
+  top_posts: RedditPost[];
+  total_posts_found: number;
+  scraped_at: string;
+}
+
+export interface TikTokVideo {
+  caption: string;
+  url: string;
+  views: number;
+  likes: number;
+  creator: string;
+  creator_followers?: number;
+}
+
+export interface TikTokSignal {
+  videos_found: number;
+  top_videos: TikTokVideo[];
+  top_hashtags: string[];
+  total_views: number;
+  scraped_at: string;
+}
+
+export interface TwitterPost {
+  text: string;
+  url: string;
+  engagement: number;
+  author?: string;
+}
+
+export interface TwitterSignal {
+  tweets_found: number;
+  top_tweets: TwitterPost[];
+  total_engagement: number;
+  scraped_at: string;
+}
+
+export interface SubcultureSignalData {
+  reddit?: RedditSignal;
+  tiktok?: TikTokSignal;
+  twitter?: TwitterSignal;
+  enriched_at: string;
+}
+
+// ─── Profile (snake_case — matches tool output, maps to Prisma camelCase) ─────
+
 export interface SubcultureProfile {
   name: string;
   slug: string;
@@ -50,4 +113,5 @@ export interface SubcultureProfile {
   psychographics: SubculturePsychographics;
   adjacent_subcultures: string[];
   brand_fit_signals: SubcultureBrandFitSignals;
+  signal_data?: SubcultureSignalData;
 }

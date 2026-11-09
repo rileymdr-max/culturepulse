@@ -2,15 +2,20 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireSession, badRequest, serverError } from "@/lib/api-helpers";
 import { generateSubcultureProfile } from "@/lib/subculture-generator";
+import { enrichSubcultureWithSignals } from "@/lib/subculture-enricher";
 import { prisma, withDbRetry } from "@/lib/prisma";
+import type { SubcultureProfile, SubcultureSignalData } from "@/lib/types/subculture";
 
-// Claude generation + DB write can take up to 90 seconds
-export const maxDuration = 120;
+// Scrape (60s) + Claude generation (60s) + DB write
+export const maxDuration = 300;
 
 const generateSchema = z.object({
   name: z.string().min(1).max(100).trim(),
   seed: z.string().max(2000).optional(),
   save: z.boolean().default(true),
+  // Pass a pre-built profile + signal_data to skip generation and just save
+  profile: z.unknown().optional(),
+  signal_data: z.unknown().optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -29,10 +34,26 @@ export async function POST(req: NextRequest) {
     return badRequest("Invalid request body.", parsed.error.flatten());
   }
 
-  const { name, seed, save } = parsed.data;
+  const { name, seed, save, profile: prebuiltProfile, signal_data: prebuiltSignals } = parsed.data;
 
   try {
-    const profile = await generateSubcultureProfile(name, seed);
+    let profile: SubcultureProfile;
+    let signalData: SubcultureSignalData | undefined;
+
+    if (prebuiltProfile && save) {
+      // Skip generation — user is saving a profile they already previewed
+      profile = prebuiltProfile as SubcultureProfile;
+      signalData = prebuiltSignals as SubcultureSignalData | undefined;
+    } else {
+      // 1. Scrape real signals in parallel across Reddit, TikTok, Twitter
+      signalData = await enrichSubcultureWithSignals(seed ?? name);
+
+      // 2. Generate profile with real signals as Claude context
+      profile = await generateSubcultureProfile(name, seed, signalData);
+    }
+
+    // Attach signal_data to the profile for the response
+    profile.signal_data = signalData;
 
     if (!save) {
       return NextResponse.json({ profile, saved: false });
@@ -63,6 +84,7 @@ export async function POST(req: NextRequest) {
         psychographics: profile.psychographics as object,
         adjacentSubcultures: profile.adjacent_subcultures,
         brandFitSignals: profile.brand_fit_signals as object,
+        signalData: signalData as object ?? null,
         generatedByAi: true,
         reviewedBy: null,
       },

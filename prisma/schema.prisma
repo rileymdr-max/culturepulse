@@ -170,6 +170,9 @@ model Subculture {
   adjacentSubcultures   String[]
   brandFitSignals       Json  // { fit_industries, red_flags }
 
+  // Live signal data (real scraped — per platform, with source labels)
+  signalData      Json?
+
   // Provenance
   generatedByAi   Boolean  @default(false)
   enrichedByApify Boolean  @default(false)

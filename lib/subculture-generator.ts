@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
-import type { SubcultureProfile } from "./types/subculture";
+import type { SubcultureProfile, SubcultureSignalData } from "./types/subculture";
+import { buildSignalContext } from "./subculture-enricher";
 
 const SYSTEM_PROMPT = `You are a subcultural intelligence analyst building profiles for Speedbag — a cultural monitoring platform used by advertising agencies to identify emerging conversations before they trend mainstream.
 
@@ -234,9 +235,13 @@ const PROFILE_TOOL = {
 
 export async function generateSubcultureProfile(
   name: string,
-  seed?: string
+  seed?: string,
+  signalData?: SubcultureSignalData
 ): Promise<SubcultureProfile> {
   const client = new Anthropic();
+
+  const signalBlock = signalData ? `\n\n${buildSignalContext(signalData)}` : "";
+  const userMessage = `Generate a complete subculture profile for: ${name}${seed ? `\n\nAdditional context: ${seed}` : ""}${signalBlock}`;
 
   const stream = client.messages.stream({
     model: "claude-opus-5-5",
@@ -246,7 +251,7 @@ export async function generateSubcultureProfile(
     messages: [
       {
         role: "user",
-        content: `Generate a complete subculture profile for: ${name}${seed ? `\n\nAdditional context: ${seed}` : ""}`,
+        content: userMessage,
       },
     ],
   });
