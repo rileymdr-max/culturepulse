@@ -1,6 +1,7 @@
 "use client";
 
-import { Radio, Bookmark, GitCompare, CreditCard, Layers } from "lucide-react";
+import { Bookmark, GitCompare, CreditCard } from "lucide-react";
+import { Logo, LogoMark } from "@/components/logo";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
@@ -16,7 +17,7 @@ interface NavHeaderProps {
 }
 
 export function NavHeader({ onOpenSaved, compareCount = 0, onOpenCompare }: NavHeaderProps) {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
   const pathname = usePathname();
   const currentPlan = useCurrentPlan();
   const plan = PLANS[currentPlan];
@@ -36,19 +37,9 @@ export function NavHeader({ onOpenSaved, compareCount = 0, onOpenCompare }: NavH
     <header className="sticky top-0 z-30 border-b border-border bg-card/80 backdrop-blur-md">
       <div className="max-w-screen-xl mx-auto px-4 sm:px-6 flex items-center h-14 gap-4">
         {/* Brand */}
-        <Link href="/dashboard" className="flex items-center gap-2 shrink-0">
-          <div className="relative">
-            <Radio className="h-5 w-5 text-indigo-500" />
-            <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-indigo-500 animate-pulse" />
-          </div>
-          <div className="hidden sm:flex flex-col leading-none">
-            <span className="font-bold text-foreground tracking-tight text-sm">
-              CulturePulse
-            </span>
-            <span className="text-[9px] font-medium text-muted-foreground tracking-wide uppercase mt-0.5">
-              Social Intelligence Platform
-            </span>
-          </div>
+        <Link href="/dashboard" className="flex items-center shrink-0" aria-label="CulturePulse home">
+          <LogoMark className="sm:hidden" />
+          <Logo className="hidden sm:inline-flex" />
         </Link>
 
         {/* Nav links */}
@@ -82,7 +73,7 @@ export function NavHeader({ onOpenSaved, compareCount = 0, onOpenCompare }: NavH
               <Button variant="outline" size="sm" className="gap-1.5 relative">
                 <GitCompare className="h-4 w-4" />
                 <span className="hidden sm:inline">Compare</span>
-                <span className="absolute -top-1.5 -right-1.5 h-4 w-4 rounded-full bg-indigo-600 text-white text-[10px] font-bold flex items-center justify-center">
+                <span className="absolute -top-1.5 -right-1.5 h-4 w-4 rounded-full bg-primary text-primary-foreground text-[10px] font-bold tabular-nums flex items-center justify-center">
                   {compareCount}
                 </span>
               </Button>
@@ -97,6 +88,8 @@ export function NavHeader({ onOpenSaved, compareCount = 0, onOpenCompare }: NavH
           )}
 
           {/* Plan badge + billing link */}
+          {/* Hidden until the session loads, so paid plans never flash "FREE" */}
+          {status === "authenticated" && (
           <Link href="/dashboard/billing">
             <span className={cn(
               "hidden sm:inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full border cursor-pointer transition-colors hover:opacity-80",
@@ -109,6 +102,7 @@ export function NavHeader({ onOpenSaved, compareCount = 0, onOpenCompare }: NavH
               {plan.name.toUpperCase()}
             </span>
           </Link>
+          )}
 
           {/* User avatar + sign out */}
           <button
