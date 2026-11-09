@@ -70,34 +70,35 @@ async function fetchSubredditSize(sub: string): Promise<number | undefined> {
   }
 }
 
+interface ApifyRedditPost {
+  title?: string;
+  communityName?: string;
+  score?: number;
+  commentCount?: number;
+  url?: string;
+}
+
 async function enrichReddit(query: string): Promise<RedditSignal | undefined> {
   try {
     const { primary } = extractKeyTerms(query);
-    // Use Reddit's public search JSON API — no Apify needed, no auth required
-    const searchUrl =
-      `https://www.reddit.com/search.json?q=${encodeURIComponent(primary)}` +
-      `&sort=relevance&limit=50&type=link&t=year`;
-    const res = await fetch(searchUrl, {
-      headers: { "User-Agent": "CulturePulse/1.0 (signal enrichment)" },
-      signal: AbortSignal.timeout(12000),
-    });
-    if (!res.ok) throw new Error(`Reddit search HTTP ${res.status}`);
+    const posts = await runActor<ApifyRedditPost>("apify/reddit-scraper", {
+      scrapeMode: "posts",
+      searchQueries: [primary],
+      searchSort: "relevance",
+      searchTimeFilter: "year",
+      maxSearchResultsPerQuery: 40,
+    }, 45);
 
-    interface RawPost {
-      data: { title: string; subreddit: string; score: number; num_comments: number; permalink: string };
-    }
-    const json = await res.json() as { data?: { children?: RawPost[] } };
-    const posts = json?.data?.children ?? [];
     if (!posts.length) return undefined;
 
     // Group by subreddit
-    const subredditMap = new Map<string, { posts: RawPost[]; engagement: number }>();
+    const subredditMap = new Map<string, { posts: ApifyRedditPost[]; engagement: number }>();
     for (const p of posts) {
-      const sub = p.data.subreddit.replace(/^r\//, "").trim();
+      const sub = (p.communityName ?? "").replace(/^r\//, "").trim();
       if (!sub) continue;
       const entry = subredditMap.get(sub) ?? { posts: [], engagement: 0 };
       entry.posts.push(p);
-      entry.engagement += p.data.score + p.data.num_comments * 3;
+      entry.engagement += (p.score ?? 0) + (p.commentCount ?? 0) * 3;
       subredditMap.set(sub, entry);
     }
 
@@ -117,14 +118,15 @@ async function enrichReddit(query: string): Promise<RedditSignal | undefined> {
     }));
 
     const topPosts: RedditPost[] = posts
-      .sort((a, b) => b.data.score - a.data.score)
+      .filter((p) => p.title && p.url)
+      .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
       .slice(0, 10)
       .map((p) => ({
-        title: p.data.title,
-        url: `https://www.reddit.com${p.data.permalink}`,
-        subreddit: p.data.subreddit,
-        score: p.data.score,
-        comments: p.data.num_comments,
+        title: p.title!,
+        url: p.url!,
+        subreddit: (p.communityName ?? "unknown").replace(/^r\//, ""),
+        score: p.score ?? 0,
+        comments: p.commentCount ?? 0,
       }));
 
     return {
