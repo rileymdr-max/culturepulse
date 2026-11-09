@@ -18,7 +18,7 @@ export async function POST(_req: NextRequest) {
     }
 
     const stripe = getStripe();
-    const appUrl = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
+    const appUrl = process.env.NEXTAUTH_URL ?? (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");
 
     const portalSession = await stripe.billingPortal.sessions.create({
       customer: user.stripeCustomerId,

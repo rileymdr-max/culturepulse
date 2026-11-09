@@ -2,37 +2,31 @@ import { cn } from "@/lib/utils";
 
 const PLATFORM_CONFIG: Record<
   string,
-  { label: string; color: string; dot: string }
+  { label: string; dot: string }
 > = {
   reddit: {
     label: "Reddit",
-    color: "bg-orange-900/40 text-orange-400 border-orange-800/60",
-    dot: "bg-orange-400",
+    dot: "bg-orange-500",
   },
   twitter: {
     label: "X / Twitter",
-    color: "bg-slate-800/60 text-slate-300 border-slate-700",
-    dot: "bg-slate-300",
+    dot: "bg-foreground",
   },
   substack: {
     label: "Substack",
-    color: "bg-amber-900/40 text-amber-400 border-amber-800/60",
-    dot: "bg-amber-400",
+    dot: "bg-amber-500",
   },
   tiktok: {
     label: "TikTok",
-    color: "bg-pink-900/40 text-pink-400 border-pink-800/60",
-    dot: "bg-pink-400",
+    dot: "bg-pink-500",
   },
   instagram: {
     label: "Instagram",
-    color: "bg-purple-900/40 text-purple-400 border-purple-800/60",
-    dot: "bg-purple-400",
+    dot: "bg-purple-500",
   },
   facebook: {
     label: "Facebook",
-    color: "bg-blue-900/40 text-blue-400 border-blue-800/60",
-    dot: "bg-blue-400",
+    dot: "bg-blue-500",
   },
 };
 
@@ -45,15 +39,13 @@ interface PlatformBadgeProps {
 export function PlatformBadge({ platform, className, showDot = true }: PlatformBadgeProps) {
   const config = PLATFORM_CONFIG[platform.toLowerCase()] ?? {
     label: platform,
-    color: "bg-muted text-muted-foreground border-border",
     dot: "bg-muted-foreground",
   };
 
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium",
-        config.color,
+        "inline-flex items-center gap-1.5 rounded-md bg-muted px-2 py-0.5 text-xs font-medium text-foreground",
         className
       )}
     >

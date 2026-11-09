@@ -63,7 +63,7 @@ export async function POST(
           },
         });
 
-    const appUrl = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
+    const appUrl = process.env.NEXTAUTH_URL ?? (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");
     const inviteUrl = `${appUrl}/join/${invite.token}`;
 
     return NextResponse.json({ invite, inviteUrl }, { status: 201 });

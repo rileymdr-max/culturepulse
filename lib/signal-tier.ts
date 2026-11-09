@@ -12,10 +12,10 @@ export function signalTier(signal: AccelerationSignal): SignalTier {
 }
 
 /** Token-based classes — readable in light and dark mode. */
-export const TIER_STYLE: Record<SignalTier, { label: string; text: string }> = {
-  breakout: { label: "Breakout", text: "text-tier-breakout" },
-  trending: { label: "Trending", text: "text-tier-trending" },
-  rising: { label: "Rising", text: "text-tier-rising" },
-  stable: { label: "Stable", text: "text-muted-foreground" },
-  cooling: { label: "Cooling", text: "text-muted-foreground" },
+export const TIER_STYLE: Record<SignalTier, { label: string; text: string; dot: string }> = {
+  breakout: { label: "Breakout", text: "text-tier-breakout", dot: "bg-tier-breakout" },
+  trending: { label: "Trending", text: "text-tier-trending", dot: "bg-tier-trending" },
+  rising: { label: "Rising", text: "text-tier-rising", dot: "bg-tier-rising" },
+  stable: { label: "Stable", text: "text-muted-foreground", dot: "bg-muted-foreground" },
+  cooling: { label: "Cooling", text: "text-muted-foreground", dot: "bg-muted-foreground" },
 };
