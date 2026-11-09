@@ -1,16 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import {
-  Users, Plus, Trash2, Mail, Copy, CheckCircle,
-  AlertCircle, Loader2, Palette, Settings, Shield,
-} from "lucide-react";
+import { Plus, Trash2, Mail, Copy, Check, AlertCircle, Loader2, Palette, X } from "lucide-react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { NavHeader } from "@/components/nav-header";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { PlanGate } from "@/components/plan-gate";
@@ -20,7 +15,12 @@ import {
   type WorkspaceSummary, type WorkspaceMember, type WorkspaceInvite,
 } from "@/hooks/use-workspace";
 
-// ─── Workspace card ───────────────────────────────────────────────────────────
+const inputCls =
+  "h-9 rounded-lg border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring";
+
+const ROLE_LABEL: Record<string, string> = { owner: "Owner", admin: "Admin", member: "Member" };
+
+// Workspace card ─────────────────────────────────────────────────────────────
 
 function WorkspaceCard({ ws, currentUserId }: { ws: WorkspaceSummary; currentUserId: string }) {
   const { data } = useWorkspace(ws.id);
@@ -34,7 +34,9 @@ function WorkspaceCard({ ws, currentUserId }: { ws: WorkspaceSummary; currentUse
 
   const workspace = data?.workspace ?? ws;
   const isOwner = ws.owner.id === currentUserId;
-  const brandColor = ws.brandColor ?? "#3b82f6";
+  const displayName = ws.brandName ?? ws.name;
+  const members = "members" in workspace && Array.isArray(workspace.members) ? (workspace.members as WorkspaceMember[]) : null;
+  const invites = "invites" in workspace && Array.isArray(workspace.invites) ? (workspace.invites as WorkspaceInvite[]) : [];
 
   async function handleCopyInvite(url: string) {
     await navigator.clipboard.writeText(url);
@@ -43,103 +45,80 @@ function WorkspaceCard({ ws, currentUserId }: { ws: WorkspaceSummary; currentUse
   }
 
   return (
-    <Card style={{ borderColor: `${brandColor}30` }}>
-      <CardHeader className="pb-3">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex items-center gap-3">
-            {ws.brandLogo ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={ws.brandLogo} alt="logo" className="h-8 w-8 rounded object-contain border border-border" />
-            ) : (
-              <div
-                className="h-8 w-8 rounded flex items-center justify-center text-white font-bold text-sm shrink-0"
-                style={{ backgroundColor: brandColor }}
-              >
-                {(ws.brandName ?? ws.name).charAt(0).toUpperCase()}
-              </div>
-            )}
-            <div>
-              <CardTitle className="text-base">{ws.brandName ?? ws.name}</CardTitle>
-              {ws.brandName && ws.brandName !== ws.name && (
-                <p className="text-xs text-muted-foreground">{ws.name}</p>
-              )}
-            </div>
+    <article className="flex flex-col rounded-xl border border-border bg-card p-6">
+      {/* Header */}
+      <header className="flex items-center gap-3">
+        {ws.brandLogo ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={ws.brandLogo} alt="" className="h-10 w-10 shrink-0 rounded-lg border border-border object-contain" />
+        ) : (
+          <div
+            aria-hidden
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-sm font-semibold text-white"
+            style={{ backgroundColor: ws.brandColor ?? "hsl(var(--primary))" }}
+          >
+            {displayName.charAt(0).toUpperCase()}
           </div>
-          <span className="text-xs text-muted-foreground shrink-0">
+        )}
+        <div className="min-w-0 flex-1">
+          <h2 className="truncate font-semibold tracking-tight">{displayName}</h2>
+          <p className="text-sm text-muted-foreground tabular-nums">
+            {ws.brandName && ws.brandName !== ws.name ? `${ws.name} · ` : ""}
             {ws._count.members} member{ws._count.members !== 1 ? "s" : ""}
-          </span>
+          </p>
         </div>
-      </CardHeader>
+      </header>
 
-      <CardContent className="space-y-5">
-        {/* Members list */}
-        {"members" in workspace && Array.isArray(workspace.members) && (
-          <div className="space-y-2">
-            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-              <Users className="h-3 w-3" />Members
-            </p>
-            {(workspace.members as WorkspaceMember[]).map((m) => (
-              <div key={m.id} className="flex items-center gap-2 text-sm">
-                <div className="h-6 w-6 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold text-muted-foreground shrink-0">
+      {/* Members */}
+      {members && (
+        <section className="mt-6">
+          <h3 className="text-sm font-semibold">Members</h3>
+          <ul className="mt-2 divide-y divide-border">
+            {members.map((m) => (
+              <li key={m.id} className="flex items-center gap-3 py-2 text-sm">
+                <span aria-hidden className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium">
                   {(m.user.name ?? m.user.email).charAt(0).toUpperCase()}
-                </div>
-                <span className="flex-1 truncate text-foreground">{m.user.name ?? m.user.email}</span>
-                <span className={cn(
-                  "text-[10px] px-1.5 py-0.5 rounded border",
-                  m.role === "owner" ? "bg-blue-500/10 text-blue-400 border-blue-500/20" :
-                  m.role === "admin" ? "bg-amber-500/10 text-amber-400 border-amber-500/20" :
-                  "bg-muted text-muted-foreground border-border"
-                )}>
-                  {m.role}
                 </span>
+                <span className="min-w-0 flex-1 truncate">{m.user.name ?? m.user.email}</span>
+                <span className="text-xs text-muted-foreground">{ROLE_LABEL[m.role] ?? m.role}</span>
                 {isOwner && m.role !== "owner" && (
-                  <Button
-                    variant="ghost" size="icon"
-                    className="h-6 w-6 text-muted-foreground/50 hover:text-red-400"
+                  <button
+                    type="button"
+                    aria-label={`Remove ${m.user.name ?? m.user.email}`}
                     disabled={isRemoving}
                     onClick={() => removeMember(m.user.id)}
+                    className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:opacity-50"
                   >
-                    <Trash2 className="h-3 w-3" />
-                  </Button>
+                    <X className="h-3.5 w-3.5" />
+                  </button>
                 )}
-              </div>
+              </li>
             ))}
-          </div>
-        )}
+          </ul>
+        </section>
+      )}
 
-        {/* Pending invites */}
-        {"invites" in workspace && Array.isArray(workspace.invites) && workspace.invites.length > 0 && (
-          <div className="space-y-1">
-            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-              Pending invites
-            </p>
-            {(workspace.invites as WorkspaceInvite[]).map((inv) => (
-              <div key={inv.id} className="flex items-center gap-2 text-xs text-muted-foreground">
-                <Mail className="h-3 w-3 shrink-0" />
-                <span className="flex-1 truncate">{inv.email}</span>
-                <span className="shrink-0">({inv.role})</span>
-              </div>
+      {/* Pending invites */}
+      {invites.length > 0 && (
+        <section className="mt-5">
+          <h3 className="text-sm font-semibold">Waiting to join</h3>
+          <ul className="mt-2 space-y-1.5">
+            {invites.map((inv) => (
+              <li key={inv.id} className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Mail className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                <span className="min-w-0 flex-1 truncate">{inv.email}</span>
+                <span className="text-xs">{ROLE_LABEL[inv.role] ?? inv.role}</span>
+              </li>
             ))}
-          </div>
-        )}
+          </ul>
+        </section>
+      )}
 
-        {/* Invite URL result */}
-        {inviteResult && (
-          <div className="flex items-center gap-2 p-2 rounded-lg bg-muted/50 border border-border text-xs">
-            <span className="flex-1 truncate font-mono text-muted-foreground">{inviteResult.inviteUrl}</span>
-            <Button
-              variant="ghost" size="icon" className="h-6 w-6 shrink-0"
-              onClick={() => handleCopyInvite(inviteResult.inviteUrl)}
-            >
-              {copied ? <CheckCircle className="h-3.5 w-3.5 text-green-400" /> : <Copy className="h-3.5 w-3.5" />}
-            </Button>
-          </div>
-        )}
-
-        {/* Invite form */}
-        {isOwner && (
+      {/* Invite */}
+      {isOwner && (
+        <section className="mt-6">
           <form
-            className="flex gap-2"
+            className="flex flex-wrap gap-2"
             onSubmit={(e) => {
               e.preventDefault();
               if (!inviteEmail) return;
@@ -147,58 +126,76 @@ function WorkspaceCard({ ws, currentUserId }: { ws: WorkspaceSummary; currentUse
               setInviteEmail("");
             }}
           >
-            <Input
+            <label className="sr-only" htmlFor={`invite-${ws.id}`}>Email to invite</label>
+            <input
+              id={`invite-${ws.id}`}
               type="email"
-              placeholder="Invite by email"
+              placeholder="name@company.com"
               value={inviteEmail}
               onChange={(e) => setInviteEmail(e.target.value)}
-              className="h-8 text-sm flex-1"
+              className={cn(inputCls, "min-w-0 flex-1")}
             />
+            <label className="sr-only" htmlFor={`role-${ws.id}`}>Role</label>
             <select
+              id={`role-${ws.id}`}
               value={inviteRole}
               onChange={(e) => setInviteRole(e.target.value as "admin" | "member")}
-              className="h-8 rounded-md border border-border bg-background text-sm px-2 text-foreground"
+              className={cn(inputCls, "px-2")}
             >
               <option value="member">Member</option>
               <option value="admin">Admin</option>
             </select>
-            <Button type="submit" size="sm" className="h-8 gap-1.5" disabled={isInviting || !inviteEmail}>
-              {isInviting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
+            <Button type="submit" disabled={isInviting || !inviteEmail}>
+              {isInviting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
               Invite
             </Button>
           </form>
-        )}
 
-        {/* Actions */}
-        <div className="flex items-center gap-2 pt-2 border-t border-border/50">
-          <Link href={`/dashboard/workspace/branding?id=${ws.id}`} className="flex-1">
-            <Button variant="ghost" size="sm" className="gap-1.5 text-xs w-full">
-              <Palette className="h-3.5 w-3.5" />Branding
-            </Button>
-          </Link>
-          {isOwner && (
-            <Button
-              variant="ghost" size="sm"
-              className={cn("text-xs gap-1.5", confirmDelete ? "text-red-400 hover:text-red-300" : "text-muted-foreground")}
-              disabled={isDeleting}
-              onClick={() => { if (!confirmDelete) { setConfirmDelete(true); return; } deleteWs(ws.id); }}
-              onBlur={() => setConfirmDelete(false)}
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-              {confirmDelete ? "Confirm?" : "Delete"}
-            </Button>
+          {inviteResult && (
+            <div className="mt-3 rounded-lg bg-muted p-3 animate-in fade-in duration-200">
+              <p className="text-xs font-medium text-muted-foreground">Invite link. Send it to them directly:</p>
+              <div className="mt-1.5 flex items-center gap-2">
+                <span className="min-w-0 flex-1 truncate text-sm">{inviteResult.inviteUrl}</span>
+                <Button type="button" variant="outline" size="sm" onClick={() => handleCopyInvite(inviteResult.inviteUrl)}>
+                  {copied ? <Check className="h-3.5 w-3.5 text-primary" /> : <Copy className="h-3.5 w-3.5" />}
+                  {copied ? "Copied" : "Copy"}
+                </Button>
+              </div>
+            </div>
           )}
-        </div>
-      </CardContent>
-    </Card>
+        </section>
+      )}
+
+      {/* Actions */}
+      <footer className="mt-6 flex items-center gap-1 border-t border-border pt-4">
+        <Link
+          href={`/dashboard/workspace/branding?id=${ws.id}`}
+          className="inline-flex h-8 items-center gap-1.5 rounded-lg px-3 text-xs font-medium transition-colors hover:bg-accent hover:text-accent-foreground"
+        >
+          <Palette className="h-3.5 w-3.5" aria-hidden />Branding
+        </Link>
+        {isOwner && (
+          <Button
+            variant="ghost" size="sm"
+            className={cn("ml-auto", confirmDelete ? "text-destructive hover:text-destructive" : "text-muted-foreground")}
+            disabled={isDeleting}
+            onClick={() => { if (!confirmDelete) { setConfirmDelete(true); return; } deleteWs(ws.id); }}
+            onBlur={() => setConfirmDelete(false)}
+          >
+            {isDeleting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+            {confirmDelete ? "Click again to delete" : "Delete workspace"}
+          </Button>
+        )}
+      </footer>
+    </article>
   );
 }
 
-// ─── Page ─────────────────────────────────────────────────────────────────────
+// Page ───────────────────────────────────────────────────────────────────────
 
 export default function WorkspacePage() {
   const { data: session } = useSession();
-  const { data, isLoading, error } = useWorkspaces();
+  const { data, isLoading, error, refetch } = useWorkspaces();
   const { mutate: createWs, isPending: isCreating } = useCreateWorkspace();
   const [newName, setNewName] = useState("");
 
@@ -206,86 +203,75 @@ export default function WorkspacePage() {
   const currentUserId = session?.user?.id ?? "";
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="flex min-h-screen flex-col bg-background">
       <NavHeader />
 
-      <main className="flex-1 max-w-screen-xl mx-auto w-full px-4 sm:px-6 py-8 space-y-6">
-        <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-              <Settings className="h-6 w-6 text-blue-400" />
-              Workspaces
-            </h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Shared team environments for Agency-tier accounts. Invite clients, apply branding.
-            </p>
-          </div>
+      <main className="mx-auto w-full max-w-screen-xl flex-1 px-4 py-10 sm:px-6">
+        <header>
+          <h1 className="text-3xl font-semibold tracking-tight">Workspaces</h1>
+          <p className="mt-2 max-w-2xl text-muted-foreground">
+            Shared spaces for each client or team, with their own members and branding.
+          </p>
+        </header>
+
+        <div className="mt-8">
+          <PlanGate requiredPlan="agency" feature="Workspaces">
+            <>
+              {/* Create */}
+              <form
+                className="flex max-w-xl flex-wrap gap-2"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (!newName.trim()) return;
+                  createWs(newName.trim());
+                  setNewName("");
+                }}
+              >
+                <label className="sr-only" htmlFor="new-workspace">New workspace name</label>
+                <input
+                  id="new-workspace"
+                  placeholder="New workspace name, e.g. Acme Corp"
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  className={cn(inputCls, "h-10 min-w-0 flex-1")}
+                />
+                <Button type="submit" size="lg" disabled={isCreating || !newName.trim()}>
+                  {isCreating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                  {isCreating ? "Creating…" : "Create workspace"}
+                </Button>
+              </form>
+
+              {error && (
+                <div role="alert" className="mt-8 flex items-center gap-3 rounded-lg bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                  <AlertCircle className="h-4 w-4 shrink-0" />
+                  Couldn’t load your workspaces.
+                  <button onClick={() => refetch()} className="font-medium underline-offset-4 hover:underline">Try again</button>
+                </div>
+              )}
+
+              {isLoading && (
+                <div aria-hidden className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
+                  {[0, 1].map((i) => <Skeleton key={i} className="h-72 rounded-xl" />)}
+                </div>
+              )}
+
+              {!isLoading && !error && workspaces.length === 0 && (
+                <div className="mt-8 rounded-xl border border-dashed border-border px-6 py-16 text-center">
+                  <h2 className="text-lg font-semibold">No workspaces yet</h2>
+                  <p className="mx-auto mt-2 max-w-md text-muted-foreground">
+                    Create one above for each client, then invite their team and add their logo and colors.
+                  </p>
+                </div>
+              )}
+
+              {workspaces.length > 0 && (
+                <div className="mt-8 grid grid-cols-1 items-start gap-6 lg:grid-cols-2">
+                  {workspaces.map((ws) => <WorkspaceCard key={ws.id} ws={ws} currentUserId={currentUserId} />)}
+                </div>
+              )}
+            </>
+          </PlanGate>
         </div>
-
-        <PlanGate requiredPlan="agency" feature="Workspaces">
-          <>
-            {error && (
-              <div className="flex items-center gap-2 text-sm text-red-400 p-4 rounded-lg border border-red-500/20 bg-red-500/5">
-                <AlertCircle className="h-4 w-4 shrink-0" /> Failed to load workspaces.
-              </div>
-            )}
-
-            {isLoading && (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-64 rounded-xl" />)}
-              </div>
-            )}
-
-            {/* Create workspace */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                  <Plus className="h-4 w-4" />New Workspace
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <form
-                  className="flex gap-3"
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    if (!newName.trim()) return;
-                    createWs(newName.trim());
-                    setNewName("");
-                  }}
-                >
-                  <Input
-                    placeholder="Workspace name (e.g. Acme Corp)"
-                    value={newName}
-                    onChange={(e) => setNewName(e.target.value)}
-                    className="flex-1"
-                  />
-                  <Button type="submit" disabled={isCreating || !newName.trim()} className="gap-2">
-                    {isCreating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-                    Create
-                  </Button>
-                </form>
-              </CardContent>
-            </Card>
-
-            {!isLoading && workspaces.length === 0 && (
-              <div className="flex flex-col items-center justify-center py-16 text-center">
-                <Shield className="h-10 w-10 text-muted-foreground/40 mb-4" />
-                <p className="text-muted-foreground font-medium">No workspaces yet</p>
-                <p className="text-sm text-muted-foreground/60 mt-1">
-                  Create your first workspace above to invite team members and apply custom branding.
-                </p>
-              </div>
-            )}
-
-            {workspaces.length > 0 && (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {workspaces.map((ws) => (
-                  <WorkspaceCard key={ws.id} ws={ws} currentUserId={currentUserId} />
-                ))}
-              </div>
-            )}
-          </>
-        </PlanGate>
       </main>
     </div>
   );

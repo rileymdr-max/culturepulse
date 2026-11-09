@@ -9,7 +9,7 @@ interface TrendingTopicsListProps {
 function VelocityIndicator({ velocity }: { velocity: number }) {
   if (velocity > 20) {
     return (
-      <span className="flex items-center gap-0.5 text-emerald-400 text-xs font-medium">
+      <span className="flex items-center gap-0.5 text-primary text-xs font-medium tabular-nums">
         <TrendingUp className="h-3.5 w-3.5" />
         +{velocity}%
       </span>
@@ -17,7 +17,7 @@ function VelocityIndicator({ velocity }: { velocity: number }) {
   }
   if (velocity < -10) {
     return (
-      <span className="flex items-center gap-0.5 text-red-400 text-xs font-medium">
+      <span className="flex items-center gap-0.5 text-muted-foreground text-xs font-medium tabular-nums">
         <TrendingDown className="h-3.5 w-3.5" />
         {velocity}%
       </span>
