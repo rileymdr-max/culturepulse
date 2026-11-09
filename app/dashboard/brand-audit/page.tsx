@@ -342,17 +342,17 @@ function AuditResults({ data, isCached, onClear }: { data: BrandAuditResult; isC
         <StatCard
           icon={<Layers className="h-4 w-4" />}
           label="Library matches"
-          value={String(data.matched_subcultures.length)}
+          value={String(data.matched_subcultures?.length ?? 0)}
         />
         <StatCard
           icon={<Sparkles className="h-4 w-4" />}
           label="New discoveries"
-          value={String(data.discovered_subcultures.length)}
+          value={String(data.discovered_subcultures?.length ?? 0)}
         />
         <StatCard
           icon={<TrendingUp className="h-4 w-4" />}
           label="Top platform"
-          value={data.primary_platforms[0] ?? "—"}
+          value={data.primary_platforms?.[0] ?? "—"}
         />
       </div>
 
@@ -367,7 +367,7 @@ function AuditResults({ data, isCached, onClear }: { data: BrandAuditResult; isC
           </div>
           <p className="text-sm text-muted-foreground leading-relaxed">{data.audience_summary}</p>
           <div className="mt-4 flex flex-wrap gap-1.5">
-            {data.dominant_themes.map((t) => (
+            {(data.dominant_themes ?? []).map((t) => (
               <span key={t} className="px-2 py-0.5 rounded-full bg-accent text-accent-foreground text-[11px] font-medium">
                 {t}
               </span>
@@ -381,25 +381,25 @@ function AuditResults({ data, isCached, onClear }: { data: BrandAuditResult; isC
         <div className="flex items-center gap-2">
           <Layers className="h-4 w-4 text-indigo-500" />
           <h2 className="text-sm font-semibold text-foreground">Subculture DNA — library matches</h2>
-          <span className="ml-auto text-xs text-muted-foreground">{data.matched_subcultures.length} matched</span>
+          <span className="ml-auto text-xs text-muted-foreground">{data.matched_subcultures?.length ?? 0} matched</span>
         </div>
-        {data.matched_subcultures.map((sub, i) => (
+        {(data.matched_subcultures ?? []).map((sub, i) => (
           <MatchedCard key={sub.slug} rank={i + 1} sub={sub} />
         ))}
       </div>
 
       {/* Discovered subcultures */}
-      {data.discovered_subcultures.length > 0 && (
+      {(data.discovered_subcultures?.length ?? 0) > 0 && (
         <div className="space-y-3">
           <div className="flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-amber-500" />
             <h2 className="text-sm font-semibold text-foreground">New discoveries — not yet in the library</h2>
             <span className="ml-auto text-xs text-muted-foreground">
-              {data.discovered_subcultures.length} found
+              {data.discovered_subcultures?.length ?? 0} found
             </span>
           </div>
           <div className="rounded-xl border border-amber-500/20 bg-amber-500/[0.03] p-1 space-y-1">
-            {data.discovered_subcultures.map((sub, i) => (
+            {(data.discovered_subcultures ?? []).map((sub, i) => (
               <DiscoveredCard key={sub.provisional_slug} rank={i + 1} sub={sub} />
             ))}
           </div>

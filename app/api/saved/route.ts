@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireSession, enforceRateLimit, badRequest, serverError } from "@/lib/api-helpers";
-import { prisma } from "@/lib/prisma";
+import { prisma, withDbRetry } from "@/lib/prisma";
 
 // ─── GET /api/saved ───────────────────────────────────────────────────────────
 
@@ -24,11 +24,11 @@ export async function GET(req: NextRequest) {
   if (rateLimitError) return rateLimitError;
 
   try {
-    const savedSearches = await prisma.savedSearch.findMany({
+    const savedSearches = await withDbRetry(() => prisma.savedSearch.findMany({
       where: { userId: session.user.id },
       orderBy: { createdAt: "desc" },
-      take: 100, // cap at 100 for performance
-    });
+      take: 100,
+    }));
 
     return NextResponse.json({ savedSearches });
   } catch (err) {

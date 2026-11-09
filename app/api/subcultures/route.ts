@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireSession, serverError } from "@/lib/api-helpers";
-import { prisma } from "@/lib/prisma";
+import { prisma, withDbRetry } from "@/lib/prisma";
 
 export async function GET(req: NextRequest) {
   const { error: authError } = await requireSession();
@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
   const status = searchParams.get("status") ?? undefined;
 
   try {
-    const subcultures = await prisma.subculture.findMany({
+    const subcultures = await withDbRetry(() => prisma.subculture.findMany({
       where: {
         ...(category ? { category } : {}),
         ...(status ? { status } : {}),
@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
         createdAt: true,
         updatedAt: true,
       },
-    });
+    }));
 
     return NextResponse.json({ subcultures, total: subcultures.length });
   } catch (err) {

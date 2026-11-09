@@ -3,7 +3,7 @@ import { z } from "zod";
 import { requireSession, badRequest, serverError, paymentRequired } from "@/lib/api-helpers";
 import { canCreateMonitor } from "@/lib/plans";
 import { getEffectivePlan } from "@/lib/admin";
-import { prisma } from "@/lib/prisma";
+import { prisma, withDbRetry } from "@/lib/prisma";
 import { computeAccelerationSignal } from "@/lib/acceleration";
 
 const createSchema = z.object({
@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
   const subcultureId = req.nextUrl.searchParams.get("subcultureId") ?? undefined;
 
   try {
-    const monitors = await prisma.monitor.findMany({
+    const monitors = await withDbRetry(() => prisma.monitor.findMany({
       where: {
         userId: session.user.id,
         ...(subcultureId ? { subcultureId } : {}),
@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
         },
       },
       orderBy: { createdAt: "desc" },
-    });
+    }));
 
     const monitorsWithSignals = monitors.map((m) => ({
       ...m,
