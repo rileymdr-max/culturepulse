@@ -16,7 +16,19 @@ const config: Config = {
       },
     },
     extend: {
+      fontFamily: {
+        sans: ["var(--font-sans)", "ui-sans-serif", "system-ui", "sans-serif"],
+      },
       colors: {
+        signal: {
+          DEFAULT: "hsl(var(--signal))",
+          foreground: "hsl(var(--signal-foreground))",
+        },
+        tier: {
+          breakout: "hsl(var(--tier-breakout))",
+          trending: "hsl(var(--tier-trending))",
+          rising: "hsl(var(--tier-rising))",
+        },
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
@@ -52,7 +64,9 @@ const config: Config = {
         },
       },
       borderRadius: {
-        lg: "var(--radius)",
+        "2xl": "calc(var(--radius) + 8px)", // 16px — outer frames
+        xl: "calc(var(--radius) + 4px)",    // 12px — cards
+        lg: "var(--radius)",                // 8px  — controls, inner panels
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
       },

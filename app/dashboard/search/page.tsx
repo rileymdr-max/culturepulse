@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import {
   Sparkles, Loader2, Plus, CheckCircle2, ChevronRight,
   BookOpen, Zap, AlertCircle, Clock, Hash, Users, Layers,
 } from "lucide-react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { NavHeader } from "@/components/nav-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -259,9 +260,23 @@ function DiscoverPageInner() {
   const [errorMsg, setErrorMsg] = useState("");
   const [recent, setRecent] = useState<string[]>([]);
 
-  // Restore last result from sessionStorage on mount
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const ranFromQuery = useRef(false); // guards StrictMode's double effect run
+
+  // ?q= (from the welcome screen or a recent-search chip) runs a search;
+  // otherwise restore the last result from sessionStorage.
   useEffect(() => {
     setRecent(loadRecent());
+    const q = searchParams.get("q")?.trim();
+    if (q) {
+      if (ranFromQuery.current) return;
+      ranFromQuery.current = true;
+      setPrompt(q);
+      handleDiscover(q);
+      router.replace("/dashboard/search"); // so Back/refresh doesn't re-run it
+      return;
+    }
     try {
       const saved = sessionStorage.getItem(SESSION_KEY);
       if (saved) {
@@ -272,6 +287,7 @@ function DiscoverPageInner() {
         }
       }
     } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function handleDiscover(inputPrompt?: string) {

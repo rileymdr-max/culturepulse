@@ -9,7 +9,7 @@
     --foreground: 222 84% 11%;       /* near-black navy */
 
     --muted: 220 20% 93%;
-    --muted-foreground: 215 16% 47%;
+    --muted-foreground: 215 19% 38%;  /* ≥4.5:1 on background + card */
 
     --accent: 238 100% 96%;          /* very light indigo tint — active nav pill bg */
     --accent-foreground: 239 72% 54%; /* indigo — active nav pill text */
@@ -34,7 +34,17 @@
 
     --ring: 239 72% 54%;
 
-    --radius: 0.5rem;
+    /* Accent: reserved for live signal moments (breakouts, alerts) — never decoration */
+    --signal: 12 80% 46%;            /* coral */
+    --signal-foreground: 0 0% 100%;
+
+    /* Signal tiers — the only status colors used for scores */
+    --tier-breakout: 12 80% 46%;
+    --tier-trending: 30 90% 34%;
+    --tier-rising: 239 72% 54%;
+
+    /* Radius scale. Nested rule: inner radius = outer radius − padding */
+    --radius: 0.5rem;                /* 8px — controls, inner panels */
   }
 
   /* ── Dark mode ──────────────────────────────────────────────────────────── */
@@ -43,7 +53,7 @@
     --foreground: 213 31% 91%;
 
     --muted: 223 47% 11%;
-    --muted-foreground: 215.4 16.3% 56.9%;
+    --muted-foreground: 215 20% 65%;
 
     --accent: 216 34% 17%;
     --accent-foreground: 210 40% 98%;
@@ -57,8 +67,8 @@
     --card: 224 71% 4%;
     --card-foreground: 213 31% 91%;
 
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 1.2%;
+    --primary: 239 84% 72%;          /* indigo stays the brand color in dark mode */
+    --primary-foreground: 224 71% 4%;
 
     --secondary: 222.2 47.4% 11.2%;
     --secondary-foreground: 210 40% 98%;
@@ -66,7 +76,13 @@
     --destructive: 0 63% 31%;
     --destructive-foreground: 210 40% 98%;
 
-    --ring: 216 34% 17%;
+    --ring: 239 84% 72%;
+
+    --signal: 12 90% 64%;
+    --signal-foreground: 224 71% 4%;
+    --tier-breakout: 12 90% 64%;
+    --tier-trending: 36 92% 58%;
+    --tier-rising: 239 84% 72%;
   }
 }
 
@@ -75,8 +91,14 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans antialiased;
     font-feature-settings: "rlig" 1, "calt" 1;
+  }
+  h1, h2, h3 {
+    text-wrap: balance;
+  }
+  p {
+    text-wrap: pretty;
   }
 }
 
@@ -120,4 +142,13 @@
 }
 ::-webkit-scrollbar-thumb:hover {
   background: hsl(var(--muted-foreground));
+}
+
+/* Respect reduced-motion for every transition/animation */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

@@ -18,7 +18,7 @@ export default async function DashboardLayout({
     <>
       {children}
       <footer className="border-t border-border/40 py-4 px-6 text-center">
-        <p className="text-[11px] text-muted-foreground/50">
+        <p className="text-xs text-muted-foreground">
           Intelligence profiles and content briefs are generated with the assistance of Claude by Anthropic.
         </p>
       </footer>
