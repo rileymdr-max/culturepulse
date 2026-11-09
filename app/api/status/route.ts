@@ -2,21 +2,20 @@
  * GET /api/status
  *
  * Returns which environment variables are present and which platforms are live.
- * Never exposes the actual values — only true/false per key.
+ * Admin only. Never exposes any part of a value — only true/false per key.
  * Useful for diagnosing deployment issues.
  */
 
 import { NextResponse } from "next/server";
 import { isPlatformLive } from "@/lib/env";
+import { requireAdmin } from "@/lib/admin";
 
 export async function GET() {
-  const anthropicKey = process.env.ANTHROPIC_API_KEY ?? "";
-  const anthropicKeyInfo = anthropicKey
-    ? { present: true, prefix: anthropicKey.slice(0, 14), length: anthropicKey.length }
-    : { present: false, prefix: null, length: 0 };
+  const { error } = await requireAdmin();
+  if (error) return error;
 
   const vars = {
-    ANTHROPIC_API_KEY: anthropicKeyInfo,
+    ANTHROPIC_API_KEY: !!process.env.ANTHROPIC_API_KEY,
     APIFY_API_TOKEN: !!process.env.APIFY_API_TOKEN,
     REDDIT_CLIENT_ID: !!process.env.REDDIT_CLIENT_ID,
     REDDIT_CLIENT_SECRET: !!process.env.REDDIT_CLIENT_SECRET,
