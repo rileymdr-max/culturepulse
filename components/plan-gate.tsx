@@ -54,18 +54,16 @@ function UpgradeCard({
 
   return (
     <div className={cn(
-      "flex flex-col items-center gap-3 p-6 border border-border rounded-xl bg-card text-center max-w-sm mx-auto",
+      "flex flex-col items-center gap-3 p-8 border border-dashed border-border rounded-xl text-center max-w-md mx-auto",
       className
     )}>
-      <div className="h-10 w-10 rounded-full bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
-        <Lock className="h-5 w-5 text-amber-400" />
-      </div>
+      <Lock className="h-5 w-5 text-muted-foreground" aria-hidden />
       <div>
         <p className="font-semibold text-foreground">
           {feature ?? "This feature"} requires {plan.name}
         </p>
         <p className="text-sm text-muted-foreground mt-0.5">
-          Upgrade to access this and all {plan.name} features — starting at ${plan.price}/mo.
+          Available on {plan.name} and above, from ${plan.price.toLocaleString("en-US")}/mo.
         </p>
       </div>
       <Button
@@ -73,7 +71,7 @@ function UpgradeCard({
         disabled={isPending}
         onClick={() => checkout(requiredPlan as Exclude<PlanId, "free">)}
       >
-        Upgrade to {plan.name} <ArrowRight className="h-4 w-4" />
+        {isPending ? "Opening checkout…" : `Upgrade to ${plan.name}`} <ArrowRight className="h-4 w-4" />
       </Button>
     </div>
   );

@@ -2,55 +2,34 @@
 
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
-import { ArrowLeft, AlertCircle, GitCompare } from "lucide-react";
+import { ArrowLeft, AlertCircle, ArrowRight } from "lucide-react";
 import Link from "next/link";
-import {
-  RadarChart,
-  Radar,
-  PolarGrid,
-  PolarAngleAxis,
-  ResponsiveContainer,
-  Tooltip,
-} from "recharts";
+import { RadarChart, Radar, PolarGrid, PolarAngleAxis, ResponsiveContainer, Tooltip } from "recharts";
 import { NavHeader } from "@/components/nav-header";
-import { PlatformBadge } from "@/components/platform-badge";
 import { TrendingTopicsList } from "@/components/trending-topics-list";
 import { TrendingContentGrid } from "@/components/trending-content-grid";
 import { TopVoicesList } from "@/components/top-voices-list";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
-import { getPlatformColor } from "@/components/platform-badge";
 import { useCompare } from "@/hooks/use-compare";
-import { formatNumber } from "@/lib/utils";
+import { useTokenColors } from "@/hooks/use-token-color";
+import { formatNumber, cn } from "@/lib/utils";
 import type { CommunityData } from "@/lib/platforms/types";
 
-// ─── Similarity score badge ───────────────────────────────────────────────────
+// Series colors come from theme tokens so they read in light and dark mode.
+const SERIES_TOKENS = ["--primary", "--signal", "--tier-trending", "--muted-foreground"] as const;
 
-function SimilarityScore({ score }: { score: number }) {
-  const color =
-    score >= 70 ? "text-emerald-400 border-emerald-800 bg-emerald-950/30" :
-    score >= 40 ? "text-yellow-400 border-yellow-800 bg-yellow-950/30" :
-                  "text-red-400 border-red-800 bg-red-950/30";
-
-  return (
-    <div className={`inline-flex flex-col items-center rounded-xl border px-4 py-2 ${color}`}>
-      <span className="text-2xl font-bold">{score}</span>
-      <span className="text-xs opacity-75">/ 100 similarity</span>
-    </div>
-  );
+function similarityLabel(score: number) {
+  return score >= 70 ? "Very similar" : score >= 40 ? "Some overlap" : "Distinct";
 }
 
-// ─── Radar chart for category comparison ─────────────────────────────────────
+// Radar ──────────────────────────────────────────────────────────────────────
 
-function CategoryRadar({ communities }: { communities: CommunityData[] }) {
-  // Build a unified set of category labels
-  const allLabels = new Set<string>();
-  communities.forEach((c) =>
-    c.conversation_categories.forEach((cat) => allLabels.add(cat.label))
-  );
+function CategoryRadar({ communities, colors }: { communities: CommunityData[]; colors: string[] }) {
+  const tokens = useTokenColors(["--border", "--muted-foreground", "--popover", "--foreground"] as const);
+  const labels = new Set<string>();
+  communities.forEach((c) => c.conversation_categories.forEach((cat) => labels.add(cat.label)));
 
-  const data = Array.from(allLabels).slice(0, 8).map((label) => {
+  const data = Array.from(labels).slice(0, 8).map((label) => {
     const entry: Record<string, string | number> = { label };
     communities.forEach((c) => {
       const cat = c.conversation_categories.find((ct) => ct.label === label);
@@ -59,20 +38,18 @@ function CategoryRadar({ communities }: { communities: CommunityData[] }) {
     return entry;
   });
 
-  const colors = communities.map((c) => getPlatformColor(c.platform));
-
   return (
-    <ResponsiveContainer width="100%" height={280}>
+    <ResponsiveContainer width="100%" height={300}>
       <RadarChart data={data}>
-        <PolarGrid stroke="hsl(216 34% 17%)" />
-        <PolarAngleAxis dataKey="label" tick={{ fill: "#64748b", fontSize: 10 }} />
+        <PolarGrid stroke={tokens["--border"]} />
+        <PolarAngleAxis dataKey="label" tick={{ fill: tokens["--muted-foreground"], fontSize: 12 }} />
         <Tooltip
           contentStyle={{
-            background: "hsl(224 71% 4%)",
-            border: "1px solid hsl(216 34% 17%)",
-            borderRadius: "8px",
-            fontSize: "12px",
-            color: "#e2e8f0",
+            background: tokens["--popover"],
+            border: `1px solid ${tokens["--border"]}`,
+            borderRadius: 8,
+            fontSize: 12,
+            color: tokens["--foreground"],
           }}
         />
         {communities.map((c, i) => (
@@ -82,8 +59,9 @@ function CategoryRadar({ communities }: { communities: CommunityData[] }) {
             dataKey={c.community_name}
             stroke={colors[i]}
             fill={colors[i]}
-            fillOpacity={0.15}
+            fillOpacity={0.12}
             strokeWidth={2}
+            isAnimationActive={false}
           />
         ))}
       </RadarChart>
@@ -91,78 +69,57 @@ function CategoryRadar({ communities }: { communities: CommunityData[] }) {
   );
 }
 
-// ─── Single compare column ────────────────────────────────────────────────────
+// Column ─────────────────────────────────────────────────────────────────────
 
-function CompareColumn({ community }: { community: CommunityData }) {
+function ColumnSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="flex flex-col gap-4 min-w-0">
-      {/* Hero */}
-      <div className="rounded-xl border border-border bg-card p-4">
-        <PlatformBadge platform={community.platform} className="mb-2" />
-        <h2 className="font-bold text-foreground text-base truncate leading-snug">
-          {community.community_name}
-        </h2>
-        <p className="text-xs text-muted-foreground mt-1 line-clamp-2 leading-relaxed">
-          {community.description}
+    <section>
+      <h3 className="text-sm font-semibold">{title}</h3>
+      <div className="mt-3">{children}</div>
+    </section>
+  );
+}
+
+function CompareColumn({ community, color }: { community: CommunityData; color: string }) {
+  return (
+    <div className="flex min-w-0 flex-col gap-8">
+      <div className="rounded-xl border border-border bg-card p-5">
+        <p className="flex items-center gap-2 text-sm text-muted-foreground capitalize">
+          <span className="h-2.5 w-2.5 rounded-full" style={{ background: color }} aria-hidden />
+          {community.platform}
         </p>
-        <p className="mt-3 text-2xl font-bold text-foreground">
-          {formatNumber(community.community_size)}
-        </p>
-        <p className="text-xs text-muted-foreground">members / views</p>
+        <h2 className="mt-1 truncate text-lg font-semibold tracking-tight">{community.community_name}</h2>
+        <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-muted-foreground">{community.description}</p>
+        <p className="mt-4 text-2xl font-semibold tracking-tight tabular-nums">{formatNumber(community.community_size)}</p>
+        <p className="text-sm text-muted-foreground">members or views</p>
       </div>
 
-      {/* Trending topics */}
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-xs text-muted-foreground uppercase tracking-wide">
-            Trending Topics
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <TrendingTopicsList topics={community.trending_topics.slice(0, 5)} />
-        </CardContent>
-      </Card>
-
-      {/* Top content */}
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-xs text-muted-foreground uppercase tracking-wide">
-            Top Content
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <TrendingContentGrid content={community.trending_content.slice(0, 2)} />
-        </CardContent>
-      </Card>
-
-      {/* Top voices */}
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-xs text-muted-foreground uppercase tracking-wide">
-            Top Voices
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <TopVoicesList voices={community.top_voices.slice(0, 3)} />
-        </CardContent>
-      </Card>
+      <ColumnSection title="Trending topics">
+        <TrendingTopicsList topics={community.trending_topics.slice(0, 5)} />
+      </ColumnSection>
+      <ColumnSection title="Top content">
+        <TrendingContentGrid content={community.trending_content.slice(0, 2)} />
+      </ColumnSection>
+      <ColumnSection title="Top voices">
+        <TopVoicesList voices={community.top_voices.slice(0, 3)} />
+      </ColumnSection>
 
       <Link
         href={`/dashboard/community/${encodeURIComponent(community.community_id)}`}
-        className="text-xs text-indigo-500 hover:text-indigo-400 text-center transition-colors"
+        className="group inline-flex items-center gap-1 text-sm font-medium text-primary"
       >
-        View full profile →
+        Full community profile
+        <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" aria-hidden />
       </Link>
     </div>
   );
 }
 
-// ─── Main compare page ────────────────────────────────────────────────────────
+// Page ───────────────────────────────────────────────────────────────────────
 
 function ComparePageInner() {
   const searchParams = useSearchParams();
-  const idsParam = searchParams.get("ids") ?? "";
-  const communityIds = idsParam
+  const communityIds = (searchParams.get("ids") ?? "")
     .split(",")
     .map((id) => decodeURIComponent(id.trim()))
     .filter(Boolean);
@@ -170,110 +127,88 @@ function ComparePageInner() {
   const { data, isLoading, error } = useCompare(communityIds);
   const communities = (data?.communities ?? []).filter((c): c is CommunityData => c !== null);
   const pairLabels = data?.pairLabels ?? [];
+  const tokenColors = useTokenColors(SERIES_TOKENS);
+  const colors = communities.map((_, i) => tokenColors[SERIES_TOKENS[i % SERIES_TOKENS.length]]);
+  const cols = { gridTemplateColumns: `repeat(${Math.max(communities.length, communityIds.length, 1)}, minmax(0, 1fr))` };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="flex min-h-screen flex-col bg-background">
       <NavHeader compareCount={communityIds.length} />
 
-      <main className="flex-1 max-w-screen-2xl mx-auto w-full px-4 sm:px-6 py-8">
-        {/* Header */}
-        <div className="mb-6">
-          <Link
-            href="/dashboard"
-            className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-4 transition-colors"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back to search
-          </Link>
-          <div className="flex items-center gap-2">
-            <GitCompare className="h-5 w-5 text-indigo-500" />
-            <h1 className="text-xl font-bold text-foreground">
-              Comparing {communities.length} Communities
-            </h1>
-          </div>
-        </div>
+      <main className="mx-auto w-full max-w-screen-2xl flex-1 px-4 py-10 sm:px-6">
+        <Link href="/dashboard/search" className="group inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground">
+          <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-0.5" aria-hidden />Search
+        </Link>
+        <h1 className="mt-4 text-3xl font-semibold tracking-tight">
+          {communities.length >= 2
+            ? communities.map((c) => c.community_name).join(" vs ")
+            : "Compare communities"}
+        </h1>
 
-        {/* No IDs */}
         {communityIds.length < 2 && !isLoading && (
-          <div className="text-center py-20">
-            <GitCompare className="h-12 w-12 text-muted-foreground/30 mx-auto mb-4" />
-            <p className="text-muted-foreground">
-              Select at least 2 communities from the search page to compare.
+          <div className="mt-8 rounded-xl border border-dashed border-border px-6 py-16 text-center">
+            <h2 className="text-lg font-semibold">Nothing to compare yet</h2>
+            <p className="mx-auto mt-2 max-w-md text-muted-foreground">
+              Comparisons show two to four communities side by side: their size, trending topics, top content and voices.
             </p>
-            <Link href="/dashboard" className="mt-4 inline-block text-indigo-500 hover:text-indigo-400 text-sm">
-              Go to search →
-            </Link>
           </div>
         )}
 
-        {/* Error */}
         {error && (
-          <div className="rounded-lg border border-red-800 bg-red-950/30 px-4 py-3 text-sm text-red-400 flex items-center gap-2 mb-6">
-            <AlertCircle className="h-4 w-4 shrink-0" />
-            {error.message}
+          <div role="alert" className="mt-8 flex items-center gap-2 rounded-lg bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            <AlertCircle className="h-4 w-4 shrink-0" />{error.message}
           </div>
         )}
 
-        {/* Loading */}
         {isLoading && (
-          <div className="grid gap-4" style={{ gridTemplateColumns: `repeat(${communityIds.length}, minmax(0, 1fr))` }}>
-            {communityIds.map((_, i) => (
-              <Skeleton key={i} className="h-[600px] rounded-xl" />
-            ))}
+          <div aria-hidden className="mt-8 grid gap-6" style={cols}>
+            {communityIds.map((_, i) => <Skeleton key={i} className="h-[560px] rounded-xl" />)}
           </div>
         )}
 
-        {/* Similarity scores summary */}
+        {/* Similarity */}
         {pairLabels.length > 0 && (
-          <div className="mb-6">
-            <p className="text-xs text-muted-foreground mb-3">Similarity Scores</p>
-            <div className="flex flex-wrap gap-4">
+          <section className="mt-8">
+            <h2 className="text-sm font-semibold">Similarity</h2>
+            <ul className="mt-3 flex flex-wrap gap-3">
               {pairLabels.map((pair, i) => (
-                <div key={i} className="flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-2">
-                  <span className="text-sm text-foreground truncate max-w-[100px]">{pair.a}</span>
-                  <SimilarityScore score={pair.score} />
-                  <span className="text-sm text-foreground truncate max-w-[100px]">{pair.b}</span>
-                </div>
+                <li key={i} className="flex items-center gap-4 rounded-xl border border-border bg-card px-4 py-3">
+                  <span className="max-w-[10rem] truncate text-sm">{pair.a}</span>
+                  <span className="text-center">
+                    <span className="block text-2xl font-semibold leading-none tracking-tight tabular-nums">{pair.score}</span>
+                    <span className={cn("mt-1 block text-xs", pair.score >= 70 ? "text-primary" : "text-muted-foreground")}>
+                      {similarityLabel(pair.score)}
+                    </span>
+                  </span>
+                  <span className="max-w-[10rem] truncate text-sm">{pair.b}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        {/* Radar */}
+        {communities.length >= 2 && (
+          <section className="mt-8 rounded-xl border border-border bg-card p-6">
+            <h2 className="text-lg font-semibold tracking-tight">What they talk about</h2>
+            <p className="mt-1 text-sm text-muted-foreground">Relative conversation volume across shared categories</p>
+            <CategoryRadar communities={communities} colors={colors} />
+            <div className="mt-2 flex flex-wrap justify-center gap-4">
+              {communities.map((c, i) => (
+                <span key={c.community_id} className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                  <span className="h-2.5 w-2.5 rounded-full" style={{ background: colors[i] }} aria-hidden />
+                  {c.community_name}
+                </span>
               ))}
             </div>
-          </div>
+          </section>
         )}
 
-        {/* Radar chart */}
-        {communities.length >= 2 && (
-          <Card className="mb-6">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm">Conversation Category Overlap</CardTitle>
-              <p className="text-xs text-muted-foreground">Normalized volume across all shared categories</p>
-            </CardHeader>
-            <CardContent>
-              <CategoryRadar communities={communities} />
-              {/* Legend */}
-              <div className="flex flex-wrap gap-4 mt-2 justify-center">
-                {communities.map((c) => (
-                  <span key={c.community_id} className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <span
-                      className="h-2.5 w-2.5 rounded-full"
-                      style={{ background: getPlatformColor(c.platform) }}
-                    />
-                    {c.community_name}
-                  </span>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        <Separator className="mb-6" />
-
-        {/* Side-by-side columns */}
+        {/* Columns */}
         {communities.length > 0 && (
-          <div
-            className="grid gap-4 items-start"
-            style={{ gridTemplateColumns: `repeat(${communities.length}, minmax(0, 1fr))` }}
-          >
-            {communities.map((community) => (
-              <CompareColumn key={community.community_id} community={community} />
+          <div className="mt-10 grid items-start gap-6" style={cols}>
+            {communities.map((community, i) => (
+              <CompareColumn key={community.community_id} community={community} color={colors[i]} />
             ))}
           </div>
         )}

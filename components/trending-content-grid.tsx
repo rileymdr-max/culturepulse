@@ -35,7 +35,7 @@ export function TrendingContentGrid({ content }: TrendingContentGridProps) {
             rel="noopener noreferrer"
             className="group block"
           >
-            <Card className="h-full hover:border-blue-800/60 transition-colors">
+            <Card className="h-full hover:border-primary/40 transition-colors">
               <CardContent className="p-4 flex flex-col gap-2 h-full">
                 {/* Type badge */}
                 <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -44,7 +44,7 @@ export function TrendingContentGrid({ content }: TrendingContentGridProps) {
                 </div>
 
                 {/* Title */}
-                <p className="text-sm text-foreground line-clamp-3 leading-relaxed flex-1 group-hover:text-indigo-400 transition-colors">
+                <p className="text-sm text-foreground line-clamp-3 leading-relaxed flex-1 group-hover:text-primary transition-colors">
                   {item.title}
                 </p>
 
@@ -54,7 +54,7 @@ export function TrendingContentGrid({ content }: TrendingContentGridProps) {
                     <Heart className="h-3 w-3" />
                     {formatNumber(item.engagement)}
                   </span>
-                  <ExternalLink className="h-3.5 w-3.5 text-muted-foreground group-hover:text-indigo-500 transition-colors" />
+                  <ExternalLink className="h-3.5 w-3.5 text-muted-foreground group-hover:text-primary transition-colors" />
                 </div>
               </CardContent>
             </Card>

@@ -2,14 +2,9 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import {
-  CheckCircle, AlertCircle, CreditCard, Zap, ArrowRight,
-  Loader2, Radio, BookOpen, FileText,
-} from "lucide-react";
+import { Check, AlertCircle, ArrowRight, Loader2, ExternalLink, X } from "lucide-react";
 import { NavHeader } from "@/components/nav-header";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { useMonitors } from "@/hooks/use-monitors";
 import { useBriefs } from "@/hooks/use-briefs";
@@ -17,147 +12,97 @@ import { useWorkspaces } from "@/hooks/use-workspace";
 import { useCheckout, useBillingPortal, useCurrentPlan } from "@/hooks/use-billing";
 import { PLANS, PLAN_ORDER, hasPlanAccess, type PlanId } from "@/lib/plans";
 
-// ─── Usage meter ──────────────────────────────────────────────────────────────
+const price = (n: number) => `$${n.toLocaleString("en-US")}`;
 
-function UsageMeter({ label, used, limit, icon: Icon }: {
-  label: string;
-  used: number;
-  limit: number; // -1 = unlimited
-  icon: React.ElementType;
-}) {
+// Usage meter ────────────────────────────────────────────────────────────────
+
+function UsageMeter({ label, used, limit }: { label: string; used: number; limit: number /* -1 = unlimited */ }) {
   const unlimited = limit === -1;
   const unavailable = !unlimited && limit === 0;
-  const pct = unavailable ? 0 : unlimited ? 0 : Math.min(100, Math.round((used / limit) * 100));
+  const pct = unlimited || unavailable ? 0 : Math.min(100, Math.round((used / limit) * 100));
   const over = !unlimited && !unavailable && used >= limit;
   const nearLimit = !unlimited && !unavailable && !over && pct >= 80;
 
   return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between text-sm">
-        <span className="flex items-center gap-1.5 text-muted-foreground">
-          <Icon className="h-3.5 w-3.5" />{label}
-        </span>
-        <span className={cn(
-          "font-medium tabular-nums",
-          over ? "text-red-400" : nearLimit ? "text-amber-400" : "text-foreground"
-        )}>
-          {unavailable ? (
-            <span className="text-muted-foreground font-normal text-xs">not available on this plan</span>
-          ) : unlimited ? (
-            <span className="text-green-400">{used} <span className="text-muted-foreground font-normal">(unlimited)</span></span>
-          ) : (
-            `${used} / ${limit}`
-          )}
+    <div>
+      <div className="flex items-baseline justify-between gap-4">
+        <span className="text-sm">{label}</span>
+        <span className={cn("text-sm tabular-nums", over ? "font-medium text-destructive" : nearLimit ? "font-medium text-tier-trending" : "text-muted-foreground")}>
+          {unavailable ? "Not on your plan" : unlimited ? `${used} · Unlimited` : `${used} of ${limit}`}
         </span>
       </div>
       {!unlimited && !unavailable && (
-        <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
           <div
-            className={cn(
-              "h-full rounded-full transition-all duration-500",
-              over ? "bg-red-400" : nearLimit ? "bg-amber-400" : "bg-indigo-500"
-            )}
+            className={cn("h-full rounded-full transition-[width] duration-500", over ? "bg-destructive" : nearLimit ? "bg-tier-trending" : "bg-primary")}
             style={{ width: `${pct}%` }}
           />
         </div>
       )}
+      {over && <p className="mt-1.5 text-xs text-destructive">You’ve reached this plan’s limit.</p>}
     </div>
   );
 }
 
-// ─── Plan card ────────────────────────────────────────────────────────────────
+// Plan card ──────────────────────────────────────────────────────────────────
 
-function PlanCard({ planId, currentPlanId }: { planId: PlanId; currentPlanId: PlanId }) {
+function PlanCard({ planId, currentPlanId, onManage, managing }: {
+  planId: PlanId;
+  currentPlanId: PlanId;
+  onManage: () => void;
+  managing: boolean;
+}) {
   const plan = PLANS[planId];
   const { mutate: checkout, isPending } = useCheckout();
   const isCurrent = planId === currentPlanId;
   const isDowngrade = PLAN_ORDER.indexOf(planId) < PLAN_ORDER.indexOf(currentPlanId);
-  const isUpgrade   = PLAN_ORDER.indexOf(planId) > PLAN_ORDER.indexOf(currentPlanId);
 
   return (
-    <Card className={cn(
-      "relative transition-all duration-200 hover:-translate-y-0.5",
-      isCurrent
-        ? "border-indigo-500/40 shadow-indigo-500/10 shadow-md"
-        : "hover:border-border hover:shadow-md",
-      planId === "pro" && !isCurrent && "border-amber-500/20 hover:border-amber-500/40"
-    )}>
-      {planId === "pro" && (
-        <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-          <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/30 tracking-wider">
-            MOST POPULAR
-          </span>
-        </div>
-      )}
-      <CardHeader className="pb-3">
-        <div className="flex items-start justify-between">
-          <div>
-            <CardTitle className="text-base">{plan.name}</CardTitle>
-            <div className="flex items-baseline gap-1 mt-1">
-              {plan.price > 0 ? (
-                <>
-                  <span className="text-2xl font-bold text-foreground">${plan.price}</span>
-                  <span className="text-sm text-muted-foreground">/mo</span>
-                </>
-              ) : (
-                <span className="text-2xl font-bold text-foreground">Free</span>
-              )}
-            </div>
-          </div>
-          {isCurrent && (
-            <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-indigo-500/15 text-indigo-500 border border-indigo-500/30 tracking-wider">
-              CURRENT
-            </span>
-          )}
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <ul className="space-y-1.5">
-          {plan.features.map((f) => (
-            <li key={f} className="flex items-start gap-2 text-sm text-muted-foreground">
-              <CheckCircle className="h-4 w-4 text-green-400 shrink-0 mt-0.5" />
-              {f}
-            </li>
-          ))}
-        </ul>
+    <div className={cn("flex flex-col rounded-xl border bg-card p-6", isCurrent ? "border-primary ring-1 ring-primary" : "border-border")}>
+      <div className="flex items-baseline justify-between gap-2">
+        <h3 className="font-semibold">{plan.name}</h3>
+        {isCurrent && <span className="text-xs font-medium text-primary">Your plan</span>}
+      </div>
+      <p className="mt-3 flex items-baseline gap-1">
+        <span className="text-3xl font-semibold tracking-tight tabular-nums">{plan.price > 0 ? price(plan.price) : "$0"}</span>
+        {plan.price > 0 && <span className="text-sm text-muted-foreground">/mo</span>}
+      </p>
+      <ul className="mt-6 flex-1 space-y-2.5 text-sm">
+        {plan.features.map((f) => (
+          <li key={f} className="flex gap-2.5">
+            <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />
+            {f}
+          </li>
+        ))}
+      </ul>
 
-        {planId !== "free" && (
-          <div className="pt-2">
-            {isCurrent ? (
-              <Button variant="outline" size="sm" className="w-full" disabled>
-                Current plan
-              </Button>
-            ) : isDowngrade ? (
-              <Button variant="ghost" size="sm" className="w-full text-muted-foreground" disabled>
-                Downgrade via portal
-              </Button>
-            ) : plan.stripePriceId ? (
-              <Button
-                size="sm"
-                className="w-full gap-2"
-                variant={planId === "pro" ? "default" : "outline"}
-                disabled={isPending}
-                onClick={() => checkout(planId as Exclude<PlanId, "free">)}
-              >
-                {isPending ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <>{isUpgrade ? "Upgrade" : "Get started"} <ArrowRight className="h-4 w-4" /></>
-                )}
-              </Button>
-            ) : (
-              <Button size="sm" variant="outline" className="w-full" disabled>
-                Contact us
-              </Button>
-            )}
-          </div>
+      <div className="mt-8">
+        {isCurrent ? (
+          <p className="flex h-9 items-center justify-center text-sm text-muted-foreground">You’re on this plan</p>
+        ) : planId === "free" ? null : isDowngrade ? (
+          <Button variant="ghost" className="w-full text-muted-foreground" disabled={managing} onClick={onManage}>
+            Switch in billing portal
+          </Button>
+        ) : plan.stripePriceId ? (
+          <Button
+            className="w-full"
+            variant={planId === "pro" ? "default" : "outline"}
+            disabled={isPending}
+            onClick={() => checkout(planId as Exclude<PlanId, "free">)}
+          >
+            {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            {isPending ? "Opening checkout…" : `Upgrade to ${plan.name}`}
+            {!isPending && <ArrowRight className="h-4 w-4" />}
+          </Button>
+        ) : (
+          <p className="flex h-9 items-center justify-center text-sm text-muted-foreground">Available on request</p>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
 
-// ─── Page ─────────────────────────────────────────────────────────────────────
+// Page ───────────────────────────────────────────────────────────────────────
 
 export default function BillingPage() {
   return (
@@ -185,124 +130,75 @@ function BillingPageInner() {
   const { mutate: openPortal, isPending: openingPortal } = useBillingPortal();
 
   const monitorCount = monitorsData?.monitors?.length ?? 0;
-  const briefCount   = briefsData?.briefs?.length ?? 0;
-  const wsCount      = wsData?.workspaces?.length ?? 0;
+  const briefCount = briefsData?.briefs?.length ?? 0;
+  const wsCount = wsData?.workspaces?.length ?? 0;
+  const paid = currentPlan !== "free";
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="flex min-h-screen flex-col bg-background">
       <NavHeader />
 
-      <main className="flex-1 max-w-screen-xl mx-auto w-full px-4 sm:px-6 py-8 space-y-8">
-
-        {/* Page header */}
-        <div>
-          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-            <CreditCard className="h-6 w-6 text-indigo-500" />
-            Billing & Plan
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Manage your subscription and usage.
+      <main className="mx-auto w-full max-w-screen-xl flex-1 px-4 py-10 sm:px-6">
+        <header>
+          <h1 className="text-3xl font-semibold tracking-tight">Billing</h1>
+          <p className="mt-2 text-muted-foreground">
+            You’re on the <span className="font-medium text-foreground">{plan.name}</span> plan
+            {plan.price > 0 && <span className="tabular-nums"> ({price(plan.price)}/mo)</span>}.
           </p>
-        </div>
+        </header>
 
-        {/* Success / canceled banners */}
-        {banner === "success" && (
-          <div className="flex items-center gap-2 text-sm text-green-400 p-4 rounded-lg border border-green-500/20 bg-green-500/5">
-            <CheckCircle className="h-4 w-4 shrink-0" />
-            Subscription activated! Your plan has been updated.
+        {banner && (
+          <div
+            role="status"
+            className={cn(
+              "mt-6 flex items-center gap-3 rounded-lg px-4 py-3 text-sm animate-in fade-in slide-in-from-top-1 duration-200",
+              banner === "success" ? "bg-primary/10 text-foreground" : "bg-muted text-muted-foreground"
+            )}
+          >
+            {banner === "success" ? <Check className="h-4 w-4 shrink-0 text-primary" /> : <AlertCircle className="h-4 w-4 shrink-0" />}
+            <span className="flex-1">
+              {banner === "success" ? "Subscription active. Your new plan is ready to use." : "Checkout canceled. You haven’t been charged."}
+            </span>
+            <button onClick={() => setBanner(null)} aria-label="Dismiss" className="rounded-md p-1 hover:bg-foreground/5">
+              <X className="h-4 w-4" />
+            </button>
           </div>
         )}
-        {banner === "canceled" && (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground p-4 rounded-lg border border-border bg-muted/20">
-            <AlertCircle className="h-4 w-4 shrink-0" />
-            Checkout canceled. You haven&apos;t been charged.
+
+        {/* Usage */}
+        <section className="mt-10 grid gap-8 rounded-xl border border-border bg-card p-6 lg:grid-cols-[1fr_2fr]">
+          <div>
+            <h2 className="text-lg font-semibold tracking-tight">Usage</h2>
+            <p className="mt-1 text-sm text-muted-foreground">What your {plan.name} plan includes, and how much you’ve used.</p>
+            {paid && (
+              <Button variant="outline" size="sm" className="mt-4" disabled={openingPortal} onClick={() => openPortal()}>
+                {openingPortal ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ExternalLink className="h-3.5 w-3.5" />}
+                {openingPortal ? "Opening…" : "Invoices & payment method"}
+              </Button>
+            )}
           </div>
-        )}
+          <div className="space-y-5">
+            <UsageMeter label="Active monitors" used={monitorCount} limit={plan.limits.monitors} />
+            <UsageMeter label="Content briefs" used={briefCount} limit={plan.limits.briefs} />
+            {hasPlanAccess(currentPlan, "agency") && (
+              <UsageMeter label="Workspaces" used={wsCount} limit={plan.limits.workspaces} />
+            )}
+            {!hasPlanAccess(currentPlan, "pro") && (
+              <p className="text-sm text-muted-foreground">Creating your own subculture profiles is available on Pro and above.</p>
+            )}
+          </div>
+        </section>
 
-        {/* Current plan + usage */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Current plan */}
-          <Card className="border-indigo-500/20">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-                Current Plan
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-black text-foreground">{plan.name}</span>
-                {plan.price > 0 && (
-                  <span className="text-muted-foreground text-sm">${plan.price}/mo</span>
-                )}
-              </div>
-
-              {currentPlan !== "free" && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-2 w-full"
-                  disabled={openingPortal}
-                  onClick={() => openPortal()}
-                >
-                  {openingPortal ? <Loader2 className="h-4 w-4 animate-spin" /> : <CreditCard className="h-4 w-4" />}
-                  Manage subscription
-                </Button>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Usage */}
-          <Card className="lg:col-span-2">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-                Usage
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <UsageMeter
-                label="Active monitors"
-                used={monitorCount}
-                limit={plan.limits.monitors}
-                icon={Radio}
-              />
-              <UsageMeter
-                label="Content briefs generated"
-                used={briefCount}
-                limit={plan.limits.briefs === 0 ? 0 : plan.limits.briefs}
-                icon={FileText}
-              />
-              {hasPlanAccess(currentPlan, "agency") && (
-                <UsageMeter
-                  label="Workspaces"
-                  used={wsCount}
-                  limit={plan.limits.workspaces}
-                  icon={BookOpen}
-                />
-              )}
-              {!hasPlanAccess(currentPlan, "pro") && (
-                <p className="text-xs text-muted-foreground pt-1">
-                  Custom subculture creation is available on Pro and above.
-                </p>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Pricing table */}
-        <div>
-          <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-            <Zap className="h-5 w-5 text-amber-400" />All Plans
-          </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Plans */}
+        <section className="mt-12">
+          <h2 className="text-xl font-semibold tracking-tight">Plans</h2>
+          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {PLAN_ORDER.map((id) => (
-              <PlanCard key={id} planId={id} currentPlanId={currentPlan} />
+              <PlanCard key={id} planId={id} currentPlanId={currentPlan} onManage={() => openPortal()} managing={openingPortal} />
             ))}
           </div>
-          <p className="text-xs text-muted-foreground mt-4 text-center">
-            All prices in USD. Billed monthly. Cancel anytime.
-            Agency pricing requires Stripe price ID configuration — contact us for custom pricing.
-          </p>
-        </div>
+          <p className="mt-4 text-sm text-muted-foreground">Prices in USD, billed monthly. Cancel anytime.</p>
+        </section>
       </main>
     </div>
   );
