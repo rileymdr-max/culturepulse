@@ -95,9 +95,12 @@ export default function WelcomePage() {
               <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
                 {getGreeting(session?.user?.name ?? session?.user?.email)}
               </h1>
-              <p className="mt-2 text-muted-foreground">
-                <SignalSummary monitors={monitors} breakouts={breakouts} />
-              </p>
+              {/* On error the Signal Board panel explains it; don't imply "no monitors" here */}
+              {!monitorsQuery.isError && (
+                <p className="mt-2 text-muted-foreground">
+                  <SignalSummary monitors={monitors} breakouts={breakouts} />
+                </p>
+              )}
             </>
           )}
         </header>
