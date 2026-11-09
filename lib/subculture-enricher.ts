@@ -155,15 +155,14 @@ interface ApifyTikTokVideo {
 
 async function enrichTikTok(query: string): Promise<TikTokSignal | undefined> {
   try {
-    const { primary, hashtags } = extractKeyTerms(query);
-    // TikTok: keyword search + top hashtag variants
-    const searchQueries = [primary, ...hashtags.slice(0, 2)];
+    const { primary } = extractKeyTerms(query);
+    // Single search query — multiple queries × 25 results blows past the 90s budget
     const videos = await runActor<ApifyTikTokVideo>("clockworks/tiktok-scraper", {
-      searchQueries,
-      resultsPerPage: 25,
+      searchQueries: [primary],
+      resultsPerPage: 15,
       shouldDownloadVideos: false,
       shouldDownloadCovers: false,
-    }, 65);
+    }, 90);
 
     if (!videos.length) return undefined;
 
