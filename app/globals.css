@@ -29,7 +29,7 @@
     --secondary: 220 20% 93%;
     --secondary-foreground: 222 84% 11%;
 
-    --destructive: 0 84% 60%;
+    --destructive: 0 72% 45%;         /* ≥4.5:1 as text on white */
     --destructive-foreground: 0 0% 100%;
 
     --ring: 239 72% 54%;
@@ -73,8 +73,8 @@
     --secondary: 222.2 47.4% 11.2%;
     --secondary-foreground: 210 40% 98%;
 
-    --destructive: 0 63% 31%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 80% 66%;         /* readable as text on dark */
+    --destructive-foreground: 224 71% 4%;
 
     --ring: 239 84% 72%;
 

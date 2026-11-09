@@ -3,7 +3,7 @@
 import { useState, useCallback } from "react";
 import {
   TrendingUp, TrendingDown, Minus, Trash2, Pause, Play,
-  AlertCircle, BookOpen, ChevronRight, Zap, Radio, FileText, Loader2, RefreshCw, Clock,
+  AlertCircle, BookOpen, ArrowUpRight, FileText, Loader2, RefreshCw, Check,
 } from "lucide-react";
 import Link from "next/link";
 import {
@@ -12,9 +12,10 @@ import {
 } from "recharts";
 import { NavHeader } from "@/components/nav-header";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { signalTier, TIER_STYLE } from "@/lib/signal-tier";
+import { useTokenColors } from "@/hooks/use-token-color";
 import {
   useMonitors,
   useDeleteMonitor,
@@ -27,67 +28,27 @@ import {
 import { useCreateBrief } from "@/hooks/use-briefs";
 import { useQueryClient } from "@tanstack/react-query";
 
-// ─── Score tier helpers ──────────────────────────────────────────────────────
+const PLATFORM_LABEL: Record<string, string> = { reddit: "Reddit", twitter: "X" };
+const platformLabel = (p: string) => PLATFORM_LABEL[p] ?? p.charAt(0).toUpperCase() + p.slice(1);
 
-type Tier = "breakout" | "trending" | "rising" | "stable" | "cooling";
+const signed = (n: number) => `${n > 0 ? "+" : n < 0 ? "−" : ""}${Math.abs(n)}%`;
 
-function getTier(signal: AccelerationSignal): Tier {
-  if (signal.isBreakout) return "breakout";
-  if (signal.breakoutScore >= 55) return "trending";
-  if (signal.breakoutScore >= 35 || signal.velocity > 5) return "rising";
-  if (signal.velocity < -5) return "cooling";
-  return "stable";
-}
-
-const TIER_BORDER: Record<Tier, string> = {
-  breakout: "border-red-500/40 shadow-red-500/10 shadow-md",
-  trending: "border-amber-500/40",
-  rising:   "border-indigo-500/30",
-  stable:   "border-border",
-  cooling:  "border-border opacity-70",
-};
-
-const TIER_BADGE: Record<Tier, { label: string; cls: string }> = {
-  breakout: { label: "BREAKOUT",  cls: "bg-red-500/15 text-red-400 border-red-500/30" },
-  trending: { label: "TRENDING",  cls: "bg-amber-500/15 text-amber-400 border-amber-500/30" },
-  rising:   { label: "RISING",    cls: "bg-indigo-500/15 text-indigo-500 border-indigo-500/30" },
-  stable:   { label: "STABLE",    cls: "bg-muted text-muted-foreground border-border" },
-  cooling:  { label: "COOLING",   cls: "bg-muted/50 text-muted-foreground/60 border-border/50" },
-};
-
-const SCORE_COLOR: Record<Tier, string> = {
-  breakout: "text-red-400",
-  trending: "text-amber-400",
-  rising:   "text-indigo-500",
-  stable:   "text-muted-foreground",
-  cooling:  "text-muted-foreground/50",
-};
-
-function MomentumIcon({ momentum }: { momentum: AccelerationSignal["momentum"] }) {
-  if (momentum === "rising")  return <TrendingUp  className="h-4 w-4 text-green-400" />;
-  if (momentum === "falling") return <TrendingDown className="h-4 w-4 text-red-400/70" />;
-  return <Minus className="h-4 w-4 text-muted-foreground" />;
-}
-
-// ─── Chart data ───────────────────────────────────────────────────────────────
+// ─── Chart ────────────────────────────────────────────────────────────────────
 
 function buildChartData(snapshots: MonitorData["snapshots"]) {
   const byRun = new Map<string, { reddit?: number; twitter?: number }>();
-
   const sorted = [...snapshots].sort(
     (a, b) => new Date(a.capturedAt).getTime() - new Date(b.capturedAt).getTime()
   );
-
   for (const s of sorted) {
     const key = new Date(s.capturedAt).toLocaleString(undefined, {
-      month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
+      month: "short", day: "numeric", hour: "numeric", minute: "2-digit",
     });
     const existing = byRun.get(key) ?? {};
-    if (s.platform === "reddit")  existing.reddit  = s.postCount;
+    if (s.platform === "reddit") existing.reddit = s.postCount;
     if (s.platform === "twitter") existing.twitter = s.postCount;
     byRun.set(key, existing);
   }
-
   return Array.from(byRun.entries()).slice(-8).map(([name, v]) => ({ name, ...v }));
 }
 
@@ -95,11 +56,12 @@ function buildChartData(snapshots: MonitorData["snapshots"]) {
 function ChartTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="bg-card border border-border rounded-md px-3 py-2 text-xs shadow-lg">
-      <p className="text-muted-foreground mb-1">{label}</p>
+    <div className="rounded-lg border border-border bg-popover px-3 py-2 text-xs shadow-md">
+      <p className="mb-1 text-muted-foreground">{label}</p>
       {payload.map((p: { dataKey: string; value: number; color: string }) => (
-        <p key={p.dataKey} style={{ color: p.color }}>
-          {p.dataKey}: <strong>{p.value} posts</strong>
+        <p key={p.dataKey} className="flex items-center gap-1.5 tabular-nums">
+          <span className="h-2 w-2 rounded-full" style={{ background: p.color }} />
+          {platformLabel(p.dataKey)}: <strong className="font-medium">{p.value} posts</strong>
         </p>
       ))}
     </div>
@@ -107,61 +69,87 @@ function ChartTooltip({ active, payload, label }: any) {
 }
 
 function VolumeChart({ snapshots }: { snapshots: MonitorData["snapshots"] }) {
+  const colors = useTokenColors(["--primary", "--muted-foreground", "--border"] as const);
   const data = buildChartData(snapshots);
+
   if (data.length < 2) {
     return (
-      <div className="h-16 flex items-center justify-center text-xs text-muted-foreground/50">
-        waiting for data — cron runs every 6 hours
+      <div className="flex h-16 items-center rounded-lg bg-muted px-4 text-sm text-muted-foreground">
+        Post-volume chart appears after the second run. Monitors refresh every 6 hours.
       </div>
     );
   }
 
-  const hasReddit  = data.some((d) => d.reddit  !== undefined);
-  const hasTwitter = data.some((d) => d.twitter !== undefined);
+  const series = [
+    { key: "reddit", color: colors["--primary"] },
+    { key: "twitter", color: colors["--muted-foreground"] },
+  ].filter((s) => data.some((d) => d[s.key as "reddit" | "twitter"] !== undefined));
 
   return (
-    <ResponsiveContainer width="100%" height={64}>
-      <AreaChart data={data} margin={{ top: 2, right: 2, bottom: 2, left: 2 }}>
-        <defs>
-          <linearGradient id="gReddit"  x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%"  stopColor="#f97316" stopOpacity={0.25} />
-            <stop offset="95%" stopColor="#f97316" stopOpacity={0} />
-          </linearGradient>
-          <linearGradient id="gTwitter" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%"  stopColor="#38bdf8" stopOpacity={0.25} />
-            <stop offset="95%" stopColor="#38bdf8" stopOpacity={0} />
-          </linearGradient>
-        </defs>
-        <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="text-border/40" vertical={false} />
-        <XAxis dataKey="name" hide />
-        <YAxis hide />
-        <Tooltip content={<ChartTooltip />} />
-        {hasReddit  && <Area type="monotone" dataKey="reddit"  stroke="#f97316" fill="url(#gReddit)"  strokeWidth={1.5} dot={false} />}
-        {hasTwitter && <Area type="monotone" dataKey="twitter" stroke="#38bdf8" fill="url(#gTwitter)" strokeWidth={1.5} dot={false} />}
-      </AreaChart>
-    </ResponsiveContainer>
+    <div>
+      <ResponsiveContainer width="100%" height={72}>
+        <AreaChart data={data} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
+          <CartesianGrid stroke={colors["--border"]} vertical={false} />
+          <XAxis dataKey="name" hide />
+          <YAxis hide />
+          <Tooltip content={<ChartTooltip />} cursor={{ stroke: colors["--border"] }} />
+          {series.map((s) => (
+            <Area
+              key={s.key}
+              type="monotone"
+              dataKey={s.key}
+              stroke={s.color}
+              fill={s.color}
+              fillOpacity={0.08}
+              strokeWidth={1.75}
+              dot={false}
+              isAnimationActive={false}
+            />
+          ))}
+        </AreaChart>
+      </ResponsiveContainer>
+      <div className="mt-1 flex gap-4 text-xs text-muted-foreground">
+        <span>Post volume, last {data.length} runs</span>
+        {series.map((s) => (
+          <span key={s.key} className="flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full" style={{ background: s.color }} />
+            {platformLabel(s.key)}
+          </span>
+        ))}
+      </div>
+    </div>
   );
 }
 
-// ─── Cross-platform strength bar ─────────────────────────────────────────────
+// ─── Metrics ──────────────────────────────────────────────────────────────────
+
+function Metric({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="min-w-0">
+      <div className="text-sm font-medium tabular-nums">{children}</div>
+      <div className="mt-0.5 text-xs text-muted-foreground">{label}</div>
+    </div>
+  );
+}
+
+function MomentumValue({ momentum }: { momentum: AccelerationSignal["momentum"] }) {
+  const Icon = momentum === "rising" ? TrendingUp : momentum === "falling" ? TrendingDown : Minus;
+  return (
+    <span className={cn("inline-flex items-center gap-1 capitalize", momentum === "falling" && "text-muted-foreground")}>
+      <Icon className="h-4 w-4" aria-hidden />
+      {momentum}
+    </span>
+  );
+}
 
 function StrengthBar({ value }: { value: number }) {
-  const filled = Math.round(value / 10);
   return (
-    <div className="flex items-center gap-1.5">
-      <div className="flex gap-0.5">
-        {Array.from({ length: 10 }, (_, i) => (
-          <div
-            key={i}
-            className={cn(
-              "w-1.5 h-2.5 rounded-sm",
-              i < filled ? "bg-indigo-500" : "bg-muted/60"
-            )}
-          />
-        ))}
-      </div>
-      <span className="text-xs tabular-nums text-muted-foreground">{value}</span>
-    </div>
+    <span className="flex items-center gap-2">
+      <span className="h-1.5 w-16 overflow-hidden rounded-full bg-muted">
+        <span className="block h-full rounded-full bg-primary" style={{ width: `${Math.min(100, value)}%` }} />
+      </span>
+      {value}
+    </span>
   );
 }
 
@@ -175,10 +163,10 @@ function MonitorCard({ monitor }: { monitor: MonitorData }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const { signal } = monitor;
-  const tier = getTier(signal);
-  const { label: tierLabel, cls: tierCls } = TIER_BADGE[tier];
-  const scoreColor = SCORE_COLOR[tier];
+  const tier = signalTier(signal);
+  const style = TIER_STYLE[tier];
   const isActive = monitor.status === "active";
+  const showTierLabel = tier === "breakout" || tier === "trending" || tier === "rising";
 
   const lastSnap = monitor.snapshots[0] ?? null;
   const topPosts: MonitorTopPost[] = Array.isArray(lastSnap?.topPosts)
@@ -186,196 +174,165 @@ function MonitorCard({ monitor }: { monitor: MonitorData }) {
     : [];
 
   const lastRun = monitor.lastRunAt
-    ? new Date(monitor.lastRunAt).toLocaleString(undefined, {
-        month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
-      })
-    : "Never run";
+    ? `Updated ${new Date(monitor.lastRunAt).toLocaleString(undefined, {
+        month: "short", day: "numeric", hour: "numeric", minute: "2-digit",
+      })}`
+    : "Not run yet";
+
+  const perPlatform = (["reddit", "twitter"] as const)
+    .map((p) => ({ p, v: signal.platform[p].velocity }))
+    .filter((x): x is { p: "reddit" | "twitter"; v: number } => x.v !== null);
 
   return (
-    <Card className={cn("transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg", TIER_BORDER[tier], !isActive && "opacity-50")}>
-      <CardContent className="p-5 space-y-4">
-
-        {/* ── Header ── */}
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className={cn("text-[11px] font-bold px-2 py-0.5 rounded-full border tracking-wider", tierCls)}>
-                {tierLabel}
-              </span>
-              <Link
-                href={`/dashboard/subcultures/${monitor.subculture.slug}`}
-                className="font-semibold text-foreground hover:text-indigo-500 transition-colors"
-              >
-                {monitor.subculture.name}
-              </Link>
-              <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground border border-border shrink-0">
-                {monitor.subculture.category}
-              </span>
-              {!isActive && <span className="text-xs text-amber-400/70">paused</span>}
-            </div>
-            <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-              {monitor.platforms.map((p) => (
-                <span key={p} className={cn(
-                  "text-[11px] px-1.5 py-0.5 rounded border",
-                  p === "reddit"  ? "bg-orange-500/10 text-orange-400 border-orange-500/20" : "bg-sky-500/10 text-sky-400 border-sky-500/20"
-                )}>
-                  {p}
-                </span>
-              ))}
-              <span className="text-[11px] text-muted-foreground/50 ml-1">· {lastRun}</span>
-            </div>
-          </div>
-
-          {/* Breakout Score circle */}
-          <div className="text-center shrink-0">
-            <div className={cn("text-3xl font-black tabular-nums leading-none", scoreColor)}>
-              {signal.breakoutScore}
-            </div>
-            <div className="text-[10px] text-muted-foreground/60 mt-0.5">score</div>
-          </div>
-        </div>
-
-        {/* ── Score breakdown ── */}
-        <div className="grid grid-cols-3 gap-3 p-3 rounded-lg bg-muted/30 border border-border/50">
-          {/* Velocity */}
-          <div className="text-center">
-            <div className={cn("text-lg font-bold tabular-nums", scoreColor)}>
-              {signal.velocity > 0 ? "+" : ""}{signal.velocity}%
-            </div>
-            <div className="text-[10px] text-muted-foreground uppercase tracking-wider mt-0.5">velocity</div>
-          </div>
-
-          {/* Momentum */}
-          <div className="flex flex-col items-center justify-center gap-1">
-            <div className="flex items-center gap-1">
-              <MomentumIcon momentum={signal.momentum} />
-              <span className="text-xs font-medium capitalize">{signal.momentum}</span>
-            </div>
-            <div className="text-[10px] text-muted-foreground uppercase tracking-wider">momentum</div>
-          </div>
-
-          {/* Cross-platform */}
-          <div className="flex flex-col items-center gap-1">
-            <StrengthBar value={signal.crossPlatformStrength} />
-            <div className="text-[10px] text-muted-foreground uppercase tracking-wider">cross-platform</div>
-          </div>
-        </div>
-
-        {/* Per-platform velocity detail */}
-        {(signal.platform.reddit.velocity !== null || signal.platform.twitter.velocity !== null) && (
-          <div className="flex gap-3 text-xs">
-            {signal.platform.reddit.velocity !== null && (
-              <span className="text-orange-400/80">
-                Reddit {signal.platform.reddit.velocity > 0 ? "+" : ""}{signal.platform.reddit.velocity}%
-              </span>
-            )}
-            {signal.platform.twitter.velocity !== null && (
-              <span className="text-sky-400/80">
-                Twitter {signal.platform.twitter.velocity > 0 ? "+" : ""}{signal.platform.twitter.velocity}%
-              </span>
-            )}
-          </div>
-        )}
-
-        {/* ── Volume chart ── */}
-        <VolumeChart snapshots={monitor.snapshots} />
-
-        {/* ── Top posts ── */}
-        {topPosts.length > 0 && (
-          <div className="space-y-1.5">
-            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-              Latest {lastSnap?.platform} posts
-            </p>
-            {topPosts.slice(0, 3).map((post, i) => (
-              <a
-                key={i}
-                href={post.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-start gap-2 group text-xs text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <span className="text-muted-foreground/30 shrink-0 mt-0.5">↗</span>
-                <span className="line-clamp-1 group-hover:text-indigo-500 transition-colors flex-1">{post.title}</span>
-                {post.score > 0 && (
-                  <span className="shrink-0 text-muted-foreground/50">{post.score.toLocaleString()}</span>
-                )}
-              </a>
-            ))}
-          </div>
-        )}
-
-        {/* ── Actions ── */}
-        <div className="flex items-center gap-2 pt-1 border-t border-border/50 flex-wrap">
-          <Link href={`/dashboard/subcultures/${monitor.subculture.slug}`}>
-            <Button variant="ghost" size="sm" className="gap-1.5 text-xs">
-              <BookOpen className="h-3.5 w-3.5" />Profile
-            </Button>
-          </Link>
-
-          <Button
-            variant="ghost" size="sm" className="gap-1.5 text-xs"
-            disabled={isRunning || !isActive}
-            onClick={() => runNow(monitor.id)}
-            title={!isActive ? "Resume monitor to run" : undefined}
-          >
-            {isRunning
-              ? <><Loader2 className="h-3.5 w-3.5 animate-spin" />Running…</>
-              : <><RefreshCw className="h-3.5 w-3.5" />Run now</>
-            }
-          </Button>
-
-          {/* Generate Brief */}
-          {briefResult?.brief ? (
-            <Link href={`/dashboard/briefs/${briefResult.brief.id}`}>
-              <Button variant="outline" size="sm" className="gap-1.5 text-xs border-indigo-500/40 text-indigo-500 hover:text-indigo-400">
-                <FileText className="h-3.5 w-3.5" />View Brief
-              </Button>
+    <article
+      className={cn(
+        "flex flex-col gap-5 rounded-xl border bg-card p-5",
+        tier === "breakout" ? "border-tier-breakout/50" : "border-border",
+        !isActive && "opacity-60"
+      )}
+    >
+      {/* Header: name + score */}
+      <header className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <Link
+              href={`/dashboard/subcultures/${monitor.subculture.slug}`}
+              className="truncate text-lg font-semibold tracking-tight transition-colors hover:text-primary"
+            >
+              {monitor.subculture.name}
             </Link>
-          ) : (
-            <Button
-              variant="ghost" size="sm" className="gap-1.5 text-xs"
-              disabled={isGeneratingBrief}
-              onClick={() => createBrief({ subcultureId: monitor.subculture.id, monitorId: monitor.id })}
-            >
-              {isGeneratingBrief
-                ? <><Loader2 className="h-3.5 w-3.5 animate-spin" />Generating…</>
-                : <><FileText className="h-3.5 w-3.5" />Brief</>
-              }
-            </Button>
-          )}
-
-          <div className="ml-auto flex items-center gap-2">
-            <Button
-              variant="ghost" size="sm" className="text-xs gap-1.5"
-              disabled={isToggling}
-              onClick={() => setStatus({ id: monitor.id, status: isActive ? "paused" : "active" })}
-            >
-              {isActive ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
-              {isActive ? "Pause" : "Resume"}
-            </Button>
-            <Button
-              variant="ghost" size="sm"
-              className={cn("text-xs gap-1.5", confirmDelete ? "text-red-400 hover:text-red-300" : "text-muted-foreground")}
-              disabled={isDeleting}
-              onClick={() => { if (!confirmDelete) { setConfirmDelete(true); return; } deleteMonitor(monitor.id); }}
-              onBlur={() => setConfirmDelete(false)}
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-              {confirmDelete ? "Confirm?" : "Remove"}
-            </Button>
+            {showTierLabel && <span className={cn("text-xs font-semibold", style.text)}>{style.label}</span>}
+            {!isActive && <span className="text-xs font-medium text-muted-foreground">Paused</span>}
           </div>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {monitor.subculture.category} · {monitor.platforms.map(platformLabel).join(", ")} · {lastRun}
+          </p>
         </div>
-      </CardContent>
-    </Card>
+        <div className="shrink-0 text-right" title="Breakout Score (0–100)">
+          <div className={cn("text-4xl font-semibold leading-none tracking-tight tabular-nums", style.text)}>
+            {signal.breakoutScore}
+          </div>
+          <div className="mt-1 text-xs text-muted-foreground">Breakout Score</div>
+        </div>
+      </header>
+
+      {/* Score breakdown */}
+      <div className="grid grid-cols-3 gap-4">
+        <Metric label="Velocity">
+          <span className={cn(signal.velocity > 0 && style.text)}>{signed(signal.velocity)}</span>
+        </Metric>
+        <Metric label="Momentum">
+          <MomentumValue momentum={signal.momentum} />
+        </Metric>
+        <Metric label="Cross-platform">
+          <StrengthBar value={signal.crossPlatformStrength} />
+        </Metric>
+      </div>
+      {perPlatform.length > 0 && (
+        <p className="-mt-3 text-xs text-muted-foreground tabular-nums">
+          {perPlatform.map(({ p, v }) => `${platformLabel(p)} ${signed(v)}`).join(" · ")}
+        </p>
+      )}
+
+      <VolumeChart snapshots={monitor.snapshots} />
+
+      {/* Top posts */}
+      {topPosts.length > 0 && (
+        <div>
+          <h3 className="text-sm font-medium">Latest {platformLabel(lastSnap?.platform ?? "")} posts</h3>
+          <ul className="mt-2 space-y-1">
+            {topPosts.slice(0, 3).map((post, i) => (
+              <li key={i}>
+                <a
+                  href={post.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group flex items-center gap-2 rounded-md py-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  <ArrowUpRight className="h-3.5 w-3.5 shrink-0 transition-transform group-hover:-translate-y-px group-hover:translate-x-px" aria-hidden />
+                  <span className="line-clamp-1 flex-1">{post.title}</span>
+                  {post.score > 0 && <span className="shrink-0 text-xs tabular-nums">{post.score.toLocaleString()}</span>}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* Actions */}
+      <footer className="mt-auto flex flex-wrap items-center gap-1 border-t border-border pt-4">
+        {briefResult?.brief ? (
+          <Link
+            href={`/dashboard/briefs/${briefResult.brief.id}`}
+            className="mr-1 inline-flex h-8 items-center gap-1.5 rounded-lg bg-primary px-3 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+          >
+            <Check className="h-3.5 w-3.5" aria-hidden />View brief
+          </Link>
+        ) : (
+          <Button
+            size="sm"
+            className="mr-1"
+            disabled={isGeneratingBrief}
+            onClick={() => createBrief({ subcultureId: monitor.subculture.id, monitorId: monitor.id })}
+          >
+            {isGeneratingBrief ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
+            {isGeneratingBrief ? "Generating brief…" : "Generate brief"}
+          </Button>
+        )}
+
+        <Button
+          variant="ghost" size="sm"
+          disabled={isRunning || !isActive}
+          onClick={() => runNow(monitor.id)}
+          title={!isActive ? "Resume this monitor to run it" : undefined}
+        >
+          <RefreshCw className={cn("h-3.5 w-3.5", isRunning && "animate-spin")} />
+          {isRunning ? "Running…" : "Run now"}
+        </Button>
+
+        <Link
+          href={`/dashboard/subcultures/${monitor.subculture.slug}`}
+          className="inline-flex h-8 items-center gap-1.5 rounded-lg px-3 text-xs font-medium transition-colors hover:bg-accent hover:text-accent-foreground"
+        >
+          <BookOpen className="h-3.5 w-3.5" aria-hidden />Profile
+        </Link>
+
+        <div className="ml-auto flex items-center gap-1">
+          <Button
+            variant="ghost" size="sm"
+            disabled={isToggling}
+            onClick={() => setStatus({ id: monitor.id, status: isActive ? "paused" : "active" })}
+          >
+            {isActive ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
+            {isActive ? "Pause" : "Resume"}
+          </Button>
+          <Button
+            variant="ghost" size="sm"
+            className={cn(confirmDelete ? "text-destructive hover:text-destructive" : "text-muted-foreground")}
+            disabled={isDeleting}
+            onClick={() => { if (!confirmDelete) { setConfirmDelete(true); return; } deleteMonitor(monitor.id); }}
+            onBlur={() => setConfirmDelete(false)}
+          >
+            {isDeleting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+            {confirmDelete ? "Click again to remove" : "Remove"}
+          </Button>
+        </div>
+      </footer>
+    </article>
   );
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 type SortKey = "score" | "velocity" | "added";
+const SORTS: { key: SortKey; label: string }[] = [
+  { key: "score", label: "Breakout Score" },
+  { key: "velocity", label: "Velocity" },
+  { key: "added", label: "Newest" },
+];
 
 function useNextCronRun(): string {
-  // Cron runs every 6h at :00 — compute time until next slot
+  // Cron runs every 6h at :00 UTC — compute time until next slot
   const now = new Date();
   const nextHour = Math.ceil(now.getUTCHours() / 6) * 6;
   const next = new Date(now);
@@ -385,6 +342,25 @@ function useNextCronRun(): string {
   const h = Math.floor(diffMs / 3_600_000);
   const m = Math.floor((diffMs % 3_600_000) / 60_000);
   return h > 0 ? `${h}h ${m}m` : `${m}m`;
+}
+
+function CardSkeleton() {
+  return (
+    <div aria-hidden className="space-y-5 rounded-xl border border-border bg-card p-5">
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex-1 space-y-2">
+          <Skeleton className="h-6 w-48" />
+          <Skeleton className="h-4 w-64 max-w-full" />
+        </div>
+        <Skeleton className="h-10 w-14" />
+      </div>
+      <div className="grid grid-cols-3 gap-4">
+        {[0, 1, 2].map((i) => <Skeleton key={i} className="h-9" />)}
+      </div>
+      <Skeleton className="h-[72px] w-full rounded-lg" />
+      <Skeleton className="h-8 w-full" />
+    </div>
+  );
 }
 
 export default function SignalBoardPage() {
@@ -412,157 +388,138 @@ export default function SignalBoardPage() {
   }, [refetch, queryClient]);
 
   const monitors = [...(data?.monitors ?? [])];
-
-  if (sort === "score")    monitors.sort((a, b) => b.signal.breakoutScore - a.signal.breakoutScore);
+  if (sort === "score") monitors.sort((a, b) => b.signal.breakoutScore - a.signal.breakoutScore);
   if (sort === "velocity") monitors.sort((a, b) => b.signal.velocity - a.signal.velocity);
-  if (sort === "added")    monitors.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  if (sort === "added") monitors.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
   const breakouts = monitors.filter((m) => m.signal.isBreakout).length;
+  const n = monitors.length;
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="flex min-h-screen flex-col bg-background">
       <NavHeader />
 
-      <main className="flex-1 max-w-screen-xl mx-auto w-full px-4 sm:px-6 py-8 space-y-6">
-
-        {/* Page header */}
-        <div className="flex items-start justify-between gap-4 flex-wrap">
+      <main className="mx-auto w-full max-w-screen-xl flex-1 px-4 py-10 sm:px-6">
+        {/* Header */}
+        <header className="flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
           <div>
-            <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-              <Zap className="h-6 w-6 text-amber-400" />
-              Signal Board
-            </h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Subcultures ranked by Breakout Score = Velocity × Momentum × Cross-Platform strength.
-              {breakouts > 0 && (
-                <span className="ml-2 text-red-400 font-medium">
-                  {breakouts} breakout signal{breakouts !== 1 ? "s" : ""} detected.
-                </span>
+            <h1 className="text-3xl font-semibold tracking-tight">Signal Board</h1>
+            <div className="mt-2 text-muted-foreground">
+              {isLoading ? (
+                <Skeleton className="inline-block h-5 w-72 align-middle" />
+              ) : n === 0 ? (
+                "Track a subculture to see its Breakout Score here."
+              ) : (
+                <>
+                  {breakouts > 0 ? (
+                    <span className="font-medium text-signal">
+                      <span className="tabular-nums">{breakouts}</span> breakout{breakouts !== 1 && "s"}
+                    </span>
+                  ) : (
+                    "No breakouts"
+                  )}{" "}
+                  across <span className="tabular-nums">{n}</span> monitored subculture{n !== 1 && "s"}.
+                </>
               )}
-            </p>
-          </div>
-
-          {/* Run all + next cron */}
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground/60">
-              <Clock className="h-3 w-3" />
-              <span>Next auto-run in {nextRun}</span>
             </div>
-            {monitors.length > 0 && (
-              <Button
-                variant="outline" size="sm"
-                className="gap-1.5 text-xs"
-                disabled={isRunningAll}
-                onClick={handleRunAll}
-              >
-                {isRunningAll
-                  ? <><Loader2 className="h-3.5 w-3.5 animate-spin" />Running all…</>
-                  : <><RefreshCw className="h-3.5 w-3.5" />Run all now</>
-                }
-              </Button>
-            )}
           </div>
-        </div>
 
-        {/* Run all result banner */}
+          {n > 0 && (
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-muted-foreground tabular-nums">Next auto-run in {nextRun}</span>
+              <Button variant="outline" size="sm" disabled={isRunningAll} onClick={handleRunAll}>
+                <RefreshCw className={cn("h-3.5 w-3.5", isRunningAll && "animate-spin")} />
+                {isRunningAll ? "Running all…" : "Run all now"}
+              </Button>
+            </div>
+          )}
+        </header>
+
+        {/* Run-all result */}
         {runAllResult && (
-          <div className={cn(
-            "flex items-center gap-2 text-sm px-4 py-2.5 rounded-lg border",
-            runAllResult.failed > 0
-              ? "bg-red-500/5 border-red-500/20 text-red-400"
-              : "bg-green-500/5 border-green-500/20 text-green-400"
-          )}>
-            <RefreshCw className="h-3.5 w-3.5 shrink-0" />
-            Ran {runAllResult.ran} monitor{runAllResult.ran !== 1 ? "s" : ""}
-            {runAllResult.failed > 0 && ` · ${runAllResult.failed} failed`}
-            {runAllResult.skipped > 0 && ` · ${runAllResult.skipped} skipped (budget)`}
+          <div
+            role="status"
+            className={cn(
+              "mt-6 flex items-center gap-2 rounded-lg px-4 py-3 text-sm animate-in fade-in slide-in-from-top-1 duration-200",
+              runAllResult.failed > 0 ? "bg-destructive/10 text-destructive" : "bg-muted text-foreground"
+            )}
+          >
+            {runAllResult.failed > 0 ? <AlertCircle className="h-4 w-4 shrink-0" /> : <Check className="h-4 w-4 shrink-0 text-primary" />}
+            <span className="tabular-nums">
+              Ran {runAllResult.ran} monitor{runAllResult.ran !== 1 && "s"}
+              {runAllResult.failed > 0 && ` · ${runAllResult.failed} failed`}
+              {runAllResult.skipped > 0 && ` · ${runAllResult.skipped} skipped (budget limit)`}
+            </span>
           </div>
         )}
 
-        {/* Sort controls */}
-        {monitors.length > 1 && (
-          <div className="flex items-center gap-1 text-xs">
-            <span className="text-muted-foreground mr-1">Sort:</span>
-            {(["score", "velocity", "added"] as SortKey[]).map((k) => (
-              <button
-                key={k}
-                onClick={() => setSort(k)}
-                className={cn(
-                  "px-2.5 py-1 rounded-md border transition-colors capitalize",
-                  sort === k
-                    ? "bg-accent text-foreground border-border"
-                    : "text-muted-foreground border-transparent hover:border-border/50"
-                )}
-              >
-                {k === "score" ? "Breakout Score" : k === "velocity" ? "Velocity" : "Date Added"}
-              </button>
-            ))}
+        {/* Toolbar: sort + legend */}
+        {n > 1 && (
+          <div className="mt-8 flex flex-wrap items-center justify-between gap-4">
+            <div role="radiogroup" aria-label="Sort monitors" className="flex gap-1 rounded-lg bg-muted p-1 text-sm">
+              {SORTS.map(({ key, label }) => (
+                <button
+                  key={key}
+                  role="radio"
+                  aria-checked={sort === key}
+                  onClick={() => setSort(key)}
+                  className={cn(
+                    "rounded-md px-3 py-1 transition-colors",
+                    sort === key ? "bg-card font-medium shadow-sm" : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+              {(["breakout", "trending", "rising"] as const).map((t) => (
+                <span key={t} className="flex items-center gap-1.5">
+                  <span className={cn("h-2 w-2 rounded-full", TIER_STYLE[t].dot)} />
+                  {TIER_STYLE[t].label} {t === "breakout" ? "70+" : t === "trending" ? "55–69" : "35–54"}
+                </span>
+              ))}
+            </div>
           </div>
         )}
 
         {/* Error */}
         {error && (
-          <div className="flex items-center gap-2 text-sm text-red-400 p-4 rounded-lg border border-red-500/20 bg-red-500/5">
-            <AlertCircle className="h-4 w-4 shrink-0" /> Failed to load monitors.
+          <div className="mt-8 flex items-center gap-3 rounded-lg bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            Couldn’t load your monitors.
+            <button onClick={() => refetch()} className="font-medium underline-offset-4 hover:underline">
+              Try again
+            </button>
           </div>
         )}
 
         {/* Loading */}
         {isLoading && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="rounded-xl border border-border p-5 space-y-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="space-y-2 flex-1">
-                    <Skeleton className="h-5 w-24 rounded-full" />
-                    <Skeleton className="h-6 w-48" />
-                    <Skeleton className="h-4 w-32" />
-                  </div>
-                  <Skeleton className="h-12 w-16 rounded-lg" />
-                </div>
-                <Skeleton className="h-16 w-full rounded-md" />
-                <div className="flex gap-3">
-                  <Skeleton className="h-4 w-20" />
-                  <Skeleton className="h-4 w-20" />
-                  <Skeleton className="h-4 w-16 ml-auto" />
-                </div>
-              </div>
-            ))}
+          <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
+            {[0, 1].map((i) => <CardSkeleton key={i} />)}
           </div>
         )}
 
         {/* Empty */}
-        {!isLoading && monitors.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-20 text-center">
-            <Radio className="h-10 w-10 text-muted-foreground/40 mb-4" />
-            <p className="text-muted-foreground font-medium">No active monitors</p>
-            <p className="text-sm text-muted-foreground/60 mt-1 mb-6">
-              Open a subculture profile and click &ldquo;Start Monitoring&rdquo; to begin tracking.
+        {!isLoading && !error && n === 0 && (
+          <div className="mt-8 rounded-xl border border-dashed border-border px-6 py-16 text-center">
+            <h2 className="text-lg font-semibold">No subcultures on your Signal Board yet</h2>
+            <p className="mx-auto mt-2 max-w-md text-muted-foreground">
+              Open any profile in the Library and choose Start monitoring. Its Breakout Score updates every 6 hours.
             </p>
-            <Link href="/dashboard/subcultures">
-              <Button variant="outline" className="gap-2">
-                <BookOpen className="h-4 w-4" />Browse Library
-                <ChevronRight className="h-4 w-4" />
-              </Button>
+            <Link
+              href="/dashboard/subcultures"
+              className="mt-6 inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+            >
+              <BookOpen className="h-4 w-4" aria-hidden />Browse the Library
             </Link>
           </div>
         )}
 
-        {/* Score legend */}
-        {monitors.length > 0 && (
-          <div className="flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground/70">
-            <span className="font-medium">Score:</span>
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-400" />Breakout ≥70</span>
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-400" />Trending 55–69</span>
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-indigo-500" />Rising 35–54</span>
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-muted-foreground/40" />Stable &lt;35</span>
-            <span className="ml-auto text-muted-foreground/50">{monitors.length} monitor{monitors.length !== 1 ? "s" : ""} · cron every 6h</span>
-          </div>
-        )}
-
-        {/* Monitor cards */}
-        {monitors.length > 0 && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Cards */}
+        {n > 0 && (
+          <div className={cn("grid grid-cols-1 gap-6 lg:grid-cols-2", n > 1 ? "mt-6" : "mt-8")}>
             {monitors.map((m) => <MonitorCard key={m.id} monitor={m} />)}
           </div>
         )}
