@@ -20,6 +20,39 @@ import type {
   TwitterPost,
 } from "@/lib/types/subculture";
 
+// ─── Keyword extraction ───────────────────────────────────────────────────────
+// When users type full sentences like "sourdough bakers who document their
+// process online", strip filler words so scrapers get useful short queries.
+
+const STOP = new Set([
+  "who","what","when","where","why","how","is","are","was","were",
+  "the","a","an","and","or","but","in","on","at","to","for","of",
+  "with","by","from","their","they","that","this","which","do","does",
+  "can","will","would","could","should","may","might","online","process",
+  "about","into","over","after","above","below","out","off","up","down",
+  "not","also","than","then","so","if","very","just","as","has","have",
+  "had","been","being","be","it","its","them","these","those","my","your",
+  "our","his","her","document","make","making","made","use","using","used",
+  "people","community","group","culture","content","platform","post",
+]);
+
+function extractKeyTerms(query: string): { primary: string; hashtags: string[] } {
+  const words = query
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, "")
+    .split(/\s+/)
+    .filter((w) => w.length > 2 && !STOP.has(w));
+
+  const primary = words.slice(0, 3).join(" ") || query.split(/\s+/).slice(0, 3).join(" ");
+  // Short hashtags: individual words + first-two-words concatenated
+  const hashtags = [
+    ...words.slice(0, 4).map((w) => `#${w}`),
+    ...(words.length >= 2 ? [`#${words[0]}${words[1]}`] : []),
+  ].filter((v, i, a) => a.indexOf(v) === i).slice(0, 5);
+
+  return { primary, hashtags };
+}
+
 // ─── Reddit ───────────────────────────────────────────────────────────────────
 
 interface ApifyRedditPost {
@@ -50,8 +83,9 @@ async function fetchSubredditSize(sub: string): Promise<number | undefined> {
 
 async function enrichReddit(query: string): Promise<RedditSignal | undefined> {
   try {
+    const { primary } = extractKeyTerms(query);
     const posts = await runActor<ApifyRedditPost>("trudax/reddit-scraper-lite", {
-      searches: [query],
+      searches: [primary],
       searchPosts: true,
       searchCommunities: false,
       sort: "relevance",
@@ -138,9 +172,11 @@ interface ApifyTikTokVideo {
 
 async function enrichTikTok(query: string): Promise<TikTokSignal | undefined> {
   try {
-    const hashtag = `#${query.replace(/\s+/g, "").replace(/^#/, "")}`;
+    const { primary, hashtags } = extractKeyTerms(query);
+    // TikTok: keyword search + top hashtag variants
+    const searchQueries = [primary, ...hashtags.slice(0, 2)];
     const videos = await runActor<ApifyTikTokVideo>("clockworks/tiktok-scraper", {
-      searchQueries: [query, hashtag],
+      searchQueries,
       resultsPerPage: 20,
       maxResults: 25,
       shouldDownloadVideos: false,
@@ -211,8 +247,9 @@ interface ApifyTweet {
 
 async function enrichTwitter(query: string): Promise<TwitterSignal | undefined> {
   try {
+    const { primary } = extractKeyTerms(query);
     const tweets = await runActor<ApifyTweet>("apidojo/tweet-scraper", {
-      searchTerms: [query],
+      searchTerms: [primary],
       maxItems: 30,
       sort: "Latest",
       tweetLanguage: "en",
