@@ -20,6 +20,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useMonitors, type MonitorData } from "@/hooks/use-monitors";
 import { useBriefs, type BriefSummary } from "@/hooks/use-briefs";
 import { signalTier, TIER_STYLE } from "@/lib/signal-tier";
+import { urgencyOf } from "@/lib/brief-urgency";
 import { cn, timeAgo } from "@/lib/utils";
 
 // Must match the key the search page writes (app/dashboard/search/page.tsx).
@@ -355,11 +356,7 @@ function SignalPanel({
   );
 }
 
-const URGENCY: Record<BriefSummary["urgency"], { label: string; cls: string }> = {
-  "act-now": { label: "Act now", cls: "text-signal" },
-  "this-week": { label: "This week", cls: "text-tier-trending" },
-  monitor: { label: "Monitor", cls: "text-muted-foreground" },
-};
+
 
 function BriefsPanel({ query }: { query: ReturnType<typeof useBriefs> }) {
   const briefs = query.data?.briefs.slice(0, 4) ?? [];
@@ -375,7 +372,7 @@ function BriefsPanel({ query }: { query: ReturnType<typeof useBriefs> }) {
       ) : (
         <ul className="animate-in fade-in duration-300">
           {briefs.map((b) => {
-            const u = URGENCY[b.urgency] ?? URGENCY.monitor;
+            const u = urgencyOf(b.urgency);
             return (
               <li key={b.id}>
                 <Link
@@ -384,7 +381,7 @@ function BriefsPanel({ query }: { query: ReturnType<typeof useBriefs> }) {
                 >
                   <p className="line-clamp-2 font-medium leading-snug">{b.headline}</p>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    <span className={cn("font-medium", u.cls)}>{u.label}</span> · {b.subculture.name} ·{" "}
+                    <span className={cn("font-medium", u.text)}>{u.label}</span> · {b.subculture.name} ·{" "}
                     {timeAgo(b.createdAt)}
                   </p>
                 </Link>

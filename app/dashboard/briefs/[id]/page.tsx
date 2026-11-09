@@ -1,168 +1,117 @@
 "use client";
 
 import { useState } from "react";
-import {
-  ArrowLeft, FileText, AlertCircle, Loader2, Trash2,
-  CheckCircle, AlertTriangle, Clock, Lightbulb, Target, TrendingUp,
-} from "lucide-react";
+import { ArrowLeft, Copy, AlertCircle, Loader2, Trash2, Check } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { NavHeader } from "@/components/nav-header";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { urgencyOf } from "@/lib/brief-urgency";
 import { useBrief, useDeleteBrief, type ContentAngle, type PlatformStrategyItem, type BriefBrandFit } from "@/hooks/use-briefs";
 
-// ─── Urgency config ───────────────────────────────────────────────────────────
+const chip = "inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-xs font-medium text-foreground";
+const signed = (n: number) => `${n > 0 ? "+" : n < 0 ? "−" : ""}${Math.abs(n)}%`;
 
-const URGENCY_CONFIG = {
-  "act-now":   { label: "ACT NOW",   cls: "bg-red-500/15 text-red-400 border-red-500/30",   icon: AlertTriangle, detail: "24–72 hour window" },
-  "this-week": { label: "THIS WEEK", cls: "bg-amber-500/15 text-amber-400 border-amber-500/30", icon: Clock, detail: "7-day window" },
-  "monitor":   { label: "MONITOR",   cls: "bg-muted text-muted-foreground border-border",   icon: TrendingUp, detail: "Building signal" },
-};
+// Layout pieces ──────────────────────────────────────────────────────────────
 
-const PLATFORM_COLORS: Record<string, string> = {
-  "TikTok":    "bg-pink-500/10 text-pink-400 border-pink-500/20",
-  "Instagram": "bg-purple-500/10 text-purple-400 border-purple-500/20",
-  "Twitter":   "bg-sky-500/10 text-sky-400 border-sky-500/20",
-  "Reddit":    "bg-orange-500/10 text-orange-400 border-orange-500/20",
-  "YouTube":   "bg-red-500/10 text-red-400 border-red-500/20",
-  "X":         "bg-sky-500/10 text-sky-400 border-sky-500/20",
-};
-
-function PlatformBadge({ platform }: { platform: string }) {
-  const cls = PLATFORM_COLORS[platform] ?? "bg-muted text-muted-foreground border-border";
+function Section({ title, meta, children }: { title: string; meta?: string; children: React.ReactNode }) {
   return (
-    <span className={cn("text-[11px] font-semibold px-2 py-0.5 rounded-full border shrink-0", cls)}>
-      {platform}
-    </span>
+    <section className="border-t border-border pt-8">
+      <div className="flex items-baseline justify-between gap-4">
+        <h2 className="text-xl font-semibold tracking-tight">{title}</h2>
+        {meta && <p className="text-sm text-muted-foreground tabular-nums">{meta}</p>}
+      </div>
+      <div className="mt-5">{children}</div>
+    </section>
   );
 }
-
-// ─── Section wrapper ──────────────────────────────────────────────────────────
-
-function Section({ icon: Icon, title, children }: { icon: React.ElementType; title: string; children: React.ReactNode }) {
-  return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="text-sm font-semibold flex items-center gap-2 text-muted-foreground uppercase tracking-wider">
-          <Icon className="h-4 w-4" />
-          {title}
-        </CardTitle>
-      </CardHeader>
-      <CardContent>{children}</CardContent>
-    </Card>
-  );
-}
-
-// ─── Content angles ───────────────────────────────────────────────────────────
 
 function ContentAngles({ angles }: { angles: ContentAngle[] }) {
   return (
-    <div className="space-y-4">
+    <ol className="space-y-8">
       {angles.map((angle, i) => (
-        <div key={i} className="border border-border rounded-lg p-4 space-y-2 hover:border-indigo-500/30 transition-colors">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs font-bold text-muted-foreground/50 tabular-nums">
-                {String(i + 1).padStart(2, "0")}
-              </span>
-              <h3 className="font-semibold text-foreground">{angle.headline}</h3>
+        <li key={i} className="flex gap-4">
+          <span className="w-6 shrink-0 pt-0.5 text-right text-sm font-medium tabular-nums text-muted-foreground">{i + 1}</span>
+          <div className="min-w-0 flex-1">
+            <h3 className="font-semibold leading-snug">{angle.headline}</h3>
+            <p className="mt-0.5 text-sm text-muted-foreground">{angle.platform}</p>
+            <p className="mt-3 leading-relaxed">{angle.description}</p>
+            <div className="mt-3 rounded-lg bg-muted px-4 py-3">
+              <p className="text-xs font-medium text-muted-foreground">Example</p>
+              <p className="mt-1 text-sm leading-relaxed">{angle.example}</p>
             </div>
-            <PlatformBadge platform={angle.platform} />
           </div>
-          <p className="text-sm text-muted-foreground leading-relaxed">{angle.description}</p>
-          <div className="pl-3 border-l-2 border-indigo-500/30 mt-2">
-            <p className="text-xs font-medium text-indigo-500 mb-0.5">Example execution</p>
-            <p className="text-sm text-foreground/80 leading-relaxed">{angle.example}</p>
-          </div>
-        </div>
+        </li>
       ))}
-    </div>
+    </ol>
   );
 }
-
-// ─── Platform strategy ────────────────────────────────────────────────────────
 
 function PlatformStrategy({ items }: { items: PlatformStrategyItem[] }) {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+    <div className="grid grid-cols-1 gap-x-10 gap-y-8 sm:grid-cols-2">
       {items.map((item) => (
-        <div key={item.platform} className="border border-border rounded-lg p-4 space-y-3">
-          <div className="flex items-center gap-2">
-            <PlatformBadge platform={item.platform} />
-          </div>
-          <p className="text-sm text-foreground/80 leading-relaxed">{item.approach}</p>
-          <div>
-            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Formats</p>
-            <div className="flex flex-wrap gap-1">
-              {item.formats.map((f) => (
-                <span key={f} className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground border border-border">
-                  {f}
-                </span>
-              ))}
+        <div key={item.platform}>
+          <h3 className="font-semibold">{item.platform}</h3>
+          <p className="mt-2 leading-relaxed text-muted-foreground">{item.approach}</p>
+          <dl className="mt-4 space-y-3 text-sm">
+            <div>
+              <dt className="font-medium">Formats</dt>
+              <dd className="mt-1.5 flex flex-wrap gap-1.5">
+                {item.formats.map((f) => <span key={f} className={chip}>{f}</span>)}
+              </dd>
             </div>
-          </div>
-          <div>
-            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">Tone</p>
-            <p className="text-xs text-muted-foreground italic">{item.tone}</p>
-          </div>
+            <div>
+              <dt className="font-medium">Tone</dt>
+              <dd className="mt-1 text-muted-foreground">{item.tone}</dd>
+            </div>
+          </dl>
         </div>
       ))}
     </div>
   );
 }
 
-// ─── Brand fit ────────────────────────────────────────────────────────────────
-
-function BrandFitSection({ brandFit }: { brandFit: BriefBrandFit }) {
+function BrandFit({ brandFit }: { brandFit: BriefBrandFit }) {
   return (
-    <div className="space-y-5">
+    <div className="grid grid-cols-1 gap-x-10 gap-y-8 sm:grid-cols-2">
       <div>
-        <p className="text-xs font-semibold text-green-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-          <CheckCircle className="h-3.5 w-3.5" />Ideal for
-        </p>
-        <div className="flex flex-wrap gap-2">
+        <h3 className="font-semibold">Best fit for</h3>
+        <ul className="mt-3 space-y-2">
           {brandFit.ideal_brands.map((b) => (
-            <span key={b} className="text-sm px-3 py-1 rounded-full bg-green-500/10 text-green-400 border border-green-500/20">
+            <li key={b} className="flex gap-2.5 leading-relaxed text-muted-foreground">
+              <Check className="mt-1 h-4 w-4 shrink-0 text-primary" aria-hidden />
               {b}
-            </span>
+            </li>
           ))}
-        </div>
+        </ul>
+        <h3 className="mt-6 font-semibold">Timing</h3>
+        <p className="mt-2 leading-relaxed text-muted-foreground">{brandFit.engagement_window}</p>
       </div>
-
       <div>
-        <p className="text-xs font-semibold text-red-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-          <AlertTriangle className="h-3.5 w-3.5" />Warning signals
-        </p>
-        <ul className="space-y-1.5">
+        <h3 className="font-semibold">Watch out for</h3>
+        <ul className="mt-3 space-y-2">
           {brandFit.warning_signals.map((w) => (
-            <li key={w} className="flex items-start gap-2 text-sm text-muted-foreground">
-              <span className="text-red-400/60 mt-0.5 shrink-0">—</span>
+            <li key={w} className="flex gap-2.5 leading-relaxed text-muted-foreground">
+              <AlertCircle className="mt-1 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
               {w}
             </li>
           ))}
         </ul>
       </div>
-
-      <div className="p-3 rounded-lg bg-amber-500/5 border border-amber-500/20">
-        <p className="text-xs font-semibold text-amber-400 uppercase tracking-wider mb-1 flex items-center gap-1.5">
-          <Clock className="h-3.5 w-3.5" />Engagement window
-        </p>
-        <p className="text-sm text-foreground/80 leading-relaxed">{brandFit.engagement_window}</p>
-      </div>
     </div>
   );
 }
 
-// ─── Copy-as-text ─────────────────────────────────────────────────────────────
+// Copy-as-text ───────────────────────────────────────────────────────────────
 
 function buildPlainText(brief: NonNullable<ReturnType<typeof useBrief>["data"]>["brief"]) {
   const { headline, urgency, momentSummary, accelerationContext, contentAngles, platformStrategy, brandFit, subculture } = brief;
   const lines: string[] = [
     `CONTENT BRIEF — ${headline}`,
-    `Urgency: ${urgency.toUpperCase()} | Subculture: ${subculture.name} | Category: ${subculture.category}`,
+    `Urgency: ${urgencyOf(urgency).label} | Subculture: ${subculture.name} | Category: ${subculture.category}`,
     "",
     "THE MOMENT",
     momentSummary,
@@ -185,14 +134,29 @@ function buildPlainText(brief: NonNullable<ReturnType<typeof useBrief>["data"]>[
       "",
     ]),
     "BRAND FIT",
-    `Ideal for: ${brandFit.ideal_brands.join(", ")}`,
-    `Warning: ${brandFit.warning_signals.join("; ")}`,
-    `Window: ${brandFit.engagement_window}`,
+    `Best fit for: ${brandFit.ideal_brands.join(", ")}`,
+    `Watch out for: ${brandFit.warning_signals.join("; ")}`,
+    `Timing: ${brandFit.engagement_window}`,
   ];
   return lines.join("\n");
 }
 
-// ─── Page ─────────────────────────────────────────────────────────────────────
+// Page ───────────────────────────────────────────────────────────────────────
+
+function Shell({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex min-h-screen flex-col bg-background">
+      <NavHeader />
+      <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-10 sm:px-6">{children}</main>
+    </div>
+  );
+}
+
+const backLink = (
+  <Link href="/dashboard/briefs" className="group inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground">
+    <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-0.5" aria-hidden />All briefs
+  </Link>
+);
 
 export default function BriefDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -213,140 +177,107 @@ export default function BriefDetailPage() {
 
   function handleDelete() {
     if (!confirmDelete) { setConfirmDelete(true); return; }
-    deleteBrief(id, {
-      onSuccess: () => router.push("/dashboard/briefs"),
-    });
+    deleteBrief(id, { onSuccess: () => router.push("/dashboard/briefs") });
   }
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background flex flex-col">
-        <NavHeader />
-        <main className="flex-1 max-w-screen-xl mx-auto w-full px-4 sm:px-6 py-8 space-y-6">
-          <Skeleton className="h-8 w-48" />
-          <Skeleton className="h-24 w-full" />
-          <div className="space-y-4">
-            {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-48 rounded-xl" />)}
+      <Shell>
+        <div aria-hidden>
+          <Skeleton className="h-4 w-20" />
+          <Skeleton className="mt-8 h-4 w-32" />
+          <Skeleton className="mt-3 h-10 w-full" />
+          <Skeleton className="mt-2 h-10 w-2/3" />
+          <Skeleton className="mt-4 h-4 w-56" />
+          <div className="mt-12 grid gap-8 sm:grid-cols-2">
+            <Skeleton className="h-32" />
+            <Skeleton className="h-32" />
           </div>
-        </main>
-      </div>
+        </div>
+      </Shell>
     );
   }
 
   if (error || !brief) {
     return (
-      <div className="min-h-screen bg-background flex flex-col">
-        <NavHeader />
-        <main className="flex-1 max-w-screen-xl mx-auto w-full px-4 sm:px-6 py-8">
-          <div className="flex items-center gap-2 text-red-400 mb-4">
-            <AlertCircle className="h-4 w-4" /> Brief not found.
-          </div>
-          <Link href="/dashboard/briefs">
-            <Button variant="ghost" size="sm" className="gap-2">
-              <ArrowLeft className="h-4 w-4" /> All Briefs
-            </Button>
-          </Link>
-        </main>
-      </div>
+      <Shell>
+        {backLink}
+        <div className="mt-8 rounded-xl border border-dashed border-border px-6 py-16 text-center">
+          <h1 className="text-lg font-semibold">We couldn’t find that brief</h1>
+          <p className="mt-2 text-muted-foreground">It may have been deleted.</p>
+        </div>
+      </Shell>
     );
   }
 
-  const urgencyConfig = URGENCY_CONFIG[brief.urgency] ?? URGENCY_CONFIG["monitor"];
-  const UrgencyIcon = urgencyConfig.icon;
-  const date = new Date(brief.createdAt).toLocaleDateString(undefined, {
-    weekday: "long", month: "long", day: "numeric", year: "numeric",
-  });
+  const u = urgencyOf(brief.urgency);
+  const date = new Date(brief.createdAt).toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" });
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      <NavHeader />
+    <Shell>
+      {/* Top bar */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        {backLink}
+        <div className="flex items-center gap-1">
+          <Button variant="outline" size="sm" onClick={handleCopy} aria-live="polite">
+            {copied ? <Check className="h-3.5 w-3.5 text-primary" /> : <Copy className="h-3.5 w-3.5" />}
+            {copied ? "Copied" : "Copy as text"}
+          </Button>
+          <Button
+            variant="ghost" size="sm"
+            className={cn(confirmDelete ? "text-destructive hover:text-destructive" : "text-muted-foreground")}
+            disabled={isDeleting}
+            onClick={handleDelete}
+            onBlur={() => setConfirmDelete(false)}
+          >
+            {isDeleting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+            {confirmDelete ? "Click again to delete" : "Delete"}
+          </Button>
+        </div>
+      </div>
 
-      <main className="flex-1 max-w-screen-xl mx-auto w-full px-4 sm:px-6 py-8 space-y-6">
-
-        {/* Back + actions */}
-        <div className="flex items-center justify-between gap-4 flex-wrap">
-          <Link href="/dashboard/briefs">
-            <Button variant="ghost" size="sm" className="gap-1.5 -ml-2 text-muted-foreground hover:text-foreground">
-              <ArrowLeft className="h-4 w-4" /> All Briefs
-            </Button>
+      {/* Header */}
+      <header className="mt-10">
+        <p className="text-sm">
+          <span className={cn("font-semibold", u.text)}>{u.label}</span>
+          <span className="text-muted-foreground"> · {u.detail}</span>
+        </p>
+        <h1 className="mt-3 text-3xl font-semibold leading-tight tracking-tight sm:text-4xl">{brief.headline}</h1>
+        <p className="mt-4 text-sm text-muted-foreground">
+          <Link href={`/dashboard/subcultures/${brief.subculture.slug}`} className="font-medium text-foreground underline-offset-4 hover:text-primary hover:underline">
+            {brief.subculture.name}
           </Link>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={handleCopy} className="gap-2 text-xs">
-              {copied ? <><CheckCircle className="h-3.5 w-3.5 text-green-400" />Copied!</> : <><FileText className="h-3.5 w-3.5" />Copy as text</>}
-            </Button>
-            <Button
-              variant="ghost" size="sm"
-              className={cn("gap-1.5 text-xs", confirmDelete ? "text-red-400 hover:text-red-300" : "text-muted-foreground")}
-              disabled={isDeleting}
-              onClick={handleDelete}
-              onBlur={() => setConfirmDelete(false)}
-            >
-              {isDeleting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
-              {confirmDelete ? "Confirm?" : "Delete"}
-            </Button>
-          </div>
+          {" · "}{brief.subculture.category}
+          {brief.velocityAtGeneration !== null && (
+            <span className="tabular-nums"> · {signed(brief.velocityAtGeneration)} velocity when generated</span>
+          )}
+          {" · "}{date}
+        </p>
+      </header>
+
+      {/* Moment + why now */}
+      <div className="mt-10 grid grid-cols-1 gap-x-10 gap-y-8 sm:grid-cols-2">
+        <div>
+          <h2 className="text-sm font-semibold">The moment</h2>
+          <p className="mt-2 leading-relaxed text-muted-foreground">{brief.momentSummary}</p>
         </div>
-
-        {/* Hero header */}
-        <div className="border border-border rounded-xl p-6 bg-card space-y-4">
-          <div className="flex items-start gap-3 flex-wrap">
-            <span className={cn("inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full border tracking-wider", urgencyConfig.cls)}>
-              <UrgencyIcon className="h-3 w-3" />
-              {urgencyConfig.label} · {urgencyConfig.detail}
-            </span>
-            <span className="text-xs px-2 py-1 rounded-full bg-muted text-muted-foreground border border-border">
-              {brief.subculture.category}
-            </span>
-            {brief.velocityAtGeneration !== null && (
-              <span className={cn(
-                "text-xs px-2 py-1 rounded-full border",
-                brief.velocityAtGeneration > 0
-                  ? "bg-indigo-500/10 text-indigo-500 border-indigo-500/20"
-                  : "bg-muted text-muted-foreground border-border"
-              )}>
-                {brief.velocityAtGeneration > 0 ? "+" : ""}{brief.velocityAtGeneration}% velocity at generation
-              </span>
-            )}
-          </div>
-
-          <h1 className="text-2xl font-bold text-foreground leading-tight">{brief.headline}</h1>
-
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <span>
-              <Link href={`/dashboard/subcultures/${brief.subculture.slug}`} className="text-indigo-500 hover:text-indigo-400 transition-colors font-medium">
-                {brief.subculture.name}
-              </Link>
-            </span>
-            <span>·</span>
-            <span>{date}</span>
-          </div>
+        <div>
+          <h2 className="text-sm font-semibold">Why now</h2>
+          <p className="mt-2 leading-relaxed text-muted-foreground">{brief.accelerationContext}</p>
         </div>
+      </div>
 
-        {/* The Moment + Why Now */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Section icon={FileText} title="The Moment">
-            <p className="text-sm text-foreground/80 leading-relaxed">{brief.momentSummary}</p>
-          </Section>
-          <Section icon={TrendingUp} title="Why Now">
-            <p className="text-sm text-foreground/80 leading-relaxed">{brief.accelerationContext}</p>
-          </Section>
-        </div>
-
-        {/* Content Angles */}
-        <Section icon={Lightbulb} title={`Content Angles (${brief.contentAngles.length})`}>
+      <div className="mt-12 space-y-12">
+        <Section title="Content angles" meta={`${brief.contentAngles.length} angle${brief.contentAngles.length !== 1 ? "s" : ""}`}>
           <ContentAngles angles={brief.contentAngles} />
         </Section>
-
-        {/* Platform Strategy */}
-        <Section icon={Target} title="Platform Strategy">
+        <Section title="Platform strategy">
           <PlatformStrategy items={brief.platformStrategy} />
         </Section>
-
-        {/* Brand Fit */}
-        <Section icon={CheckCircle} title="Brand Fit">
-          <BrandFitSection brandFit={brief.brandFit} />
+        <Section title="Brand fit">
+          <BrandFit brandFit={brief.brandFit} />
         </Section>
-      </main>
-    </div>
+      </div>
+    </Shell>
   );
 }

@@ -1,285 +1,282 @@
 "use client";
 
-import { useState } from "react";
-import { Plus, Loader2, BookOpen, Sparkles, AlertCircle, ChevronRight, Hash, Layers } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Plus, Loader2, AlertCircle, Check, X, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { NavHeader } from "@/components/nav-header";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useSubcultures, useGenerateSubculture, type SubcultureSummary } from "@/hooks/use-subcultures";
 
-const CATEGORIES = ["All", "Fashion", "Gaming", "Music", "Sports", "Food & Drink", "Tech", "Beauty & Wellness", "Lifestyle", "Entertainment", "Outdoors", "Finance", "Automotive", "Arts & Creativity"];
+/**
+ * AI-written categories are free-form ("Food & Beverage / Hobbyist Craft"), so exact-match
+ * filters miss most profiles. Map each to one broad bucket by keyword (first match wins).
+ */
+const BUCKETS: [string, RegExp][] = [
+  ["Automotive", /auto|car\b|motor|vehicle/i],
+  ["Food & drink", /food|beverage|drink|coffee|beer|wine|culinary|cook/i],
+  ["Health & fitness", /health|fitness|wellness|longevity|nutrition/i],
+  ["Sports & outdoors", /sport|outdoor|endurance|running|climb|hik|recreation/i],
+  ["Fashion & beauty", /fashion|beauty|\bstyle\b|apparel|streetwear/i],
+  ["Music & entertainment", /music|fandom|\bfan\b|k-pop|nightlife|entertainment|film|\btv\b/i],
+  ["Gaming", /gaming|game|esport/i],
+  ["Books & arts", /book|literat|\bart|craft|creativ|design/i],
+  ["Tech", /tech|software|ai\b|crypto|gadget|computing/i],
+  ["Lifestyle", /lifestyle|aesthetic|travel|home|parent/i],
+];
+const match = (text: string) => BUCKETS.find(([, re]) => re.test(text))?.[0];
+// Match the main part ("Automotive" in "Automotive / Motorsport") before the full text.
+const bucketOf = (c: string) => match(c.split(" / ")[0]) ?? match(c) ?? "Other";
 
-const CATEGORY_COLORS: Record<string, string> = {
-  Fashion: "bg-pink-500/10 text-pink-400 border-pink-500/20",
-  Gaming: "bg-purple-500/10 text-purple-400 border-purple-500/20",
-  Music: "bg-indigo-500/10 text-indigo-500 border-indigo-500/20",
-  Sports: "bg-green-500/10 text-green-400 border-green-500/20",
-  "Food & Drink": "bg-orange-500/10 text-orange-400 border-orange-500/20",
-  Tech: "bg-cyan-500/10 text-cyan-400 border-cyan-500/20",
-  "Beauty & Wellness": "bg-rose-500/10 text-rose-400 border-rose-500/20",
-  Lifestyle: "bg-amber-500/10 text-amber-400 border-amber-500/20",
-  Entertainment: "bg-violet-500/10 text-violet-400 border-violet-500/20",
-  Outdoors: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
-  Finance: "bg-yellow-500/10 text-yellow-400 border-yellow-500/20",
-  Automotive: "bg-red-500/10 text-red-400 border-red-500/20",
-  "Arts & Creativity": "bg-fuchsia-500/10 text-fuchsia-400 border-fuchsia-500/20",
-  "Politics & Activism": "bg-sky-500/10 text-sky-400 border-sky-500/20",
-};
+// Card ───────────────────────────────────────────────────────────────────────
 
 function SubcultureCard({ s }: { s: SubcultureSummary }) {
+  const facts = [
+    s.enrichedByApify ? "Live data" : null,
+    s.status !== "approved" ? "Draft" : null,
+  ].filter(Boolean);
+
   return (
-    <Link href={`/dashboard/subcultures/${s.slug}`}>
-      <Card className="group h-full hover:border-indigo-500/50 hover:shadow-md hover:shadow-indigo-500/5 transition-all cursor-pointer">
-        <CardContent className="p-5 flex flex-col gap-3 h-full">
-          {/* Top row */}
-          <div className="flex items-start justify-between gap-2">
-            <span className={cn("text-xs font-medium px-2 py-0.5 rounded-full border", CATEGORY_COLORS[s.category] ?? "bg-muted text-muted-foreground border-border")}>
-              {s.category}
-            </span>
-            <div className="flex items-center gap-1.5">
-              <span className={cn("text-xs px-1.5 py-0.5 rounded", s.status === "approved" ? "bg-green-500/10 text-green-400" : "bg-amber-500/10 text-amber-400")}>
-                {s.status}
-              </span>
-            </div>
-          </div>
-
-          {/* Name + description */}
-          <div className="flex-1">
-            <h3 className="font-semibold text-foreground group-hover:text-indigo-500 transition-colors">
-              {s.name}
-            </h3>
-            <p className="mt-1 text-xs text-muted-foreground line-clamp-2 leading-relaxed">
-              {s.description}
-            </p>
-          </div>
-
-          {/* Footer */}
-          <div className="flex items-center justify-between pt-2 border-t border-border/50">
-            <div className="flex items-center gap-3 text-xs text-muted-foreground">
-              <span className="flex items-center gap-1">
-                <Hash className="h-3 w-3" />
-                keywords
-              </span>
-              <span className="flex items-center gap-1">
-                <Layers className="h-3 w-3" />
-                10 fields
-              </span>
-            </div>
-            <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-indigo-500 transition-colors" />
-          </div>
-        </CardContent>
-      </Card>
+    <Link
+      href={`/dashboard/subcultures/${s.slug}`}
+      className="group flex h-full flex-col rounded-xl border border-border bg-card p-5 transition-colors hover:border-primary/40"
+    >
+      <p className="text-xs font-medium text-muted-foreground">{s.category}</p>
+      <h3 className="mt-1 font-semibold tracking-tight transition-colors group-hover:text-primary">{s.name}</h3>
+      <p className="mt-2 line-clamp-3 flex-1 text-sm leading-relaxed text-muted-foreground">{s.description}</p>
+      <div className="mt-4 flex items-center justify-between gap-3 text-xs text-muted-foreground">
+        <span>{facts.length ? facts.join(" · ") : " "}</span>
+        <ArrowRight className="h-4 w-4 shrink-0 transition-transform group-hover:translate-x-0.5 group-hover:text-primary" aria-hidden />
+      </div>
     </Link>
   );
 }
+
+function CardSkeleton() {
+  return (
+    <div aria-hidden className="flex h-44 flex-col gap-3 rounded-xl border border-border bg-card p-5">
+      <Skeleton className="h-3.5 w-20" />
+      <Skeleton className="h-5 w-40" />
+      <Skeleton className="h-4 w-full" />
+      <Skeleton className="h-4 w-4/5" />
+    </div>
+  );
+}
+
+// Generate dialog ────────────────────────────────────────────────────────────
 
 function GenerateDialog({ onClose }: { onClose: () => void }) {
   const [name, setName] = useState("");
   const [seed, setSeed] = useState("");
   const { mutate, isPending, error, data } = useGenerateSubculture();
+  const nameRef = useRef<HTMLInputElement>(null);
 
-  function handleGenerate() {
+  useEffect(() => {
+    nameRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape" && !isPending) onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [isPending, onClose]);
+
+  function handleGenerate(e?: React.FormEvent) {
+    e?.preventDefault();
     if (!name.trim()) return;
     mutate({ name: name.trim(), seed: seed.trim() || undefined });
   }
 
-  if (data) {
-    return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-        <Card className="w-full max-w-md">
-          <CardContent className="p-6 space-y-4">
-            <div className="flex items-center gap-2 text-green-400">
-              <Sparkles className="h-5 w-5" />
-              <span className="font-semibold">Profile Generated</span>
-            </div>
-            <p className="text-sm text-muted-foreground">
-              <strong className="text-foreground">{data.subculture.name}</strong> has been added to the library.
-            </p>
-            <div className="flex gap-2">
-              <Link href={`/dashboard/subcultures/${data.subculture.slug}`} className="flex-1">
-                <Button className="w-full" size="sm">View Profile</Button>
-              </Link>
-              <Button variant="outline" size="sm" onClick={onClose}>Close</Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+  const inputCls =
+    "h-10 w-full rounded-lg border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-60";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <Card className="w-full max-w-md">
-        <CardContent className="p-6 space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-indigo-500" />
-              <span className="font-semibold text-foreground">Generate Subculture Profile</span>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 p-4 backdrop-blur-sm animate-in fade-in duration-150"
+      onMouseDown={(e) => { if (e.target === e.currentTarget && !isPending) onClose(); }}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="generate-title"
+        className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-lg animate-in zoom-in-95 duration-150"
+      >
+        {data ? (
+          <div>
+            <p className="flex items-center gap-2 text-sm font-medium text-primary">
+              <Check className="h-4 w-4" aria-hidden />Profile ready
+            </p>
+            <h2 id="generate-title" className="mt-2 text-lg font-semibold tracking-tight">
+              {data.subculture.name} is in your Library
+            </h2>
+            <div className="mt-6 flex gap-2">
+              <Link
+                href={`/dashboard/subcultures/${data.subculture.slug}`}
+                className="inline-flex h-9 flex-1 items-center justify-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+              >
+                Open profile
+              </Link>
+              <Button variant="outline" onClick={onClose}>Close</Button>
             </div>
-            <Button variant="ghost" size="sm" onClick={onClose} disabled={isPending}>✕</Button>
           </div>
-
-          <div className="space-y-3">
-            <div>
-              <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
-                Subculture name *
-              </label>
-              <Input
-                placeholder="e.g. Cottagecore, Hot Rodders, BookTok..."
-                value={name}
-                onChange={e => setName(e.target.value)}
-                onKeyDown={e => e.key === "Enter" && !isPending && handleGenerate()}
+        ) : (
+          <form onSubmit={handleGenerate}>
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 id="generate-title" className="text-lg font-semibold tracking-tight">New subculture profile</h2>
+                <p className="mt-1 text-sm text-muted-foreground">Claude builds the keywords, vernacular and moments for you.</p>
+              </div>
+              <button
+                type="button"
+                onClick={onClose}
                 disabled={isPending}
-                autoFocus
-              />
+                aria-label="Close"
+                className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-50"
+              >
+                <X className="h-4 w-4" />
+              </button>
             </div>
-            <div>
-              <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
-                Context (optional)
+
+            <div className="mt-6 space-y-4">
+              <label className="block">
+                <span className="text-sm font-medium">Name</span>
+                <input
+                  ref={nameRef}
+                  className={cn(inputCls, "mt-1.5")}
+                  placeholder="Cottagecore, hot rodders, BookTok…"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  disabled={isPending}
+                />
               </label>
-              <Input
-                placeholder="Any specific angle, region, or nuance..."
-                value={seed}
-                onChange={e => setSeed(e.target.value)}
-                disabled={isPending}
-              />
+              <label className="block">
+                <span className="text-sm font-medium">Context <span className="font-normal text-muted-foreground">(optional)</span></span>
+                <input
+                  className={cn(inputCls, "mt-1.5")}
+                  placeholder="A specific angle, region or nuance"
+                  value={seed}
+                  onChange={(e) => setSeed(e.target.value)}
+                  disabled={isPending}
+                />
+              </label>
             </div>
-          </div>
 
-          {error && (
-            <div className="flex items-center gap-2 text-sm text-red-400">
-              <AlertCircle className="h-4 w-4 shrink-0" />
-              {error.message}
+            {error && (
+              <p role="alert" className="mt-4 flex items-center gap-2 text-sm text-destructive">
+                <AlertCircle className="h-4 w-4 shrink-0" />{error.message}
+              </p>
+            )}
+            {isPending && (
+              <p role="status" className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />Building the profile. This takes 1–2 minutes.
+              </p>
+            )}
+
+            <div className="mt-6 flex gap-2">
+              <Button type="submit" className="flex-1" disabled={isPending || !name.trim()}>
+                {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                {isPending ? "Building…" : "Create profile"}
+              </Button>
+              <Button type="button" variant="outline" onClick={onClose} disabled={isPending}>Cancel</Button>
             </div>
-          )}
-
-          {isPending && (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Claude is building the profile — this takes 1–2 minutes...
-            </div>
-          )}
-
-          <div className="flex gap-2">
-            <Button
-              className="flex-1"
-              onClick={handleGenerate}
-              disabled={isPending || !name.trim()}
-            >
-              {isPending ? (
-                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Generating...</>
-              ) : (
-                <><Sparkles className="h-4 w-4 mr-2" /> Generate Profile</>
-              )}
-            </Button>
-            <Button variant="outline" onClick={onClose} disabled={isPending}>Cancel</Button>
-          </div>
-        </CardContent>
-      </Card>
+          </form>
+        )}
+      </div>
     </div>
   );
 }
+
+// Page ───────────────────────────────────────────────────────────────────────
 
 export default function SubculturesPage() {
   const [activeCategory, setActiveCategory] = useState("All");
   const [showGenerate, setShowGenerate] = useState(false);
 
-  const { data, isLoading, error } = useSubcultures(activeCategory === "All" ? undefined : activeCategory);
-  const subcultures = data?.subcultures ?? [];
+  // Load everything once and filter here, so filters always match real profiles.
+  const { data, isLoading, error, refetch } = useSubcultures();
+  const all = useMemo(() => data?.subcultures ?? [], [data]);
+  const categories = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const s of all) counts.set(bucketOf(s.category), (counts.get(bucketOf(s.category)) ?? 0) + 1);
+    // Biggest buckets first; "Other" always last
+    return Array.from(counts.entries()).sort((a, b) =>
+      (a[0] === "Other" ? 1 : 0) - (b[0] === "Other" ? 1 : 0) || b[1] - a[1] || a[0].localeCompare(b[0]));
+  }, [all]);
+  const subcultures = activeCategory === "All" ? all : all.filter((s) => bucketOf(s.category) === activeCategory);
+  const n = subcultures.length;
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="flex min-h-screen flex-col bg-background">
       <NavHeader />
 
-      <main className="flex-1 max-w-screen-xl mx-auto w-full px-4 sm:px-6 py-8 space-y-6">
-        {/* Page header */}
-        <div className="flex items-start justify-between gap-4">
+      <main className="mx-auto w-full max-w-screen-xl flex-1 px-4 py-10 sm:px-6">
+        <header className="flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
           <div>
-            <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-              <BookOpen className="h-6 w-6 text-indigo-500" />
-              Subculture Library
-            </h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Pre-built intelligence profiles that power your monitors. Each profile has keywords, vernacular, and moments for precise Boolean query construction.
+            <h1 className="text-3xl font-semibold tracking-tight">Library</h1>
+            <p className="mt-2 max-w-2xl text-muted-foreground">
+              Subculture profiles with the keywords, vernacular and moments your monitors listen for.
             </p>
           </div>
-          <Button onClick={() => setShowGenerate(true)} className="shrink-0 gap-2">
-            <Plus className="h-4 w-4" />
-            Generate New
+          <Button onClick={() => setShowGenerate(true)}>
+            <Plus className="h-4 w-4" />New profile
           </Button>
-        </div>
+        </header>
 
-        {/* Category filter */}
-        <div className="flex flex-wrap gap-2">
-          {CATEGORIES.map(cat => (
-            <button
-              key={cat}
-              onClick={() => setActiveCategory(cat)}
-              className={cn(
-                "px-3 py-1 rounded-full text-xs font-medium border transition-colors",
-                activeCategory === cat
-                  ? "bg-indigo-600 text-white border-indigo-600"
-                  : "border-border text-muted-foreground hover:text-foreground hover:border-foreground/30"
-              )}
-            >
-              {cat}
-            </button>
-          ))}
-        </div>
-
-        {/* Error */}
-        {error && (
-          <div className="flex items-center gap-2 text-sm text-red-400 p-4 rounded-lg border border-red-500/20 bg-red-500/5">
-            <AlertCircle className="h-4 w-4 shrink-0" />
-            Failed to load subcultures.
+        {/* Category filter — built from the profiles you actually have */}
+        {categories.length > 1 && (
+          <div role="radiogroup" aria-label="Category" className="mt-8 flex flex-wrap gap-1.5">
+            {[["All", all.length] as const, ...categories].map(([cat, count]) => (
+              <button
+                key={cat}
+                role="radio"
+                aria-checked={activeCategory === cat}
+                onClick={() => setActiveCategory(cat)}
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm transition-colors",
+                  activeCategory === cat
+                    ? "bg-foreground font-medium text-background"
+                    : "bg-muted text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {cat}
+                <span className={cn("tabular-nums", activeCategory === cat ? "text-background/70" : "text-muted-foreground/80")}>{count}</span>
+              </button>
+            ))}
           </div>
         )}
 
-        {/* Grid */}
-        {isLoading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className="rounded-xl border border-border p-5 h-44 flex flex-col gap-3">
-                <div className="flex items-center justify-between">
-                  <Skeleton className="h-5 w-20 rounded-full" />
-                  <Skeleton className="h-4 w-12 rounded" />
-                </div>
-                <Skeleton className="h-5 w-36" />
-                <Skeleton className="h-3.5 w-full" />
-                <Skeleton className="h-3.5 w-4/5" />
-                <div className="mt-auto flex items-center justify-between pt-2 border-t border-border/40">
-                  <Skeleton className="h-3 w-24" />
-                  <Skeleton className="h-4 w-4 rounded" />
-                </div>
-              </div>
-            ))}
+        {!isLoading && !error && n > 0 && (
+          <p className="mt-6 text-sm text-muted-foreground tabular-nums">
+            {n} profile{n !== 1 && "s"}{activeCategory !== "All" && ` in ${activeCategory.toLowerCase()}`}
+          </p>
+        )}
+
+        {error && (
+          <div role="alert" className="mt-8 flex items-center gap-3 rounded-lg bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            Couldn’t load the Library.
+            <button onClick={() => refetch()} className="font-medium underline-offset-4 hover:underline">Try again</button>
           </div>
-        ) : subcultures.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-center">
-            <BookOpen className="h-10 w-10 text-muted-foreground/40 mb-4" />
-            <p className="text-muted-foreground font-medium">No profiles yet</p>
-            <p className="text-sm text-muted-foreground/60 mt-1 mb-6">
-              Generate your first subculture profile to get started.
+        )}
+
+        {isLoading ? (
+          <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {Array.from({ length: 8 }).map((_, i) => <CardSkeleton key={i} />)}
+          </div>
+        ) : !error && n === 0 ? (
+          <div className="mt-8 rounded-xl border border-dashed border-border px-6 py-16 text-center">
+            <h2 className="text-lg font-semibold">
+              {activeCategory === "All" ? "No profiles yet" : `No ${activeCategory} profiles yet`}
+            </h2>
+            <p className="mx-auto mt-2 max-w-md text-muted-foreground">
+              Create a profile for any subculture and Claude will build it in a minute or two.
             </p>
-            <Button onClick={() => setShowGenerate(true)} variant="outline" className="gap-2">
-              <Sparkles className="h-4 w-4" />
-              Generate Profile
+            <Button className="mt-6" onClick={() => setShowGenerate(true)}>
+              <Plus className="h-4 w-4" />New profile
             </Button>
           </div>
         ) : (
-          <>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {subcultures.map(s => <SubcultureCard key={s.id} s={s} />)}
-            </div>
-            <p className="text-xs text-muted-foreground text-center">
-              {subcultures.length} profile{subcultures.length !== 1 ? "s" : ""} in library
-            </p>
-          </>
+          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {subcultures.map((s) => <SubcultureCard key={s.id} s={s} />)}
+          </div>
         )}
       </main>
 
