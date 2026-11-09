@@ -128,7 +128,7 @@ function StepAudit({
       const res = await fetch("/api/brand-audit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ handle: trimmed, platform: "all" }),
+        body: JSON.stringify({ handles: { default: trimmed }, platform: "all" }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Audit failed");
