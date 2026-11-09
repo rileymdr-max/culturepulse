@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, Suspense } from "react";
 import {
   Sparkles, Loader2, Plus, CheckCircle2, ChevronRight,
   BookOpen, Zap, AlertCircle, Clock, Hash, Users, Layers,
-  TrendingUp, MessageSquare, Eye, ExternalLink,
+  TrendingUp, MessageSquare, Eye, ExternalLink, FileText,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import type { SubcultureProfile, SubcultureSignalData } from "@/lib/types/subculture";
+import { useCreateBrief } from "@/hooks/use-briefs";
 
 const RECENT_KEY = "speedbag:recent-discoveries";
 const SESSION_KEY = "culturepulse-search";
@@ -292,6 +293,7 @@ function ProfileCard({
 }) {
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [savedSlug, setSavedSlug] = useState<string | null>(null);
+  const { mutate: createBrief, isPending: isGeneratingBrief, data: briefResult, isError: isBriefError, reset: resetBrief } = useCreateBrief();
 
   async function handleAddToLibrary() {
     setSaveState("saving");
@@ -350,12 +352,38 @@ function ProfileCard({
 
           <div className="flex-shrink-0">
             {saveState === "saved" && savedSlug ? (
-              <Link href={`/dashboard/subcultures/${savedSlug}`}>
-                <Button size="sm" variant="outline" className="gap-1.5 text-green-600 dark:text-green-400 border-green-500/30">
-                  <CheckCircle2 className="h-3.5 w-3.5" />
-                  View Profile
-                </Button>
-              </Link>
+              <div className="flex items-center gap-2 flex-wrap">
+                {briefResult?.brief ? (
+                  <Link href={`/dashboard/briefs/${briefResult.brief.id}`}>
+                    <Button size="sm" className="gap-1.5 bg-indigo-600 hover:bg-indigo-700">
+                      <FileText className="h-3.5 w-3.5" />
+                      View Brief
+                    </Button>
+                  </Link>
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-1.5 border-indigo-500/40 text-indigo-500 hover:text-indigo-400 hover:border-indigo-500/60"
+                    disabled={isGeneratingBrief}
+                    onClick={() => { if (isBriefError) resetBrief(); createBrief({ subcultureSlug: savedSlug }); }}
+                  >
+                    {isGeneratingBrief ? (
+                      <><Loader2 className="h-3.5 w-3.5 animate-spin" />Generating…</>
+                    ) : isBriefError ? (
+                      <><AlertCircle className="h-3.5 w-3.5" />Retry brief</>
+                    ) : (
+                      <><FileText className="h-3.5 w-3.5" />Generate Brief</>
+                    )}
+                  </Button>
+                )}
+                <Link href={`/dashboard/subcultures/${savedSlug}`}>
+                  <Button size="sm" variant="ghost" className="gap-1.5 text-muted-foreground hover:text-foreground">
+                    <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+                    View Profile
+                  </Button>
+                </Link>
+              </div>
             ) : (
               <Button
                 size="sm"
