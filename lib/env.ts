@@ -26,7 +26,9 @@ const envSchema = z.object({
   NEXTAUTH_SECRET: z
     .string()
     .min(1, "NEXTAUTH_SECRET is required"),
-  NEXTAUTH_URL: z.string().url("NEXTAUTH_URL must be a valid URL"),
+  // Optional on Vercel: NextAuth derives each deployment's own URL there, so
+  // every preview branch works without a per-branch setting. Required elsewhere.
+  NEXTAUTH_URL: emptyUrl,
 
   // Optional platform API keys — missing/empty values fall back to mock data
   REDDIT_CLIENT_ID: emptyStringToUndefined,
@@ -77,6 +79,10 @@ const envSchema = z.object({
     .string()
     .transform((v) => v === "true")
     .default("false"),
+}).superRefine((e, ctx) => {
+  if (!e.NEXTAUTH_URL && !process.env.VERCEL) {
+    ctx.addIssue({ code: "custom", path: ["NEXTAUTH_URL"], message: "NEXTAUTH_URL is required outside Vercel" });
+  }
 });
 
 export type Env = z.infer<typeof envSchema>;
