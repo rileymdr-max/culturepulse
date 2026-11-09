@@ -1,132 +1,107 @@
 "use client";
 
 import Link from "next/link";
-import { FileText, AlertCircle, Zap, ChevronRight, BookOpen } from "lucide-react";
+import { AlertCircle, ArrowRight } from "lucide-react";
 import { NavHeader } from "@/components/nav-header";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { useBriefs, type BriefSummary } from "@/hooks/use-briefs";
+import { urgencyOf } from "@/lib/brief-urgency";
 
-const URGENCY_BADGE: Record<string, { label: string; cls: string }> = {
-  "act-now":    { label: "ACT NOW",    cls: "bg-red-500/15 text-red-400 border-red-500/30" },
-  "this-week":  { label: "THIS WEEK",  cls: "bg-amber-500/15 text-amber-400 border-amber-500/30" },
-  "monitor":    { label: "MONITOR",    cls: "bg-muted text-muted-foreground border-border" },
-};
+const signed = (n: number) => `${n > 0 ? "+" : n < 0 ? "−" : ""}${Math.abs(n)}%`;
 
 function BriefRow({ brief }: { brief: BriefSummary }) {
-  const badge = URGENCY_BADGE[brief.urgency] ?? URGENCY_BADGE["monitor"];
-  const date = new Date(brief.createdAt).toLocaleDateString(undefined, {
-    month: "short", day: "numeric", year: "numeric",
-  });
+  const u = urgencyOf(brief.urgency);
+  const date = new Date(brief.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 
   return (
-    <Link href={`/dashboard/briefs/${brief.id}`}>
-      <Card className="group hover:border-indigo-500/40 hover:shadow-sm transition-all cursor-pointer">
-        <CardContent className="px-5 py-4 flex items-center gap-4">
-          <span className={cn("text-[11px] font-bold px-2 py-0.5 rounded-full border shrink-0 tracking-wider", badge.cls)}>
-            {badge.label}
-          </span>
-          <div className="flex-1 min-w-0">
-            <p className="font-semibold text-foreground group-hover:text-indigo-500 transition-colors truncate">
-              {brief.headline}
-            </p>
-            <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground">
-              <span>{brief.subculture.name}</span>
-              <span>·</span>
-              <span className="px-1.5 py-0.5 rounded bg-muted border border-border">
-                {brief.subculture.category}
-              </span>
-              {brief.velocityAtGeneration !== null && (
-                <>
-                  <span>·</span>
-                  <span className={brief.velocityAtGeneration > 0 ? "text-indigo-500" : "text-muted-foreground"}>
-                    {brief.velocityAtGeneration > 0 ? "+" : ""}{brief.velocityAtGeneration}% at generation
-                  </span>
-                </>
-              )}
-            </div>
-          </div>
-          <div className="flex items-center gap-3 shrink-0">
-            <span className="text-xs text-muted-foreground/60 hidden sm:inline">{date}</span>
-            <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-indigo-500 transition-colors" />
-          </div>
-        </CardContent>
-      </Card>
-    </Link>
+    <li>
+      <Link href={`/dashboard/briefs/${brief.id}`} className="group flex items-center gap-4 px-5 py-4 transition-colors hover:bg-muted/60">
+        <div className="min-w-0 flex-1">
+          <p className="font-medium leading-snug transition-colors group-hover:text-primary sm:truncate">{brief.headline}</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            <span className={cn("font-medium", u.text)}>{u.label}</span>
+            {" · "}{brief.subculture.name}
+            {brief.velocityAtGeneration !== null && (
+              <span className="tabular-nums"> · {signed(brief.velocityAtGeneration)} velocity</span>
+            )}
+          </p>
+        </div>
+        <span className="hidden shrink-0 text-sm text-muted-foreground tabular-nums sm:block">{date}</span>
+        <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-primary" aria-hidden />
+      </Link>
+    </li>
   );
 }
 
 export default function BriefsPage() {
-  const { data, isLoading, error } = useBriefs();
+  const { data, isLoading, error, refetch } = useBriefs();
   const briefs = data?.briefs ?? [];
+  const n = briefs.length;
+  const actNow = briefs.filter((b) => b.urgency === "act-now").length;
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="flex min-h-screen flex-col bg-background">
       <NavHeader />
 
-      <main className="flex-1 max-w-screen-xl mx-auto w-full px-4 sm:px-6 py-8 space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-            <FileText className="h-6 w-6 text-indigo-500" />
-            Content Briefs
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-Strategy documents built from subculture intelligence and live signal context.
-          </p>
-        </div>
+      <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-10 sm:px-6">
+        <header>
+          <h1 className="text-3xl font-semibold tracking-tight">Briefs</h1>
+          <div className="mt-2 text-muted-foreground">
+            {isLoading ? (
+              <Skeleton className="h-5 w-64" />
+            ) : n === 0 ? (
+              "Strategy briefs built from a subculture’s profile and its live signals."
+            ) : (
+              <>
+                <span className="tabular-nums">{n}</span> brief{n !== 1 && "s"}
+                {actNow > 0 && (
+                  <>, <span className="font-medium text-signal tabular-nums">{actNow} to act on now</span></>
+                )}
+                .
+              </>
+            )}
+          </div>
+        </header>
 
         {error && (
-          <div className="flex items-center gap-2 text-sm text-red-400 p-4 rounded-lg border border-red-500/20 bg-red-500/5">
-            <AlertCircle className="h-4 w-4 shrink-0" /> Failed to load briefs.
+          <div role="alert" className="mt-8 flex items-center gap-3 rounded-lg bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            Couldn’t load your briefs.
+            <button onClick={() => refetch()} className="font-medium underline-offset-4 hover:underline">Try again</button>
           </div>
         )}
 
         {isLoading && (
-          <div className="space-y-3">
+          <div aria-hidden className="mt-8 divide-y divide-border rounded-xl border border-border bg-card">
             {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="rounded-xl border border-border px-5 py-4 flex items-center gap-4">
-                <Skeleton className="h-5 w-20 rounded-full shrink-0" />
-                <div className="flex-1 space-y-2">
-                  <Skeleton className="h-4 w-64" />
-                  <Skeleton className="h-3 w-40" />
-                </div>
-                <Skeleton className="h-3 w-16 hidden sm:block" />
+              <div key={i} className="space-y-2 px-5 py-4">
+                <Skeleton className="h-5 w-3/4" />
+                <Skeleton className="h-4 w-48" />
               </div>
             ))}
           </div>
         )}
 
-        {!isLoading && briefs.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-20 text-center">
-            <FileText className="h-10 w-10 text-muted-foreground/40 mb-4" />
-            <p className="text-muted-foreground font-medium">No briefs yet</p>
-            <p className="text-sm text-muted-foreground/60 mt-1 mb-6">
-              Generate a brief from the Signal Board or any subculture profile.
+        {!isLoading && !error && n === 0 && (
+          <div className="mt-8 rounded-xl border border-dashed border-border px-6 py-16 text-center">
+            <h2 className="text-lg font-semibold">No briefs yet</h2>
+            <p className="mx-auto mt-2 max-w-md text-muted-foreground">
+              Choose Generate brief on any Signal Board card or Audience Audit result.
             </p>
-            <div className="flex items-center gap-3">
-              <Link href="/dashboard/monitors">
-                <Button variant="outline" className="gap-2">
-                  <Zap className="h-4 w-4" />Signal Board
-                </Button>
-              </Link>
-              <Link href="/dashboard/subcultures">
-                <Button variant="outline" className="gap-2">
-                  <BookOpen className="h-4 w-4" />Library
-                </Button>
-              </Link>
-            </div>
+            <Link
+              href="/dashboard/monitors"
+              className="mt-6 inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+            >
+              Open the Signal Board
+            </Link>
           </div>
         )}
 
-        {briefs.length > 0 && (
-          <div className="space-y-3">
+        {n > 0 && (
+          <ol className="mt-8 divide-y divide-border overflow-hidden rounded-xl border border-border bg-card">
             {briefs.map((b) => <BriefRow key={b.id} brief={b} />)}
-            <p className="text-xs text-muted-foreground text-center pt-2">
-              {briefs.length} brief{briefs.length !== 1 ? "s" : ""} generated
-            </p>
-          </div>
+          </ol>
         )}
       </main>
     </div>
