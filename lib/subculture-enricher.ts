@@ -18,6 +18,11 @@ import type {
   TikTokVideo,
   TwitterSignal,
   TwitterPost,
+  YouTubeSignal,
+  YouTubeVideo,
+  InstagramSignal,
+  InstagramPost,
+  TrendsSignal,
 } from "@/lib/types/subculture";
 
 // ─── Keyword extraction ───────────────────────────────────────────────────────
@@ -268,19 +273,239 @@ async function enrichTwitter(query: string): Promise<TwitterSignal | undefined> 
   }
 }
 
+// ─── YouTube ──────────────────────────────────────────────────────────────────
+
+interface ApifyYouTubeVideo {
+  title?: string;
+  url?: string;
+  viewCount?: number;
+  likes?: number;
+  channelName?: string;
+  numberOfSubscribers?: number;
+}
+
+async function enrichYouTube(query: string): Promise<YouTubeSignal | undefined> {
+  try {
+    const { primary } = extractKeyTerms(query);
+    const videos = await runActor<ApifyYouTubeVideo>("streamers/youtube-scraper", {
+      searchQueries: [primary],
+      maxResults: 10,
+      sortingOrder: "views",
+    }, 45);
+
+    if (!videos.length) return undefined;
+
+    const topVideos: YouTubeVideo[] = videos
+      .filter((v) => v.title && v.url)
+      .sort((a, b) => (b.viewCount ?? 0) - (a.viewCount ?? 0))
+      .slice(0, 8)
+      .map((v) => ({
+        title: v.title!,
+        url: v.url!,
+        views: v.viewCount ?? 0,
+        likes: v.likes ?? 0,
+        channel: v.channelName ?? "unknown",
+        channel_subscribers: v.numberOfSubscribers,
+      }));
+
+    const totalViews = videos.reduce((s, v) => s + (v.viewCount ?? 0), 0);
+
+    return {
+      videos_found: videos.length,
+      top_videos: topVideos,
+      total_views: totalViews,
+      scraped_at: new Date().toISOString(),
+    };
+  } catch (err) {
+    console.warn("[enricher] YouTube scrape failed:", err);
+    return undefined;
+  }
+}
+
+// ─── Instagram ────────────────────────────────────────────────────────────────
+
+interface ApifyInstagramPost {
+  caption?: string;
+  url?: string;
+  likesCount?: number;
+  commentsCount?: number;
+  ownerUsername?: string;
+  hashtags?: string[];
+}
+
+async function enrichInstagram(query: string): Promise<InstagramSignal | undefined> {
+  try {
+    const { primary } = extractKeyTerms(query);
+    // Use the top keyword as a hashtag URL — most reliable way to get real posts
+    const hashtag = primary.split(" ")[0].toLowerCase();
+    const posts = await runActor<ApifyInstagramPost>("apify/instagram-scraper", {
+      resultsType: "posts",
+      directUrls: [`https://www.instagram.com/explore/tags/${encodeURIComponent(hashtag)}/`],
+      resultsLimit: 20,
+    }, 60);
+
+    if (!posts.length) return undefined;
+
+    const topPosts: InstagramPost[] = posts
+      .filter((p) => p.url)
+      .sort((a, b) => (b.likesCount ?? 0) - (a.likesCount ?? 0))
+      .slice(0, 8)
+      .map((p) => ({
+        caption: (p.caption ?? "").slice(0, 150),
+        url: p.url!,
+        likes: p.likesCount ?? 0,
+        comments: p.commentsCount ?? 0,
+        owner: p.ownerUsername,
+      }));
+
+    // Extract hashtags from captions
+    const hashtagCounts = new Map<string, number>();
+    for (const p of posts) {
+      const tags = p.hashtags ?? [];
+      const captionTags = (p.caption ?? "").match(/#\w+/g)?.map((t) => t.toLowerCase()) ?? [];
+      for (const tag of [...tags.map((t) => t.toLowerCase()), ...captionTags]) {
+        const clean = tag.replace(/^#/, "");
+        if (clean) hashtagCounts.set(clean, (hashtagCounts.get(clean) ?? 0) + 1);
+      }
+    }
+    const topHashtags = Array.from(hashtagCounts.entries())
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 12)
+      .map(([tag]) => `#${tag}`);
+
+    const totalLikes = posts.reduce((s, p) => s + (p.likesCount ?? 0), 0);
+
+    return {
+      posts_found: posts.length,
+      top_posts: topPosts,
+      top_hashtags: topHashtags,
+      total_likes: totalLikes,
+      scraped_at: new Date().toISOString(),
+    };
+  } catch (err) {
+    console.warn("[enricher] Instagram scrape failed:", err);
+    return undefined;
+  }
+}
+
+// ─── Google Trends ────────────────────────────────────────────────────────────
+// Uses the unofficial Google Trends explore + widgetdata APIs.
+// Returns current interest score (0–100), trend direction, and related queries.
+
+async function enrichTrends(query: string): Promise<TrendsSignal | undefined> {
+  try {
+    const { primary } = extractKeyTerms(query);
+
+    // Step 1: get widget tokens
+    const exploreReq = JSON.stringify({
+      comparisonItem: [{ keyword: primary, geo: "", time: "today 12-m" }],
+      category: 0,
+      property: "",
+    });
+    const exploreUrl =
+      `https://trends.google.com/trends/api/explore?hl=en-US&tz=0` +
+      `&req=${encodeURIComponent(exploreReq)}`;
+
+    const exploreRes = await fetch(exploreUrl, {
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; CulturePulse/1.0)" },
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!exploreRes.ok) return undefined;
+
+    const exploreRaw = await exploreRes.text();
+    const exploreJson = JSON.parse(exploreRaw.replace(/^\)\]\}'/, "")) as {
+      widgets?: Array<{ id?: string; token?: string; request?: unknown }>;
+    };
+
+    const timeWidget = exploreJson.widgets?.find((w) => w.id === "TIMESERIES");
+    const relatedWidget = exploreJson.widgets?.find((w) => w.id === "RELATED_QUERIES");
+    if (!timeWidget?.token) return undefined;
+
+    // Step 2: fetch time-series interest data
+    const timeReq = JSON.stringify(timeWidget.request);
+    const timeUrl =
+      `https://trends.google.com/trends/api/widgetdata/multiline?hl=en-US&tz=0` +
+      `&req=${encodeURIComponent(timeReq)}&token=${encodeURIComponent(timeWidget.token)}`;
+
+    const timeRes = await fetch(timeUrl, {
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; CulturePulse/1.0)" },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!timeRes.ok) return undefined;
+
+    const timeRaw = await timeRes.text();
+    const timeJson = JSON.parse(timeRaw.replace(/^\)\]\}'/, "")) as {
+      default?: { timelineData?: Array<{ value?: number[] }> };
+    };
+
+    const timeline = timeJson.default?.timelineData ?? [];
+    const values = timeline.map((p) => p.value?.[0] ?? 0).filter((v) => v > 0);
+    if (!values.length) return undefined;
+
+    const currentScore = values[values.length - 1] ?? 0;
+    const recentAvg = values.slice(-4).reduce((a, b) => a + b, 0) / Math.min(4, values.length);
+    const earlyAvg = values.slice(0, 4).reduce((a, b) => a + b, 0) / Math.min(4, values.length);
+    const trend: TrendsSignal["trend"] =
+      recentAvg > earlyAvg * 1.15 ? "rising" :
+      recentAvg < earlyAvg * 0.85 ? "declining" : "stable";
+
+    // Step 3: fetch related queries (best-effort)
+    const relatedQueries: string[] = [];
+    if (relatedWidget?.token) {
+      try {
+        const relReq = JSON.stringify(relatedWidget.request);
+        const relUrl =
+          `https://trends.google.com/trends/api/widgetdata/relatedsearches?hl=en-US&tz=0` +
+          `&req=${encodeURIComponent(relReq)}&token=${encodeURIComponent(relatedWidget.token)}`;
+        const relRes = await fetch(relUrl, {
+          headers: { "User-Agent": "Mozilla/5.0 (compatible; CulturePulse/1.0)" },
+          signal: AbortSignal.timeout(8000),
+        });
+        if (relRes.ok) {
+          const relRaw = await relRes.text();
+          const relJson = JSON.parse(relRaw.replace(/^\)\]\}'/, "")) as {
+            default?: { rankedList?: Array<{ rankedKeyword?: Array<{ query?: string }> }> };
+          };
+          const topList = relJson.default?.rankedList?.[0]?.rankedKeyword ?? [];
+          for (const item of topList.slice(0, 10)) {
+            if (item.query) relatedQueries.push(item.query);
+          }
+        }
+      } catch { /* related queries are best-effort */ }
+    }
+
+    return {
+      interest_score: currentScore,
+      trend,
+      related_queries: relatedQueries,
+      scraped_at: new Date().toISOString(),
+    };
+  } catch (err) {
+    console.warn("[enricher] Google Trends failed:", err);
+    return undefined;
+  }
+}
+
 // ─── Main enricher ────────────────────────────────────────────────────────────
 
 export async function enrichSubcultureWithSignals(query: string): Promise<SubcultureSignalData> {
-  const [redditResult, tiktokResult, twitterResult] = await Promise.allSettled([
-    enrichReddit(query),
-    enrichTikTok(query),
-    enrichTwitter(query),
-  ]);
+  const [redditResult, tiktokResult, twitterResult, youtubeResult, instagramResult, trendsResult] =
+    await Promise.allSettled([
+      enrichReddit(query),
+      enrichTikTok(query),
+      enrichTwitter(query),
+      enrichYouTube(query),
+      enrichInstagram(query),
+      enrichTrends(query),
+    ]);
 
   return {
     reddit: redditResult.status === "fulfilled" ? redditResult.value : undefined,
     tiktok: tiktokResult.status === "fulfilled" ? tiktokResult.value : undefined,
     twitter: twitterResult.status === "fulfilled" ? twitterResult.value : undefined,
+    youtube: youtubeResult.status === "fulfilled" ? youtubeResult.value : undefined,
+    instagram: instagramResult.status === "fulfilled" ? instagramResult.value : undefined,
+    trends: trendsResult.status === "fulfilled" ? trendsResult.value : undefined,
     enriched_at: new Date().toISOString(),
   };
 }
@@ -346,10 +571,57 @@ export function buildSignalContext(signals: SubcultureSignalData): string {
     lines.push("");
   }
 
+  if (signals.youtube) {
+    const yt = signals.youtube;
+    lines.push(`YOUTUBE — ${yt.videos_found} videos, ${yt.total_views.toLocaleString()} total views`);
+    if (yt.top_videos.length) {
+      lines.push("  Top videos:");
+      for (const v of yt.top_videos.slice(0, 8)) {
+        const subs = v.channel_subscribers
+          ? ` (${(v.channel_subscribers / 1_000).toFixed(0)}K subscribers)`
+          : "";
+        lines.push(
+          `    • "${v.title}" — ${v.views.toLocaleString()} views, ${v.likes.toLocaleString()} likes (${v.channel}${subs})`
+        );
+      }
+    }
+    lines.push("");
+  }
+
+  if (signals.instagram) {
+    const ig = signals.instagram;
+    lines.push(`INSTAGRAM — ${ig.posts_found} posts, ${ig.total_likes.toLocaleString()} total likes`);
+    if (ig.top_hashtags.length) {
+      lines.push(`  Top hashtags: ${ig.top_hashtags.slice(0, 10).join("  ")}`);
+    }
+    if (ig.top_posts.length) {
+      lines.push("  Top posts:");
+      for (const p of ig.top_posts.slice(0, 6)) {
+        const owner = p.owner ? ` (@${p.owner})` : "";
+        const caption = p.caption ? `"${p.caption.slice(0, 80)}…"` : "(no caption)";
+        lines.push(`    • ${caption}${owner} — ${p.likes.toLocaleString()} likes`);
+      }
+    }
+    lines.push("");
+  }
+
+  if (signals.trends) {
+    const tr = signals.trends;
+    const trendLabel = tr.trend === "rising" ? "↑ Rising" : tr.trend === "declining" ? "↓ Declining" : "→ Stable";
+    lines.push(`GOOGLE TRENDS — interest score ${tr.interest_score}/100 (${trendLabel})`);
+    if (tr.related_queries.length) {
+      lines.push(`  Related searches: ${tr.related_queries.slice(0, 8).join(", ")}`);
+    }
+    lines.push("");
+  }
+
   const platformsFound = [
     signals.reddit && "Reddit",
     signals.tiktok && "TikTok",
     signals.twitter && "Twitter/X",
+    signals.youtube && "YouTube",
+    signals.instagram && "Instagram",
+    signals.trends && "Google Trends",
   ].filter(Boolean).join(", ");
 
   if (!platformsFound) {

@@ -89,10 +89,52 @@ export interface TwitterSignal {
   scraped_at: string;
 }
 
+export interface YouTubeVideo {
+  title: string;
+  url: string;
+  views: number;
+  likes: number;
+  channel: string;
+  channel_subscribers?: number;
+}
+
+export interface YouTubeSignal {
+  videos_found: number;
+  top_videos: YouTubeVideo[];
+  total_views: number;
+  scraped_at: string;
+}
+
+export interface InstagramPost {
+  caption?: string;
+  url: string;
+  likes: number;
+  comments: number;
+  owner?: string;
+}
+
+export interface InstagramSignal {
+  posts_found: number;
+  top_posts: InstagramPost[];
+  top_hashtags: string[];
+  total_likes: number;
+  scraped_at: string;
+}
+
+export interface TrendsSignal {
+  interest_score: number;    // 0–100 current relative search volume
+  trend: "rising" | "stable" | "declining";
+  related_queries: string[];
+  scraped_at: string;
+}
+
 export interface SubcultureSignalData {
   reddit?: RedditSignal;
   tiktok?: TikTokSignal;
   twitter?: TwitterSignal;
+  youtube?: YouTubeSignal;
+  instagram?: InstagramSignal;
+  trends?: TrendsSignal;
   enriched_at: string;
 }
 

@@ -42,12 +42,15 @@ function saveRecent(prompt: string) {
 
 // ─── Source badge ─────────────────────────────────────────────────────────────
 
-function SourceBadge({ source }: { source: "reddit" | "tiktok" | "twitter" | "ai" }) {
+function SourceBadge({ source }: { source: "reddit" | "tiktok" | "twitter" | "youtube" | "instagram" | "trends" | "ai" }) {
   const configs = {
-    reddit:  { label: "Reddit",      cls: "text-orange-500 bg-orange-500/10 border-orange-500/20" },
-    tiktok:  { label: "TikTok",      cls: "text-pink-500 bg-pink-500/10 border-pink-500/20" },
-    twitter: { label: "Twitter / X", cls: "text-sky-500 bg-sky-500/10 border-sky-500/20" },
-    ai:      { label: "AI Analysis", cls: "text-indigo-500 bg-indigo-500/10 border-indigo-500/20" },
+    reddit:    { label: "Reddit",         cls: "text-orange-500 bg-orange-500/10 border-orange-500/20" },
+    tiktok:    { label: "TikTok",         cls: "text-pink-500 bg-pink-500/10 border-pink-500/20" },
+    twitter:   { label: "Twitter / X",    cls: "text-sky-500 bg-sky-500/10 border-sky-500/20" },
+    youtube:   { label: "YouTube",        cls: "text-red-500 bg-red-500/10 border-red-500/20" },
+    instagram: { label: "Instagram",      cls: "text-purple-500 bg-purple-500/10 border-purple-500/20" },
+    trends:    { label: "Google Trends",  cls: "text-green-500 bg-green-500/10 border-green-500/20" },
+    ai:        { label: "AI Analysis",    cls: "text-indigo-500 bg-indigo-500/10 border-indigo-500/20" },
   };
   const { label, cls } = configs[source];
   return (
@@ -60,7 +63,7 @@ function SourceBadge({ source }: { source: "reddit" | "tiktok" | "twitter" | "ai
 // ─── Live signal panel ────────────────────────────────────────────────────────
 
 function SignalPanel({ signals }: { signals: SubcultureSignalData }) {
-  const hasAny = signals.reddit || signals.tiktok || signals.twitter;
+  const hasAny = signals.reddit || signals.tiktok || signals.twitter || signals.youtube || signals.instagram || signals.trends;
   if (!hasAny) return null;
 
   return (
@@ -78,7 +81,7 @@ function SignalPanel({ signals }: { signals: SubcultureSignalData }) {
       </div>
 
       {/* Stats tiles */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
         {signals.reddit && (
           <div className="rounded-md bg-background border border-orange-500/15 p-2.5 space-y-1">
             <SourceBadge source="reddit" />
@@ -125,6 +128,57 @@ function SignalPanel({ signals }: { signals: SubcultureSignalData }) {
             <p className="text-[10px] text-muted-foreground">
               tweets · {signals.twitter.total_engagement.toLocaleString()} engagement
             </p>
+          </div>
+        )}
+        {signals.youtube && (
+          <div className="rounded-md bg-background border border-red-500/15 p-2.5 space-y-1">
+            <SourceBadge source="youtube" />
+            <p className="text-base font-bold text-foreground leading-none mt-1.5">
+              {signals.youtube.videos_found}
+            </p>
+            <p className="text-[10px] text-muted-foreground">
+              videos · {signals.youtube.total_views >= 1_000_000
+                ? `${(signals.youtube.total_views / 1_000_000).toFixed(1)}M`
+                : `${(signals.youtube.total_views / 1_000).toFixed(0)}K`} views
+            </p>
+            {signals.youtube.top_videos[0] && (
+              <p className="text-[10px] text-muted-foreground truncate">
+                {signals.youtube.top_videos[0].channel}
+              </p>
+            )}
+          </div>
+        )}
+        {signals.instagram && (
+          <div className="rounded-md bg-background border border-purple-500/15 p-2.5 space-y-1">
+            <SourceBadge source="instagram" />
+            <p className="text-base font-bold text-foreground leading-none mt-1.5">
+              {signals.instagram.posts_found}
+            </p>
+            <p className="text-[10px] text-muted-foreground">
+              posts · {signals.instagram.total_likes.toLocaleString()} likes
+            </p>
+            <p className="text-[10px] text-muted-foreground truncate">
+              {signals.instagram.top_hashtags.slice(0, 3).join("  ")}
+            </p>
+          </div>
+        )}
+        {signals.trends && (
+          <div className="rounded-md bg-background border border-green-500/15 p-2.5 space-y-1">
+            <SourceBadge source="trends" />
+            <p className="text-base font-bold text-foreground leading-none mt-1.5">
+              {signals.trends.interest_score}
+              <span className="text-xs font-normal text-muted-foreground">/100</span>
+            </p>
+            <p className="text-[10px] text-muted-foreground">
+              interest score ·{" "}
+              {signals.trends.trend === "rising" ? "↑ rising" :
+               signals.trends.trend === "declining" ? "↓ declining" : "→ stable"}
+            </p>
+            {signals.trends.related_queries.length > 0 && (
+              <p className="text-[10px] text-muted-foreground truncate">
+                {signals.trends.related_queries.slice(0, 2).join(", ")}
+              </p>
+            )}
           </div>
         )}
       </div>
@@ -180,6 +234,45 @@ function SignalPanel({ signals }: { signals: SubcultureSignalData }) {
           ))}
         </div>
       )}
+
+      {/* Top YouTube videos */}
+      {signals.youtube && signals.youtube.top_videos.length > 0 && (
+        <div className="space-y-1">
+          <p className="text-[10px] font-semibold text-red-500/80 uppercase tracking-wider">Top YouTube videos</p>
+          {signals.youtube.top_videos.slice(0, 3).map((video, i) => (
+            <a key={i} href={video.url} target="_blank" rel="noopener noreferrer" className="flex items-start gap-2 group">
+              <span className="text-[10px] text-muted-foreground/40 mt-0.5 w-3 shrink-0">{i + 1}</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-[11px] text-foreground group-hover:text-red-500 transition-colors truncate">{video.title}</p>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <span className="text-[9px] text-muted-foreground truncate max-w-[80px]">{video.channel}</span>
+                  <span className="flex items-center gap-0.5 text-[9px] text-muted-foreground">
+                    <Eye className="h-2 w-2" />
+                    {video.views >= 1_000_000
+                      ? `${(video.views / 1_000_000).toFixed(1)}M`
+                      : `${(video.views / 1_000).toFixed(0)}K`}
+                  </span>
+                </div>
+              </div>
+              <ExternalLink className="h-2.5 w-2.5 text-muted-foreground/30 group-hover:text-red-500/50 shrink-0 mt-0.5 transition-colors" />
+            </a>
+          ))}
+        </div>
+      )}
+
+      {/* Google Trends related queries */}
+      {signals.trends && signals.trends.related_queries.length > 0 && (
+        <div className="space-y-1">
+          <p className="text-[10px] font-semibold text-green-500/80 uppercase tracking-wider">Google Trends · Related searches</p>
+          <div className="flex flex-wrap gap-1">
+            {signals.trends.related_queries.slice(0, 10).map((q, i) => (
+              <span key={i} className="text-[10px] bg-green-500/8 border border-green-500/15 text-green-700 dark:text-green-400 px-1.5 py-0.5 rounded">
+                {q}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -220,9 +313,12 @@ function ProfileCard({
   }
 
   const platformsFound = [
-    signalData?.reddit  && "Reddit",
-    signalData?.tiktok  && "TikTok",
-    signalData?.twitter && "Twitter/X",
+    signalData?.reddit    && "Reddit",
+    signalData?.tiktok    && "TikTok",
+    signalData?.twitter   && "Twitter/X",
+    signalData?.youtube   && "YouTube",
+    signalData?.instagram && "Instagram",
+    signalData?.trends    && "Google Trends",
   ].filter(Boolean);
 
   return (
@@ -512,7 +608,7 @@ function DiscoverPageInner() {
         <div>
           <h1 className="text-2xl font-bold text-foreground mb-1">Discover Subcultures</h1>
           <p className="text-sm text-muted-foreground">
-            Describe any audience or niche — we scrape Reddit, TikTok, and Twitter in real time, then build a full intelligence profile grounded in live data.
+            Describe any audience or niche — we scrape Reddit, TikTok, Twitter, YouTube, and Google Trends in real time, then build a full intelligence profile grounded in live data.
           </p>
         </div>
 
