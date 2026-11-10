@@ -275,11 +275,9 @@ export default function SubcultureDetailPage() {
           <ul className="space-y-4">
             {s.moments.map((m) => (
               <li key={m.name}>
-                <div className="flex items-baseline justify-between gap-3">
-                  <span className="font-medium">{m.name}</span>
-                  <span className="shrink-0 text-sm text-muted-foreground">{m.timing}</span>
-                </div>
-                <p className="mt-0.5 text-sm leading-relaxed text-muted-foreground">{m.description}</p>
+                <p className="font-medium">{m.name}</p>
+                <p className="text-sm font-medium text-primary">{m.timing}</p>
+                <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{m.description}</p>
               </li>
             ))}
           </ul>
