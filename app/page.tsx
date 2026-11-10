@@ -10,6 +10,9 @@ import { cn } from "@/lib/utils";
 import { BRAND_ROOT, D, M, CARD, BTN_GO, BTN_INK, STICKER, Wordmark } from "@/components/marketing/brand";
 
 const SIGNUP_HREF = "/register";
+const DEMO_HREF = "https://calendly.com/rileymdr/30min";
+const BTN_OUTLINE =
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full border-2 border-current px-7 py-[14px] text-[17px] font-bold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4";
 const PLATFORMS = ["Reddit", "TikTok", "Instagram", "X", "Facebook", "Substack"];
 
 export default async function HomePage() {
@@ -43,12 +46,20 @@ export default async function HomePage() {
               CulturePulse reads the micro-communities where taste is made, scores which ones are about to break out,
               and writes the brief your team needs to show up first.
             </p>
-            <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-4">
+            <div className="mt-8 flex flex-wrap items-center gap-4">
               <PendingLink href={SIGNUP_HREF} arrow className={BTN_GO}>
                 Find your first breakout
               </PendingLink>
-              <p className="text-sm text-[#66625A]">Free plan · No credit card</p>
+              <a
+                href={DEMO_HREF}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={cn(BTN_OUTLINE, "text-[#111110] hover:bg-[#111110] hover:text-[#F2EDE3] focus-visible:outline-[#0B6B45]")}
+              >
+                Book a demo
+              </a>
             </div>
+            <p className="mt-4 text-sm text-[#66625A]">Free plan · No credit card</p>
             <p className={cn(M, "mt-10 text-xs uppercase tracking-[0.08em] text-[#66625A]")}>
               Listening across {PLATFORMS.join(" · ")}
             </p>
@@ -230,13 +241,23 @@ export default async function HomePage() {
               </h2>
               <p className="mt-5 text-lg text-[#F2EDE3]/80">Start on the free plan with one monitor. No credit card required.</p>
             </div>
-            <PendingLink
-              href={SIGNUP_HREF}
-              arrow
-              className={cn(BTN_GO, "bg-[#F2EDE3] text-[#111110] focus-visible:outline-[#F2EDE3]")}
-            >
-              Start free
-            </PendingLink>
+            <div className="flex flex-wrap gap-4">
+              <PendingLink
+                href={SIGNUP_HREF}
+                arrow
+                className={cn(BTN_GO, "bg-[#F2EDE3] text-[#111110] focus-visible:outline-[#F2EDE3]")}
+              >
+                Start free
+              </PendingLink>
+              <a
+                href={DEMO_HREF}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={cn(BTN_OUTLINE, "text-[#F2EDE3] hover:bg-[#F2EDE3] hover:text-[#0B6B45] focus-visible:outline-[#F2EDE3]")}
+              >
+                Book a demo
+              </a>
+            </div>
           </div>
         </section>
       </main>
