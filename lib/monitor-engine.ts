@@ -1,215 +1,123 @@
 import { prisma } from "@/lib/prisma";
-import { runActor } from "@/lib/apify";
-import { sendBreakoutAlert } from "@/lib/email";
-import type { Subculture, Monitor } from "@prisma/client";
+import { enrichSubcultureWithSignals } from "@/lib/subculture-enricher";
+import { computeAccelerationSignal, type SnapshotLike } from "@/lib/acceleration";
+import type { Monitor, Subculture } from "@prisma/client";
 
-interface ApifyRedditPost {
-  title?: string;
-  url?: string;
-  permalink?: string;
-  score?: number;
-  numberOfComments?: number;
-}
-
-interface ApifyTweet {
-  text?: string;
-  fullText?: string;
-  url?: string;
-  likeCount?: number;
-  retweetCount?: number;
-  replyCount?: number;
-}
-
-export interface MonitorTopPost {
-  title: string;
-  url: string;
-  score: number;
-  comments?: number;
-}
-
-function buildMonitorQuery(subculture: Subculture): string {
-  const terms = [
-    ...subculture.keywords.slice(0, 7),
-    ...subculture.vernacular.slice(0, 4),
-  ];
-  return terms.map((t) => (t.includes(" ") ? `"${t}"` : t)).join(" OR ");
-}
-
-async function snapshotReddit(monitorId: string, query: string): Promise<void> {
-  const posts = await runActor<ApifyRedditPost>("trudax/reddit-scraper-lite", {
-    searches: [query],
-    searchPosts: true,
-    searchCommunities: false,
-    sort: "relevance",
-    maxItems: 50,
-    skipComments: true,
-    proxy: { useApifyProxy: true },
-  }, 90);
-
-  const topPosts: MonitorTopPost[] = posts
-    .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
-    .slice(0, 5)
-    .map((p) => ({
-      title: p.title ?? "(no title)",
-      url: p.url ?? p.permalink ?? "",
-      score: p.score ?? 0,
-      comments: p.numberOfComments ?? 0,
-    }));
-
-  await prisma.monitorSnapshot.create({
-    data: {
-      monitorId,
-      platform: "reddit",
-      postCount: posts.length,
-      engagement: posts.reduce((s, p) => s + (p.score ?? 0) + (p.numberOfComments ?? 0), 0),
-      topPosts: topPosts as object[],
-    },
-  });
-}
-
-async function snapshotTwitter(monitorId: string, query: string): Promise<void> {
-  const tweets = await runActor<ApifyTweet>("apidojo/tweet-scraper", {
-    searchTerms: [query],
-    maxItems: 50,
-    sort: "Latest",
-    tweetLanguage: "en",
-  }, 90);
-
-  const topPosts: MonitorTopPost[] = tweets
-    .sort((a, b) => {
-      const eA = (a.likeCount ?? 0) + (a.retweetCount ?? 0) * 2;
-      const eB = (b.likeCount ?? 0) + (b.retweetCount ?? 0) * 2;
-      return eB - eA;
-    })
-    .slice(0, 5)
-    .map((t) => ({
-      title: (t.fullText ?? t.text ?? "").slice(0, 160),
-      url: t.url ?? "",
-      score: (t.likeCount ?? 0) + (t.retweetCount ?? 0) * 2,
-    }));
-
-  await prisma.monitorSnapshot.create({
-    data: {
-      monitorId,
-      platform: "twitter",
-      postCount: tweets.length,
-      engagement: tweets.reduce(
-        (s, t) => s + (t.likeCount ?? 0) + (t.retweetCount ?? 0) * 2 + (t.replyCount ?? 0),
-        0
-      ),
-      topPosts: topPosts as object[],
-    },
-  });
-}
-
-export function computeAccelerationScore(counts: number[]): number {
-  if (counts.length < 2) return 0;
-  const latest = counts[0];
-  const history = counts.slice(1, 8);
+/**
+ * Simplified score for a single stream of engagement values (newest first).
+ * Used by the weekly digest email to rank monitors without full platform breakdown.
+ */
+export function computeAccelerationScore(engagements: number[]): number {
+  if (engagements.length < 2) return 0;
+  const latest = engagements[0];
+  const history = engagements.slice(1, 8);
   const avg = history.reduce((s, n) => s + n, 0) / history.length;
-  if (avg === 0) return latest > 0 ? 100 : 0;
-  return Math.round(((latest - avg) / avg) * 100);
+  if (avg === 0) return latest > 0 ? 50 : 0;
+  const velocity = ((latest - avg) / avg) * 100;
+  return Math.round(Math.min(100, Math.max(0, (velocity + 20) * 1.25)));
 }
 
-const BREAKOUT_THRESHOLD = 70;
-const BREAKOUT_COOLDOWN_HOURS = 24;
+type MonitorWithSubculture = Monitor & { subculture: Subculture };
 
-export async function runMonitor(
-  monitor: Monitor & { subculture: Subculture }
-): Promise<void> {
-  const query = buildMonitorQuery(monitor.subculture);
-  const tasks: Promise<void>[] = [];
+function buildSearchQuery(subculture: Subculture): string {
+  const terms = subculture.keywords?.slice(0, 4) ?? [];
+  return terms.length > 0 ? `${subculture.name} ${terms.join(" ")}` : subculture.name;
+}
 
-  if (monitor.platforms.includes("reddit")) tasks.push(snapshotReddit(monitor.id, query));
-  if (monitor.platforms.includes("twitter")) tasks.push(snapshotTwitter(monitor.id, query));
+export async function runMonitor(monitor: MonitorWithSubculture): Promise<void> {
+  const query = buildSearchQuery(monitor.subculture);
+  const signals = await enrichSubcultureWithSignals(query);
 
-  const results = await Promise.allSettled(tasks);
-  for (const r of results) {
-    if (r.status === "rejected") {
-      console.error(`[monitor-engine] snapshot failed for ${monitor.id}:`, r.reason);
-    }
+  const snapshotRows: Array<{
+    monitorId: string;
+    platform: "reddit" | "twitter";
+    postCount: number;
+    engagement: number;
+    topPosts: object;
+  }> = [];
+
+  if (signals.reddit && monitor.platforms.includes("reddit")) {
+    const topPosts = signals.reddit.top_posts.slice(0, 5).map((p) => ({
+      title: p.title,
+      url: p.url,
+      score: p.score,
+      comments: p.comments,
+    }));
+    snapshotRows.push({
+      monitorId: monitor.id,
+      platform: "reddit",
+      postCount: signals.reddit.total_posts_found,
+      engagement: signals.reddit.communities.reduce((sum, c) => sum + c.engagement, 0),
+      topPosts,
+    });
   }
 
-  // Compute breakout score from last 8 snapshots per platform
-  const recentSnapshots = await prisma.monitorSnapshot.findMany({
+  if (signals.twitter && monitor.platforms.includes("twitter")) {
+    const topPosts = signals.twitter.top_tweets.slice(0, 5).map((t) => ({
+      title: t.text,
+      url: t.url,
+      score: t.engagement,
+    }));
+    snapshotRows.push({
+      monitorId: monitor.id,
+      platform: "twitter",
+      postCount: signals.twitter.tweets_found,
+      engagement: signals.twitter.total_engagement,
+      topPosts,
+    });
+  }
+
+  if (snapshotRows.length === 0) {
+    // Still update lastRunAt so the cron doesn't retry immediately
+    await prisma.monitor.update({
+      where: { id: monitor.id },
+      data: { lastRunAt: new Date() },
+    });
+    return;
+  }
+
+  await prisma.monitorSnapshot.createMany({ data: snapshotRows });
+
+  // Compute acceleration from new + existing snapshots to detect breakouts
+  const existing: SnapshotLike[] = await prisma.monitorSnapshot.findMany({
     where: { monitorId: monitor.id },
+    select: { platform: true, postCount: true, capturedAt: true },
     orderBy: { capturedAt: "desc" },
-    take: 8,
+    take: 20,
   });
 
-  const engagements = recentSnapshots.map((s) => s.engagement);
-  const breakoutScore = computeAccelerationScore(engagements);
+  const signal = computeAccelerationSignal(existing);
 
   await prisma.monitor.update({
     where: { id: monitor.id },
-    data: { lastRunAt: new Date() },
+    data: {
+      lastRunAt: new Date(),
+      ...(signal.isBreakout ? { lastBreakoutAlertAt: new Date() } : {}),
+    },
   });
-
-  // Send breakout alert if score ≥ threshold and not sent in the last 24 hours
-  if (breakoutScore >= BREAKOUT_THRESHOLD) {
-    const cooloffMs = BREAKOUT_COOLDOWN_HOURS * 60 * 60 * 1000;
-    const lastAlert = (monitor as Monitor & { lastBreakoutAlertAt?: Date | null }).lastBreakoutAlertAt;
-    const cooloffPassed = !lastAlert || Date.now() - lastAlert.getTime() > cooloffMs;
-
-    if (cooloffPassed) {
-      try {
-        const user = await prisma.user.findUnique({ where: { id: monitor.userId }, select: { email: true, name: true } });
-        if (user?.email) {
-          const topSnap = recentSnapshots[0];
-          const topPosts = topSnap?.topPosts as { title: string; url: string; score: number }[] | null;
-          const topPost = topPosts?.[0];
-
-          await sendBreakoutAlert({
-            toEmail: user.email,
-            toName: user.name ?? "there",
-            subcultureName: monitor.subculture.name,
-            breakoutScore,
-            platforms: monitor.platforms,
-            topPost,
-          });
-
-          await prisma.monitor.update({
-            where: { id: monitor.id },
-            data: { lastBreakoutAlertAt: new Date() },
-          });
-
-          console.log(`[monitor-engine] breakout alert sent for ${monitor.id} (score ${breakoutScore})`);
-        }
-      } catch (err) {
-        // Don't fail the whole run if email fails
-        console.error(`[monitor-engine] breakout alert failed for ${monitor.id}:`, err);
-      }
-    }
-  }
 }
 
-// Run monitors sequentially so Apify actor concurrency stays predictable
-// and we don't exhaust the Vercel function timeout with parallel runs.
-export async function runAllActiveMonitors(): Promise<{ ran: number; failed: number; skipped: number }> {
+export async function runAllActiveMonitors(): Promise<{
+  ran: number;
+  failed: number;
+  skipped: number;
+}> {
   const monitors = await prisma.monitor.findMany({
     where: { status: "active" },
     include: { subculture: true },
-    orderBy: { lastRunAt: "asc" }, // oldest first so stale ones are prioritised
   });
 
   let ran = 0;
   let failed = 0;
-  let skipped = 0;
-  const startedAt = Date.now();
-  const BUDGET_MS = 240_000; // leave 60s buffer inside the 300s maxDuration
+  const skipped = 0;
 
-  for (const m of monitors) {
-    if (Date.now() - startedAt > BUDGET_MS) {
-      skipped++;
-      console.warn(`[monitor-engine] budget exceeded — skipping ${m.id}`);
-      continue;
-    }
+  for (const monitor of monitors) {
     try {
-      await runMonitor(m);
+      await runMonitor(monitor);
       ran++;
     } catch (err) {
+      console.error(`[monitor-engine] failed monitor ${monitor.id}:`, err);
       failed++;
-      console.error(`[monitor-engine] run failed for ${m.id}:`, err);
     }
   }
 

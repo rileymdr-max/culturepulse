@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Sparkles, Hash, MessageSquare, Package, Calendar, Radio, Users, Brain, Layers, TrendingUp, AlertTriangle, Bell, CheckCircle, Loader2, FileText } from "lucide-react";
+import { ArrowLeft, Sparkles, Hash, MessageSquare, Package, Calendar, Radio, Users, Brain, Layers, TrendingUp, AlertTriangle, Bell, CheckCircle, Loader2, FileText, Zap, TrendingDown, Minus, ExternalLink } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { NavHeader } from "@/components/nav-header";
@@ -10,7 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useSubculture } from "@/hooks/use-subcultures";
-import { useMonitors, useCreateMonitor } from "@/hooks/use-monitors";
+import { useMonitors, useCreateMonitor, type MonitorData } from "@/hooks/use-monitors";
 import { useCreateBrief, useBriefs } from "@/hooks/use-briefs";
 
 const SENTIMENT_STYLES: Record<string, string> = {
@@ -36,6 +36,131 @@ function Section({ icon: Icon, title, children, className }: { icon: React.Eleme
         </CardTitle>
       </CardHeader>
       <CardContent>{children}</CardContent>
+    </Card>
+  );
+}
+
+// ─── Acceleration widget ──────────────────────────────────────────────────────
+
+type Tier = "breakout" | "trending" | "rising" | "stable" | "cooling";
+
+function getTier(score: number, velocity: number, isBreakout: boolean): Tier {
+  if (isBreakout) return "breakout";
+  if (score >= 55) return "trending";
+  if (score >= 35 || velocity > 5) return "rising";
+  if (velocity < -5) return "cooling";
+  return "stable";
+}
+
+const TIER_BADGE: Record<Tier, { label: string; cls: string }> = {
+  breakout: { label: "BREAKOUT",  cls: "bg-red-500/15 text-red-400 border-red-500/30" },
+  trending: { label: "TRENDING",  cls: "bg-amber-500/15 text-amber-400 border-amber-500/30" },
+  rising:   { label: "RISING",    cls: "bg-indigo-500/15 text-indigo-500 border-indigo-500/30" },
+  stable:   { label: "STABLE",    cls: "bg-muted text-muted-foreground border-border" },
+  cooling:  { label: "COOLING",   cls: "bg-muted/50 text-muted-foreground/60 border-border/50" },
+};
+
+const SCORE_COLOR: Record<Tier, string> = {
+  breakout: "text-red-400",
+  trending: "text-amber-400",
+  rising:   "text-indigo-500",
+  stable:   "text-muted-foreground",
+  cooling:  "text-muted-foreground/50",
+};
+
+function AccelerationWidget({ monitor }: { monitor: MonitorData }) {
+  const { signal } = monitor;
+  const tier = getTier(signal.breakoutScore, signal.velocity, signal.isBreakout);
+  const { label: tierLabel, cls: tierCls } = TIER_BADGE[tier];
+  const scoreColor = SCORE_COLOR[tier];
+  const hasData = monitor.snapshots.length > 0;
+
+  if (!hasData) {
+    return (
+      <Card className="border-border/50">
+        <CardContent className="p-4 flex items-center gap-3 text-sm text-muted-foreground">
+          <Zap className="h-4 w-4 shrink-0 text-amber-400/50" />
+          Monitor active — waiting for first data run (cron runs every 6h, or{" "}
+          <Link href="/dashboard/monitors" className="underline underline-offset-2 hover:text-foreground transition-colors">
+            run now
+          </Link>
+          )
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card className={cn(
+      "transition-all",
+      tier === "breakout" && "border-red-500/40 shadow-red-500/10 shadow-md",
+      tier === "trending" && "border-amber-500/30",
+      tier === "rising"   && "border-indigo-500/20",
+    )}>
+      <CardContent className="p-4">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          {/* Left: tier + label */}
+          <div className="flex items-center gap-3 flex-wrap">
+            <Zap className={cn("h-4 w-4 shrink-0", tier === "breakout" ? "text-red-400" : tier === "trending" ? "text-amber-400" : "text-indigo-500")} />
+            <span className="text-sm font-semibold text-foreground">Live Signal</span>
+            <span className={cn("text-[11px] font-bold px-2 py-0.5 rounded-full border tracking-wider", tierCls)}>
+              {tierLabel}
+            </span>
+          </div>
+
+          {/* Right: score + metrics */}
+          <div className="flex items-center gap-6">
+            {/* Score */}
+            <div className="text-center">
+              <div className={cn("text-2xl font-black tabular-nums leading-none", scoreColor)}>
+                {signal.breakoutScore}
+              </div>
+              <div className="text-[10px] text-muted-foreground/60 mt-0.5">score</div>
+            </div>
+
+            {/* Velocity */}
+            <div className="text-center">
+              <div className={cn("text-lg font-bold tabular-nums", signal.velocity >= 0 ? "text-green-400" : "text-red-400/70")}>
+                {signal.velocity > 0 ? "+" : ""}{signal.velocity}%
+              </div>
+              <div className="text-[10px] text-muted-foreground uppercase tracking-wider mt-0.5">velocity</div>
+            </div>
+
+            {/* Momentum */}
+            <div className="flex flex-col items-center gap-0.5">
+              {signal.momentum === "rising"  && <TrendingUp  className="h-4 w-4 text-green-400" />}
+              {signal.momentum === "falling" && <TrendingDown className="h-4 w-4 text-red-400/70" />}
+              {signal.momentum === "stable"  && <Minus className="h-4 w-4 text-muted-foreground" />}
+              <div className="text-[10px] text-muted-foreground uppercase tracking-wider capitalize">{signal.momentum}</div>
+            </div>
+
+            <Link href="/dashboard/monitors">
+              <Button variant="ghost" size="sm" className="gap-1.5 text-xs text-muted-foreground hover:text-foreground">
+                Signal Board <ExternalLink className="h-3 w-3" />
+              </Button>
+            </Link>
+          </div>
+        </div>
+
+        {/* Per-platform breakdown */}
+        {(signal.platform.reddit.velocity !== null || signal.platform.twitter.velocity !== null) && (
+          <div className="flex gap-4 mt-3 pt-3 border-t border-border/50 text-xs">
+            {signal.platform.reddit.velocity !== null && (
+              <span className="text-orange-400/80">
+                Reddit {signal.platform.reddit.velocity > 0 ? "+" : ""}{signal.platform.reddit.velocity}%
+              </span>
+            )}
+            {signal.platform.twitter.velocity !== null && (
+              <span className="text-sky-400/80">
+                Twitter {signal.platform.twitter.velocity > 0 ? "+" : ""}{signal.platform.twitter.velocity}%
+              </span>
+            )}
+            <span className="ml-auto text-muted-foreground/50">
+              {monitor.snapshots.length} snapshot{monitor.snapshots.length !== 1 ? "s" : ""}
+            </span>
+          </div>
+        )}
+      </CardContent>
     </Card>
   );
 }
@@ -183,6 +308,9 @@ export default function SubcultureDetailPage() {
             )}
           </div>
         </div>
+
+        {/* Acceleration signal — only when a monitor is active */}
+        {existingMonitor && <AccelerationWidget monitor={existingMonitor} />}
 
         {/* Top 3 fields — full width */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
