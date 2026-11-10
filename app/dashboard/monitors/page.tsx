@@ -11,11 +11,12 @@ import {
   ResponsiveContainer, CartesianGrid,
 } from "recharts";
 import { NavHeader } from "@/components/nav-header";
-import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-import { signalTier, TIER_STYLE } from "@/lib/signal-tier";
-import { useTokenColors } from "@/hooks/use-token-color";
+import { signalTier, type SignalTier } from "@/lib/signal-tier";
+import {
+  BRAND_ROOT, D, M, F2, PANEL, EYEBROW, BTN_GO_SM, BTN_LINE_SM, BTN_GHOST_SM,
+} from "@/components/marketing/brand";
 import {
   useMonitors,
   useDeleteMonitor,
@@ -32,6 +33,30 @@ const PLATFORM_LABEL: Record<string, string> = { reddit: "Reddit", twitter: "X" 
 const platformLabel = (p: string) => PLATFORM_LABEL[p] ?? p.charAt(0).toUpperCase() + p.slice(1);
 
 const signed = (n: number) => `${n > 0 ? "+" : n < 0 ? "−" : ""}${Math.abs(n)}%`;
+
+/* F2 tier palette (page-scoped). Text colors are ≥6:1 on the card;
+   chips put ink text on a light fill, or white on green. */
+const TIER: Record<SignalTier, { label: string; text: string; chip: string; swatch: string }> = {
+  breakout: { label: "Breakout", text: "text-[#0B6B45]", chip: "bg-[#0B6B45] text-white", swatch: "bg-[#0B6B45]" },
+  trending: { label: "Trending", text: "text-[#742A9E]", chip: "bg-[#BBA8FF] text-[#111110]", swatch: "bg-[#BBA8FF]" },
+  rising: { label: "Rising", text: "text-[#111110]", chip: "bg-[#C7F2D9] text-[#111110]", swatch: "bg-[#C7F2D9]" },
+  stable: { label: "Stable", text: "text-[#5E5A52]", chip: "bg-[#F2EDE3] text-[#5E5A52]", swatch: "bg-[#F2EDE3]" },
+  cooling: { label: "Cooling", text: "text-[#5E5A52]", chip: "bg-[#F2EDE3] text-[#5E5A52]", swatch: "bg-[#F2EDE3]" },
+};
+
+function TierChip({ tier, className }: { tier: SignalTier; className?: string }) {
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center rounded-full border-2 border-[#111110] px-2.5 py-0.5 text-xs font-bold",
+        TIER[tier].chip,
+        className
+      )}
+    >
+      {TIER[tier].label}
+    </span>
+  );
+}
 
 // ─── Chart ────────────────────────────────────────────────────────────────────
 
@@ -56,43 +81,43 @@ function buildChartData(snapshots: MonitorData["snapshots"]) {
 function ChartTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="rounded-lg border border-border bg-popover px-3 py-2 text-xs shadow-md">
-      <p className="mb-1 text-muted-foreground">{label}</p>
+    <div className="rounded-lg border-2 border-[#111110] bg-[#FFFDF8] px-3 py-2 text-xs shadow-[3px_3px_0_#111110]">
+      <p className="mb-1 text-[#5E5A52]">{label}</p>
       {payload.map((p: { dataKey: string; value: number; color: string }) => (
         <p key={p.dataKey} className="flex items-center gap-1.5 tabular-nums">
           <span className="h-2 w-2 rounded-full" style={{ background: p.color }} />
-          {platformLabel(p.dataKey)}: <strong className="font-medium">{p.value} posts</strong>
+          {platformLabel(p.dataKey)}: <strong className="font-bold">{p.value} posts</strong>
         </p>
       ))}
     </div>
   );
 }
 
+const SERIES_COLOR = { reddit: F2.green, twitter: F2.violet } as const;
+
 function VolumeChart({ snapshots }: { snapshots: MonitorData["snapshots"] }) {
-  const colors = useTokenColors(["--primary", "--muted-foreground", "--border"] as const);
   const data = buildChartData(snapshots);
 
   if (data.length < 2) {
     return (
-      <div className="flex h-16 items-center rounded-lg bg-muted px-4 text-sm text-muted-foreground">
+      <div className="flex min-h-16 items-center rounded-xl bg-[#F2EDE3] px-4 py-3 text-sm text-[#5E5A52]">
         Post-volume chart appears after the second run. Monitors refresh every 6 hours.
       </div>
     );
   }
 
-  const series = [
-    { key: "reddit", color: colors["--primary"] },
-    { key: "twitter", color: colors["--muted-foreground"] },
-  ].filter((s) => data.some((d) => d[s.key as "reddit" | "twitter"] !== undefined));
+  const series = (["reddit", "twitter"] as const)
+    .map((key) => ({ key, color: SERIES_COLOR[key] }))
+    .filter((s) => data.some((d) => d[s.key] !== undefined));
 
   return (
     <div>
       <ResponsiveContainer width="100%" height={72}>
         <AreaChart data={data} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
-          <CartesianGrid stroke={colors["--border"]} vertical={false} />
+          <CartesianGrid stroke={F2.rule} vertical={false} />
           <XAxis dataKey="name" hide />
           <YAxis hide />
-          <Tooltip content={<ChartTooltip />} cursor={{ stroke: colors["--border"] }} />
+          <Tooltip content={<ChartTooltip />} cursor={{ stroke: F2.ink, strokeDasharray: "3 3" }} />
           {series.map((s) => (
             <Area
               key={s.key}
@@ -100,15 +125,15 @@ function VolumeChart({ snapshots }: { snapshots: MonitorData["snapshots"] }) {
               dataKey={s.key}
               stroke={s.color}
               fill={s.color}
-              fillOpacity={0.08}
-              strokeWidth={1.75}
+              fillOpacity={0.12}
+              strokeWidth={2}
               dot={false}
               isAnimationActive={false}
             />
           ))}
         </AreaChart>
       </ResponsiveContainer>
-      <div className="mt-1 flex gap-4 text-xs text-muted-foreground">
+      <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-[#5E5A52]">
         <span>Post volume, last {data.length} runs</span>
         {series.map((s) => (
           <span key={s.key} className="flex items-center gap-1.5">
@@ -125,9 +150,9 @@ function VolumeChart({ snapshots }: { snapshots: MonitorData["snapshots"] }) {
 
 function Metric({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="min-w-0">
-      <div className="text-sm font-medium tabular-nums">{children}</div>
-      <div className="mt-0.5 text-xs text-muted-foreground">{label}</div>
+    <div className="min-w-0 px-3 py-3 first:pl-4 last:pr-4">
+      <div className={EYEBROW}>{label}</div>
+      <div className="mt-1 text-[15px] font-semibold tabular-nums">{children}</div>
     </div>
   );
 }
@@ -135,7 +160,7 @@ function Metric({ label, children }: { label: string; children: React.ReactNode 
 function MomentumValue({ momentum }: { momentum: AccelerationSignal["momentum"] }) {
   const Icon = momentum === "rising" ? TrendingUp : momentum === "falling" ? TrendingDown : Minus;
   return (
-    <span className={cn("inline-flex items-center gap-1 capitalize", momentum === "falling" && "text-muted-foreground")}>
+    <span className={cn("inline-flex items-center gap-1 capitalize", momentum === "falling" && "text-[#5E5A52]")}>
       <Icon className="h-4 w-4" aria-hidden />
       {momentum}
     </span>
@@ -145,8 +170,8 @@ function MomentumValue({ momentum }: { momentum: AccelerationSignal["momentum"] 
 function StrengthBar({ value }: { value: number }) {
   return (
     <span className="flex items-center gap-2">
-      <span className="h-1.5 w-16 overflow-hidden rounded-full bg-muted">
-        <span className="block h-full rounded-full bg-primary" style={{ width: `${Math.min(100, value)}%` }} />
+      <span className="h-2 w-full max-w-16 overflow-hidden rounded-full border border-[#111110] bg-[#F2EDE3]">
+        <span className="block h-full bg-[#0B6B45]" style={{ width: `${Math.min(100, value)}%` }} />
       </span>
       {value}
     </span>
@@ -164,7 +189,6 @@ function MonitorCard({ monitor }: { monitor: MonitorData }) {
 
   const { signal } = monitor;
   const tier = signalTier(signal);
-  const style = TIER_STYLE[tier];
   const isActive = monitor.status === "active";
   const showTierLabel = tier === "breakout" || tier === "trending" || tier === "rising";
 
@@ -186,72 +210,81 @@ function MonitorCard({ monitor }: { monitor: MonitorData }) {
   return (
     <article
       className={cn(
-        "flex flex-col gap-5 rounded-xl border bg-card p-5",
-        tier === "breakout" ? "border-tier-breakout/50" : "border-border",
-        !isActive && "opacity-60"
+        PANEL,
+        "flex flex-col gap-5 p-5 sm:p-6",
+        tier === "breakout" && "shadow-[5px_5px_0_#0B6B45]",
+        !isActive && "opacity-70"
       )}
     >
       {/* Header: name + score */}
       <header className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
             <Link
               href={`/dashboard/subcultures/${monitor.subculture.slug}`}
-              className="truncate text-lg font-semibold tracking-tight transition-colors hover:text-primary"
+              className="truncate text-lg font-bold tracking-tight underline-offset-4 transition-colors hover:text-[#0B6B45] hover:underline"
             >
               {monitor.subculture.name}
             </Link>
-            {showTierLabel && <span className={cn("text-xs font-semibold", style.text)}>{style.label}</span>}
-            {!isActive && <span className="text-xs font-medium text-muted-foreground">Paused</span>}
+            {showTierLabel && <TierChip tier={tier} />}
+            {!isActive && (
+              <span className="inline-flex items-center rounded-full border-2 border-dashed border-[#5E5A52] px-2.5 py-0.5 text-xs font-bold text-[#5E5A52]">
+                Paused
+              </span>
+            )}
           </div>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p className="mt-1.5 text-sm text-[#5E5A52]">
             {monitor.subculture.category} · {monitor.platforms.map(platformLabel).join(", ")} · {lastRun}
           </p>
         </div>
         <div className="shrink-0 text-right" title="Breakout Score (0–100)">
-          <div className={cn("text-4xl font-semibold leading-none tracking-tight tabular-nums", style.text)}>
+          <div className={cn(D, "text-5xl leading-[0.9] tabular-nums", TIER[tier].text)}>
             {signal.breakoutScore}
           </div>
-          <div className="mt-1 text-xs text-muted-foreground">Breakout Score</div>
+          <div className={cn(EYEBROW, "mt-1.5")}>Breakout Score</div>
         </div>
       </header>
 
-      {/* Score breakdown */}
-      <div className="grid grid-cols-3 gap-4">
-        <Metric label="Velocity">
-          <span className={cn(signal.velocity > 0 && style.text)}>{signed(signal.velocity)}</span>
-        </Metric>
-        <Metric label="Momentum">
-          <MomentumValue momentum={signal.momentum} />
-        </Metric>
-        <Metric label="Cross-platform">
-          <StrengthBar value={signal.crossPlatformStrength} />
-        </Metric>
+      {/* Acceleration breakdown */}
+      <div>
+        <div className="grid grid-cols-3 divide-x-2 divide-[#E4DDD0] rounded-xl border-2 border-[#E4DDD0]">
+          <Metric label="Velocity">
+            <span className={cn(signal.velocity > 0 && TIER[tier].text)}>{signed(signal.velocity)}</span>
+          </Metric>
+          <Metric label="Momentum">
+            <MomentumValue momentum={signal.momentum} />
+          </Metric>
+          <Metric label="Cross-platform">
+            <StrengthBar value={signal.crossPlatformStrength} />
+          </Metric>
+        </div>
+        {perPlatform.length > 0 && (
+          <p className={cn(M, "mt-2 text-xs text-[#5E5A52] tabular-nums")}>
+            {perPlatform.map(({ p, v }) => `${platformLabel(p)} ${signed(v)}`).join(" · ")}
+          </p>
+        )}
       </div>
-      {perPlatform.length > 0 && (
-        <p className="-mt-3 text-xs text-muted-foreground tabular-nums">
-          {perPlatform.map(({ p, v }) => `${platformLabel(p)} ${signed(v)}`).join(" · ")}
-        </p>
-      )}
 
       <VolumeChart snapshots={monitor.snapshots} />
 
       {/* Top posts */}
       {topPosts.length > 0 && (
         <div>
-          <h3 className="text-sm font-medium">Latest {platformLabel(lastSnap?.platform ?? "")} posts</h3>
-          <ul className="mt-2 space-y-1">
+          <h3 className={EYEBROW}>Latest {platformLabel(lastSnap?.platform ?? "")} posts</h3>
+          <ul className="mt-2 divide-y divide-[#E4DDD0]">
             {topPosts.slice(0, 3).map((post, i) => (
               <li key={i}>
                 <a
                   href={post.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="group flex items-center gap-2 rounded-md py-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
+                  className="group flex items-center gap-2 py-2 text-sm text-[#111110] transition-colors hover:text-[#0B6B45]"
                 >
-                  <ArrowUpRight className="h-3.5 w-3.5 shrink-0 transition-transform group-hover:-translate-y-px group-hover:translate-x-px" aria-hidden />
+                  <ArrowUpRight className="h-3.5 w-3.5 shrink-0 text-[#5E5A52] transition-transform group-hover:-translate-y-px group-hover:translate-x-px group-hover:text-[#0B6B45]" aria-hidden />
                   <span className="line-clamp-1 flex-1">{post.title}</span>
-                  {post.score > 0 && <span className="shrink-0 text-xs tabular-nums">{post.score.toLocaleString()}</span>}
+                  {post.score > 0 && (
+                    <span className={cn(M, "shrink-0 text-xs tabular-nums text-[#5E5A52]")}>{post.score.toLocaleString()}</span>
+                  )}
                 </a>
               </li>
             ))}
@@ -260,62 +293,58 @@ function MonitorCard({ monitor }: { monitor: MonitorData }) {
       )}
 
       {/* Actions */}
-      <footer className="mt-auto flex flex-wrap items-center gap-1 border-t border-border pt-4">
+      <footer className="mt-auto flex flex-wrap items-center gap-1 border-t-2 border-[#111110] pt-4">
         {briefResult?.brief ? (
-          <Link
-            href={`/dashboard/briefs/${briefResult.brief.id}`}
-            className="mr-1 inline-flex h-8 items-center gap-1.5 rounded-lg bg-primary px-3 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-          >
+          <Link href={`/dashboard/briefs/${briefResult.brief.id}`} className={BTN_GO_SM}>
             <Check className="h-3.5 w-3.5" aria-hidden />View brief
           </Link>
         ) : (
-          <Button
-            size="sm"
-            className="mr-1"
+          <button
+            type="button"
+            className={BTN_GO_SM}
             disabled={isGeneratingBrief}
             onClick={() => createBrief({ subcultureId: monitor.subculture.id, monitorId: monitor.id })}
           >
             {isGeneratingBrief ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
             {isGeneratingBrief ? "Generating brief…" : "Generate brief"}
-          </Button>
+          </button>
         )}
 
-        <Button
-          variant="ghost" size="sm"
+        <button
+          type="button"
+          className={BTN_GHOST_SM}
           disabled={isRunning || !isActive}
           onClick={() => runNow(monitor.id)}
           title={!isActive ? "Resume this monitor to run it" : undefined}
         >
           <RefreshCw className={cn("h-3.5 w-3.5", isRunning && "animate-spin")} />
           {isRunning ? "Running…" : "Run now"}
-        </Button>
+        </button>
 
-        <Link
-          href={`/dashboard/subcultures/${monitor.subculture.slug}`}
-          className="inline-flex h-8 items-center gap-1.5 rounded-lg px-3 text-xs font-medium transition-colors hover:bg-accent hover:text-accent-foreground"
-        >
+        <Link href={`/dashboard/subcultures/${monitor.subculture.slug}`} className={BTN_GHOST_SM}>
           <BookOpen className="h-3.5 w-3.5" aria-hidden />Profile
         </Link>
 
         <div className="ml-auto flex items-center gap-1">
-          <Button
-            variant="ghost" size="sm"
+          <button
+            type="button"
+            className={BTN_GHOST_SM}
             disabled={isToggling}
             onClick={() => setStatus({ id: monitor.id, status: isActive ? "paused" : "active" })}
           >
             {isActive ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
             {isActive ? "Pause" : "Resume"}
-          </Button>
-          <Button
-            variant="ghost" size="sm"
-            className={cn(confirmDelete ? "text-destructive hover:text-destructive" : "text-muted-foreground")}
+          </button>
+          <button
+            type="button"
+            className={cn(BTN_GHOST_SM, confirmDelete ? "text-[#B42318] hover:bg-[#FDECEA]" : "text-[#5E5A52]")}
             disabled={isDeleting}
             onClick={() => { if (!confirmDelete) { setConfirmDelete(true); return; } deleteMonitor(monitor.id); }}
             onBlur={() => setConfirmDelete(false)}
           >
             {isDeleting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
             {confirmDelete ? "Click again to remove" : "Remove"}
-          </Button>
+          </button>
         </div>
       </footer>
     </article>
@@ -346,19 +375,17 @@ function useNextCronRun(): string {
 
 function CardSkeleton() {
   return (
-    <div aria-hidden className="space-y-5 rounded-xl border border-border bg-card p-5">
+    <div aria-hidden className={cn(PANEL, "space-y-5 p-5 sm:p-6")}>
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1 space-y-2">
           <Skeleton className="h-6 w-48" />
           <Skeleton className="h-4 w-64 max-w-full" />
         </div>
-        <Skeleton className="h-10 w-14" />
+        <Skeleton className="h-12 w-14" />
       </div>
-      <div className="grid grid-cols-3 gap-4">
-        {[0, 1, 2].map((i) => <Skeleton key={i} className="h-9" />)}
-      </div>
-      <Skeleton className="h-[72px] w-full rounded-lg" />
-      <Skeleton className="h-8 w-full" />
+      <Skeleton className="h-16 w-full rounded-xl" />
+      <Skeleton className="h-[72px] w-full rounded-xl" />
+      <Skeleton className="h-9 w-full" />
     </div>
   );
 }
@@ -397,23 +424,25 @@ export default function SignalBoardPage() {
   const n = monitors.length;
 
   return (
-    <div className="flex min-h-screen flex-col bg-background">
+    // Paper background behind the shared nav; F2 fonts are scoped to <main>
+    // so the nav keeps its own design-system look until the app-wide pass.
+    <div className="flex min-h-screen flex-col bg-[#F2EDE3]">
       <NavHeader />
 
-      <main className="mx-auto w-full max-w-screen-xl flex-1 px-4 py-10 sm:px-6">
+      <main className={cn(BRAND_ROOT, "mx-auto w-full max-w-screen-xl flex-1 px-4 pb-16 pt-10 sm:px-6")}>
         {/* Header */}
         <header className="flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
           <div>
-            <h1 className="text-3xl font-semibold tracking-tight">Signal Board</h1>
-            <div className="mt-2 text-muted-foreground">
+            <h1 className={cn(D, "text-5xl leading-[0.95] sm:text-6xl")}>Signal Board</h1>
+            <div className="mt-3 text-base text-[#5E5A52]">
               {isLoading ? (
-                <Skeleton className="inline-block h-5 w-72 align-middle" />
+                <Skeleton className="inline-block h-5 w-72 max-w-full align-middle" />
               ) : n === 0 ? (
                 "Track a subculture to see its Breakout Score here."
               ) : (
                 <>
                   {breakouts > 0 ? (
-                    <span className="font-medium text-signal">
+                    <span className="font-bold text-[#0B6B45]">
                       <span className="tabular-nums">{breakouts}</span> breakout{breakouts !== 1 && "s"}
                     </span>
                   ) : (
@@ -426,12 +455,12 @@ export default function SignalBoardPage() {
           </div>
 
           {n > 0 && (
-            <div className="flex items-center gap-3">
-              <span className="text-sm text-muted-foreground tabular-nums">Next auto-run in {nextRun}</span>
-              <Button variant="outline" size="sm" disabled={isRunningAll} onClick={handleRunAll}>
+            <div className="flex flex-wrap items-center gap-3">
+              <span className={cn(M, "text-xs text-[#5E5A52] tabular-nums")}>Next auto-run in {nextRun}</span>
+              <button type="button" className={BTN_LINE_SM} disabled={isRunningAll} onClick={handleRunAll}>
                 <RefreshCw className={cn("h-3.5 w-3.5", isRunningAll && "animate-spin")} />
                 {isRunningAll ? "Running all…" : "Run all now"}
-              </Button>
+              </button>
             </div>
           )}
         </header>
@@ -441,11 +470,13 @@ export default function SignalBoardPage() {
           <div
             role="status"
             className={cn(
-              "mt-6 flex items-center gap-2 rounded-lg px-4 py-3 text-sm animate-in fade-in slide-in-from-top-1 duration-200",
-              runAllResult.failed > 0 ? "bg-destructive/10 text-destructive" : "bg-muted text-foreground"
+              "mt-6 flex items-center gap-2 rounded-xl border-2 px-4 py-3 text-sm font-medium animate-in fade-in slide-in-from-top-1 duration-200",
+              runAllResult.failed > 0
+                ? "border-[#B42318] bg-[#FDECEA] text-[#8A1C12]"
+                : "border-[#111110] bg-[#C7F2D9] text-[#111110]"
             )}
           >
-            {runAllResult.failed > 0 ? <AlertCircle className="h-4 w-4 shrink-0" /> : <Check className="h-4 w-4 shrink-0 text-primary" />}
+            {runAllResult.failed > 0 ? <AlertCircle className="h-4 w-4 shrink-0" /> : <Check className="h-4 w-4 shrink-0" />}
             <span className="tabular-nums">
               Ran {runAllResult.ran} monitor{runAllResult.ran !== 1 && "s"}
               {runAllResult.failed > 0 && ` · ${runAllResult.failed} failed`}
@@ -457,27 +488,33 @@ export default function SignalBoardPage() {
         {/* Toolbar: sort + legend */}
         {n > 1 && (
           <div className="mt-8 flex flex-wrap items-center justify-between gap-4">
-            <div role="radiogroup" aria-label="Sort monitors" className="flex gap-1 rounded-lg bg-muted p-1 text-sm">
+            <div
+              role="radiogroup"
+              aria-label="Sort monitors"
+              className="flex max-w-full gap-1 overflow-x-auto rounded-full border-2 border-[#111110] bg-[#FFFDF8] p-1 text-sm"
+            >
               {SORTS.map(({ key, label }) => (
                 <button
                   key={key}
+                  type="button"
                   role="radio"
                   aria-checked={sort === key}
                   onClick={() => setSort(key)}
                   className={cn(
-                    "rounded-md px-3 py-1 transition-colors",
-                    sort === key ? "bg-card font-medium shadow-sm" : "text-muted-foreground hover:text-foreground"
+                    "whitespace-nowrap rounded-full px-3.5 py-1.5 font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0B6B45]",
+                    sort === key ? "bg-[#111110] text-[#F2EDE3]" : "text-[#5E5A52] hover:text-[#111110]"
                   )}
                 >
                   {label}
                 </button>
               ))}
             </div>
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-[#5E5A52]">
               {(["breakout", "trending", "rising"] as const).map((t) => (
                 <span key={t} className="flex items-center gap-1.5">
-                  <span className={cn("h-2 w-2 rounded-full", TIER_STYLE[t].dot)} />
-                  {TIER_STYLE[t].label} {t === "breakout" ? "70+" : t === "trending" ? "55–69" : "35–54"}
+                  <span className={cn("h-3 w-3 rounded-full border-2 border-[#111110]", TIER[t].swatch)} />
+                  <span className="font-semibold text-[#111110]">{TIER[t].label}</span>
+                  <span className={cn(M, "tabular-nums")}>{t === "breakout" ? "70+" : t === "trending" ? "55–69" : "35–54"}</span>
                 </span>
               ))}
             </div>
@@ -486,10 +523,14 @@ export default function SignalBoardPage() {
 
         {/* Error */}
         {error && (
-          <div className="mt-8 flex items-center gap-3 rounded-lg bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          <div className="mt-8 flex flex-wrap items-center gap-3 rounded-xl border-2 border-[#B42318] bg-[#FDECEA] px-4 py-3 text-sm font-medium text-[#8A1C12]">
             <AlertCircle className="h-4 w-4 shrink-0" />
             Couldn’t load your monitors.
-            <button onClick={() => refetch()} className="font-medium underline-offset-4 hover:underline">
+            <button
+              type="button"
+              onClick={() => refetch()}
+              className="font-bold underline decoration-2 underline-offset-2 hover:text-[#111110]"
+            >
               Try again
             </button>
           </div>
@@ -497,22 +538,19 @@ export default function SignalBoardPage() {
 
         {/* Loading */}
         {isLoading && (
-          <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <div className="mt-8 grid grid-cols-1 gap-7 lg:grid-cols-2">
             {[0, 1].map((i) => <CardSkeleton key={i} />)}
           </div>
         )}
 
         {/* Empty */}
         {!isLoading && !error && n === 0 && (
-          <div className="mt-8 rounded-xl border border-dashed border-border px-6 py-16 text-center">
-            <h2 className="text-lg font-semibold">No subcultures on your Signal Board yet</h2>
-            <p className="mx-auto mt-2 max-w-md text-muted-foreground">
+          <div className="mt-8 rounded-2xl border-2 border-dashed border-[#111110] bg-[#FFFDF8] px-6 py-16 text-center">
+            <h2 className="text-xl font-bold">No subcultures on your Signal Board yet</h2>
+            <p className="mx-auto mt-2 max-w-md text-[#5E5A52]">
               Open any profile in the Library and choose Start monitoring. Its Breakout Score updates every 6 hours.
             </p>
-            <Link
-              href="/dashboard/subcultures"
-              className="mt-6 inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-            >
+            <Link href="/dashboard/subcultures" className={cn(BTN_GO_SM, "mt-6 h-11 px-5 text-[15px]")}>
               <BookOpen className="h-4 w-4" aria-hidden />Browse the Library
             </Link>
           </div>
@@ -520,7 +558,7 @@ export default function SignalBoardPage() {
 
         {/* Cards */}
         {n > 0 && (
-          <div className={cn("grid grid-cols-1 gap-6 lg:grid-cols-2", n > 1 ? "mt-6" : "mt-8")}>
+          <div className={cn("grid grid-cols-1 gap-7 lg:grid-cols-2", n > 1 ? "mt-6" : "mt-8")}>
             {monitors.map((m) => <MonitorCard key={m.id} monitor={m} />)}
           </div>
         )}
