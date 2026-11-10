@@ -26,14 +26,7 @@ function buildSearchQuery(subculture: Subculture): string {
 
 export async function runMonitor(monitor: MonitorWithSubculture): Promise<void> {
   const query = buildSearchQuery(monitor.subculture);
-  // Only scrape what this monitor stores. Snapshots are reddit + twitter only,
-  // so skipping TikTok/YouTube/Instagram/Trends avoids their slower actors.
-  const platforms = monitor.platforms.filter((p) => p === "reddit" || p === "twitter");
-  if (platforms.length === 0) {
-    await prisma.monitor.update({ where: { id: monitor.id }, data: { lastRunAt: new Date() } });
-    return;
-  }
-  const signals = await enrichSubcultureWithSignals(query, platforms);
+  const signals = await enrichSubcultureWithSignals(query);
 
   const snapshotRows: Array<{
     monitorId: string;
@@ -104,15 +97,15 @@ export async function runMonitor(monitor: MonitorWithSubculture): Promise<void> 
   });
 }
 
-/** Max monitors scraped at once. Each runs up to 2 Apify actors, so 4 → ≤8 concurrent Apify runs. */
+/** Max monitors scraped at once. Each runs up to 5 Apify actors, so 4 → ≤20 concurrent Apify runs. */
 export const MONITOR_CONCURRENCY = 4;
 /**
- * Stop starting new monitors after this long. A monitor takes at most ~65s
- * (Twitter actor 50s + 15s abort margin), so anything started before 200s
+ * Stop starting new monitors after this long. A monitor takes at most ~105s
+ * (TikTok actor 90s + 15s abort margin), so anything started before 180s
  * finishes inside the 300s function limit. Monitors not started are reported
  * as skipped and, being oldest by lastRunAt, go first next run.
  */
-export const MONITOR_START_BUDGET_MS = 200_000;
+export const MONITOR_START_BUDGET_MS = 180_000;
 
 export type MonitorRunResult = {
   monitorId: string;
