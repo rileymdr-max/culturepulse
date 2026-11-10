@@ -34,6 +34,47 @@ export const INPUT =
 export const LABEL = "mb-1.5 block text-sm font-bold";
 export const LINK = "font-bold text-[#0B6B45] underline decoration-2 underline-offset-2 hover:text-[#111110]";
 
+/* ── In-app recipes ────────────────────────────────────────────────
+   The calmer, work-screen version of F2 used inside the signed-in app
+   (piloted on the Signal Board). Smaller shadows, normal-size type. */
+
+/** Brand colors, for places that need a raw value (charts, inline styles). */
+export const F2 = {
+  paper: "#F2EDE3",
+  card: "#FFFDF8",
+  ink: "#111110",
+  green: "#0B6B45",
+  mint: "#C7F2D9",
+  yellow: "#FFE14D",
+  lilac: "#BBA8FF",
+  /** Plum: lilac deepened for text/lines on light backgrounds (7.4:1 on card). */
+  violet: "#742A9E",
+  /** Secondary text: 6.8:1 on card, 6.1:1 on paper. */
+  muted: "#5E5A52",
+  rule: "#E4DDD0",
+} as const;
+
+/** Main content panel: ink outline, modest offset shadow. */
+export const PANEL = "rounded-2xl border-2 border-[#111110] bg-[#FFFDF8] shadow-[5px_5px_0_#111110]";
+/** Small label above/below data, mono caps. */
+export const EYEBROW = "font-[family-name:var(--font-mono)] text-[11px] font-medium uppercase tracking-[0.08em] text-[#5E5A52]";
+const FOCUS = "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0B6B45]";
+/** Compact primary button for toolbars and card footers. */
+export const BTN_GO_SM = cn(
+  "inline-flex h-9 items-center justify-center gap-1.5 whitespace-nowrap rounded-full border-2 border-[#111110] bg-[#0B6B45] px-4 text-sm font-bold text-white shadow-[2px_2px_0_#111110] transition-[transform,box-shadow] duration-150 hover:-translate-x-px hover:-translate-y-px hover:shadow-[3px_3px_0_#111110] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-x-0 disabled:hover:translate-y-0 disabled:hover:shadow-[2px_2px_0_#111110]",
+  FOCUS
+);
+/** Compact secondary button: outlined, paper fill. */
+export const BTN_LINE_SM = cn(
+  "inline-flex h-9 items-center justify-center gap-1.5 whitespace-nowrap rounded-full border-2 border-[#111110] bg-[#FFFDF8] px-4 text-sm font-bold text-[#111110] transition-colors hover:bg-[#F2EDE3] disabled:cursor-not-allowed disabled:opacity-50",
+  FOCUS
+);
+/** Quiet text button for tertiary actions. */
+export const BTN_GHOST_SM = cn(
+  "inline-flex h-9 items-center justify-center gap-1.5 whitespace-nowrap rounded-full px-2.5 text-sm font-semibold text-[#111110] transition-colors hover:bg-[#F2EDE3] disabled:cursor-not-allowed disabled:opacity-50",
+  FOCUS
+);
+
 export function Wordmark({ className }: { className?: string }) {
   return (
     <span className={cn(D, "text-[26px] leading-none text-[#111110]", className)}>
