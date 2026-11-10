@@ -2,35 +2,15 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Anton, DM_Sans, JetBrains_Mono } from "next/font/google";
 import { Check, Search, ArrowUpRight } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { PLANS, PLAN_ORDER } from "@/lib/plans";
 import { PendingLink } from "@/components/pending-link";
 import { cn } from "@/lib/utils";
-
-/* ── Marketing-only type and color ─────────────────────────────────
-   The logged-out homepage uses its own poster type (Anton) on warm
-   paper with deep green. These values are scoped to this page so the
-   signed-in app keeps its design-system tokens. */
-
-const display = Anton({ weight: "400", subsets: ["latin"], display: "swap", variable: "--font-display" });
-const body = DM_Sans({ subsets: ["latin"], display: "swap", variable: "--font-body" });
-const mono = JetBrains_Mono({ weight: ["400", "500"], subsets: ["latin"], display: "swap", variable: "--font-mono" });
+import { BRAND_ROOT, D, M, CARD, BTN_GO, BTN_INK, STICKER, Wordmark } from "@/components/marketing/brand";
 
 const SIGNUP_HREF = "/register";
 const PLATFORMS = ["Reddit", "TikTok", "Instagram", "X", "Facebook", "Substack"];
-
-/* Shared class recipes */
-const D = "font-[family-name:var(--font-display)] font-normal uppercase";
-const M = "font-[family-name:var(--font-mono)]";
-const CARD = "rounded-[18px] border-2 border-[#111110] bg-[#FFFDF8] shadow-[8px_8px_0_#111110]";
-const BTN_GO =
-  "group inline-flex items-center justify-center gap-2.5 whitespace-nowrap rounded-full bg-[#0B6B45] px-7 py-4 text-[17px] font-bold text-white shadow-[4px_4px_0_#111110] transition-[transform,box-shadow] duration-150 hover:-translate-x-px hover:-translate-y-px hover:shadow-[5px_5px_0_#111110] active:translate-x-[3px] active:translate-y-[3px] active:shadow-[1px_1px_0_#111110] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#0B6B45]";
-const BTN_INK =
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full bg-[#111110] px-5 py-2.5 text-[15px] font-bold text-[#F2EDE3] transition-colors hover:bg-[#2A2925] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0B6B45]";
-const STICKER =
-  "inline-flex items-center gap-2 whitespace-nowrap rounded-full border-2 border-[#111110] px-4 py-2 text-[15px] font-bold shadow-[3px_3px_0_#111110]";
 
 export default async function HomePage() {
   const session = await getServerSession(authOptions);
@@ -44,12 +24,7 @@ export default async function HomePage() {
 
   return (
     <div
-      className={cn(
-        display.variable,
-        body.variable,
-        mono.variable,
-        "min-h-screen overflow-x-hidden bg-[#F2EDE3] font-[family-name:var(--font-body)] text-[#111110] antialiased"
-      )}
+      className={cn(BRAND_ROOT, "min-h-screen overflow-x-hidden")}
     >
       <SiteNav />
 
@@ -282,14 +257,6 @@ export default async function HomePage() {
 }
 
 /* ─────────────────────────────────────────────────────────────── */
-
-function Wordmark() {
-  return (
-    <span className={cn(D, "text-[26px] leading-none text-[#111110]")}>
-      Culture<span className="text-[#0B6B45]">Pulse</span>
-    </span>
-  );
-}
 
 function SiteNav() {
   return (
