@@ -105,8 +105,11 @@ function LiveSignal({ monitor }: { monitor: MonitorData }) {
   const tier = signalTier(signal);
   const style = TIER_STYLE[tier];
   const MomentumIcon = signal.momentum === "rising" ? TrendingUp : signal.momentum === "falling" ? TrendingDown : Minus;
-  const perPlatform = (["reddit", "twitter"] as const)
-    .map((p) => ({ label: p === "reddit" ? "Reddit" : "X", v: signal.platform[p].velocity }))
+  const PLATFORM_LABEL: Record<string, string> = {
+    reddit: "Reddit", twitter: "X", tiktok: "TikTok", youtube: "YouTube", instagram: "Instagram", trends: "Google Trends",
+  };
+  const perPlatform = Object.entries(signal.platform)
+    .map(([p, a]) => ({ label: PLATFORM_LABEL[p] ?? p, v: a?.velocity ?? null }))
     .filter((x): x is { label: string; v: number } => x.v !== null);
 
   return (

@@ -28,7 +28,7 @@ export async function POST(
         subculture: {
           select: { id: true, name: true, slug: true, category: true, description: true },
         },
-        snapshots: { orderBy: { capturedAt: "desc" }, take: 16 },
+        snapshots: { orderBy: { capturedAt: "desc" }, take: 48 },
       },
     });
 

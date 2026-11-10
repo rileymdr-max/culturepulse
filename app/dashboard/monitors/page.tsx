@@ -28,7 +28,17 @@ import {
 import { useCreateBrief } from "@/hooks/use-briefs";
 import { useQueryClient } from "@tanstack/react-query";
 
-const PLATFORM_LABEL: Record<string, string> = { reddit: "Reddit", twitter: "X" };
+const PLATFORM_LABEL: Record<string, string> = {
+  reddit: "Reddit",
+  twitter: "X",
+  tiktok: "TikTok",
+  youtube: "YouTube",
+  instagram: "Instagram",
+  trends: "Google Trends",
+};
+// Platforms whose postCount is a post/video count (Trends is search interest, so it's left off the volume chart).
+const VOLUME_PLATFORMS = ["reddit", "twitter", "tiktok", "youtube", "instagram"] as const;
+const VELOCITY_PLATFORMS = [...VOLUME_PLATFORMS, "trends"] as const;
 const platformLabel = (p: string) => PLATFORM_LABEL[p] ?? p.charAt(0).toUpperCase() + p.slice(1);
 
 const signed = (n: number) => `${n > 0 ? "+" : n < 0 ? "−" : ""}${Math.abs(n)}%`;
@@ -36,7 +46,7 @@ const signed = (n: number) => `${n > 0 ? "+" : n < 0 ? "−" : ""}${Math.abs(n)}
 // ─── Chart ────────────────────────────────────────────────────────────────────
 
 function buildChartData(snapshots: MonitorData["snapshots"]) {
-  const byRun = new Map<string, { reddit?: number; twitter?: number }>();
+  const byRun = new Map<string, Partial<Record<string, number>>>();
   const sorted = [...snapshots].sort(
     (a, b) => new Date(a.capturedAt).getTime() - new Date(b.capturedAt).getTime()
   );
@@ -45,8 +55,7 @@ function buildChartData(snapshots: MonitorData["snapshots"]) {
       month: "short", day: "numeric", hour: "numeric", minute: "2-digit",
     });
     const existing = byRun.get(key) ?? {};
-    if (s.platform === "reddit") existing.reddit = s.postCount;
-    if (s.platform === "twitter") existing.twitter = s.postCount;
+    if ((VOLUME_PLATFORMS as readonly string[]).includes(s.platform)) existing[s.platform] = s.postCount;
     byRun.set(key, existing);
   }
   return Array.from(byRun.entries()).slice(-8).map(([name, v]) => ({ name, ...v }));
@@ -69,7 +78,7 @@ function ChartTooltip({ active, payload, label }: any) {
 }
 
 function VolumeChart({ snapshots }: { snapshots: MonitorData["snapshots"] }) {
-  const colors = useTokenColors(["--primary", "--muted-foreground", "--border"] as const);
+  const colors = useTokenColors(["--primary", "--muted-foreground", "--foreground", "--border"] as const);
   const data = buildChartData(snapshots);
 
   if (data.length < 2) {
@@ -80,10 +89,13 @@ function VolumeChart({ snapshots }: { snapshots: MonitorData["snapshots"] }) {
     );
   }
 
-  const series = [
-    { key: "reddit", color: colors["--primary"] },
-    { key: "twitter", color: colors["--muted-foreground"] },
-  ].filter((s) => data.some((d) => d[s.key as "reddit" | "twitter"] !== undefined));
+  // Three theme colours, solid then dashed, so five platforms stay distinguishable.
+  const palette = [colors["--primary"], colors["--muted-foreground"], colors["--foreground"]];
+  const series = VOLUME_PLATFORMS.map((key, i) => ({
+    key,
+    color: palette[i % palette.length],
+    dash: i >= palette.length ? "4 3" : undefined,
+  })).filter((s) => data.some((d) => (d as Record<string, unknown>)[s.key] !== undefined));
 
   return (
     <div>
@@ -99,8 +111,9 @@ function VolumeChart({ snapshots }: { snapshots: MonitorData["snapshots"] }) {
               type="monotone"
               dataKey={s.key}
               stroke={s.color}
+              strokeDasharray={s.dash}
               fill={s.color}
-              fillOpacity={0.08}
+              fillOpacity={s.dash ? 0 : 0.06}
               strokeWidth={1.75}
               dot={false}
               isAnimationActive={false}
@@ -108,7 +121,7 @@ function VolumeChart({ snapshots }: { snapshots: MonitorData["snapshots"] }) {
           ))}
         </AreaChart>
       </ResponsiveContainer>
-      <div className="mt-1 flex gap-4 text-xs text-muted-foreground">
+      <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
         <span>Post volume, last {data.length} runs</span>
         {series.map((s) => (
           <span key={s.key} className="flex items-center gap-1.5">
@@ -168,10 +181,15 @@ function MonitorCard({ monitor }: { monitor: MonitorData }) {
   const isActive = monitor.status === "active";
   const showTierLabel = tier === "breakout" || tier === "trending" || tier === "rising";
 
-  const lastSnap = monitor.snapshots[0] ?? null;
-  const topPosts: MonitorTopPost[] = Array.isArray(lastSnap?.topPosts)
-    ? (lastSnap.topPosts as MonitorTopPost[])
-    : [];
+  // Top post from each platform in the latest run (Trends has searches, not posts).
+  const latestAt = monitor.snapshots[0] ? new Date(monitor.snapshots[0].capturedAt).getTime() : 0;
+  const topPosts: Array<MonitorTopPost & { platform: string }> = VOLUME_PLATFORMS.flatMap((p) => {
+    const snap = monitor.snapshots.find(
+      (s) => s.platform === p && latestAt - new Date(s.capturedAt).getTime() < 10 * 60_000
+    );
+    const posts = Array.isArray(snap?.topPosts) ? (snap.topPosts as MonitorTopPost[]) : [];
+    return posts.slice(0, 1).map((post) => ({ ...post, platform: p }));
+  });
 
   const lastRun = monitor.lastRunAt
     ? `Updated ${new Date(monitor.lastRunAt).toLocaleString(undefined, {
@@ -179,9 +197,9 @@ function MonitorCard({ monitor }: { monitor: MonitorData }) {
       })}`
     : "Not run yet";
 
-  const perPlatform = (["reddit", "twitter"] as const)
-    .map((p) => ({ p, v: signal.platform[p].velocity }))
-    .filter((x): x is { p: "reddit" | "twitter"; v: number } => x.v !== null);
+  const perPlatform = VELOCITY_PLATFORMS.map((p) => ({ p, v: signal.platform[p]?.velocity ?? null })).filter(
+    (x): x is { p: (typeof VELOCITY_PLATFORMS)[number]; v: number } => x.v !== null
+  );
 
   return (
     <article
@@ -239,9 +257,9 @@ function MonitorCard({ monitor }: { monitor: MonitorData }) {
       {/* Top posts */}
       {topPosts.length > 0 && (
         <div>
-          <h3 className="text-sm font-medium">Latest {platformLabel(lastSnap?.platform ?? "")} posts</h3>
+          <h3 className="text-sm font-medium">Latest top posts</h3>
           <ul className="mt-2 space-y-1">
-            {topPosts.slice(0, 3).map((post, i) => (
+            {topPosts.slice(0, 5).map((post, i) => (
               <li key={i}>
                 <a
                   href={post.url}
@@ -250,6 +268,7 @@ function MonitorCard({ monitor }: { monitor: MonitorData }) {
                   className="group flex items-center gap-2 rounded-md py-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
                 >
                   <ArrowUpRight className="h-3.5 w-3.5 shrink-0 transition-transform group-hover:-translate-y-px group-hover:translate-x-px" aria-hidden />
+                  <span className="shrink-0 text-xs">{platformLabel(post.platform)}</span>
                   <span className="line-clamp-1 flex-1">{post.title}</span>
                   {post.score > 0 && <span className="shrink-0 text-xs tabular-nums">{post.score.toLocaleString()}</span>}
                 </a>

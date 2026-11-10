@@ -30,41 +30,90 @@ export async function runMonitor(monitor: MonitorWithSubculture): Promise<void> 
 
   const snapshotRows: Array<{
     monitorId: string;
-    platform: "reddit" | "twitter";
+    platform: string;
     postCount: number;
     engagement: number;
     topPosts: object;
   }> = [];
-
-  if (signals.reddit && monitor.platforms.includes("reddit")) {
-    const topPosts = signals.reddit.top_posts.slice(0, 5).map((p) => ({
-      title: p.title,
-      url: p.url,
-      score: p.score,
-      comments: p.comments,
-    }));
+  const wants = (p: string) => monitor.platforms.includes(p);
+  const add = (platform: string, postCount: number, engagement: number, topPosts: object[]) =>
     snapshotRows.push({
       monitorId: monitor.id,
-      platform: "reddit",
-      postCount: signals.reddit.total_posts_found,
-      engagement: signals.reddit.communities.reduce((sum, c) => sum + c.engagement, 0),
-      topPosts,
+      platform,
+      postCount: Math.round(postCount),
+      engagement: Math.min(2_147_483_647, Math.round(engagement)), // Int column
+      topPosts: topPosts.slice(0, 5),
     });
+
+  if (signals.reddit && wants("reddit")) {
+    const r = signals.reddit;
+    add(
+      "reddit",
+      r.total_posts_found,
+      r.communities.reduce((sum, c) => sum + c.engagement, 0),
+      r.top_posts.map((p) => ({ title: p.title, url: p.url, score: p.score, comments: p.comments }))
+    );
   }
 
-  if (signals.twitter && monitor.platforms.includes("twitter")) {
-    const topPosts = signals.twitter.top_tweets.slice(0, 5).map((t) => ({
-      title: t.text,
-      url: t.url,
-      score: t.engagement,
-    }));
-    snapshotRows.push({
-      monitorId: monitor.id,
-      platform: "twitter",
-      postCount: signals.twitter.tweets_found,
-      engagement: signals.twitter.total_engagement,
-      topPosts,
-    });
+  if (signals.twitter && wants("twitter")) {
+    const t = signals.twitter;
+    add(
+      "twitter",
+      t.tweets_found,
+      t.total_engagement,
+      t.top_tweets.map((p) => ({ title: p.text, url: p.url, score: p.engagement }))
+    );
+  }
+
+  if (signals.tiktok && wants("tiktok")) {
+    const t = signals.tiktok;
+    add(
+      "tiktok",
+      t.videos_found,
+      t.total_views,
+      t.top_videos.map((v) => ({ title: v.caption, url: v.url, score: v.views }))
+    );
+  }
+
+  if (signals.youtube && wants("youtube")) {
+    const y = signals.youtube;
+    add(
+      "youtube",
+      y.videos_found,
+      y.total_views,
+      y.top_videos.map((v) => ({ title: v.title, url: v.url, score: v.views }))
+    );
+  }
+
+  if (signals.instagram && wants("instagram")) {
+    const i = signals.instagram;
+    add(
+      "instagram",
+      i.posts_found,
+      i.total_likes,
+      i.top_posts.map((p) => ({
+        title: p.caption ?? (p.owner ? `@${p.owner}` : "Instagram post"),
+        url: p.url,
+        score: p.likes,
+        comments: p.comments,
+      }))
+    );
+  }
+
+  if (signals.trends && wants("trends")) {
+    // Trends has no posts: postCount holds search interest (0–100) so velocity
+    // still tracks it, and topPosts holds related searches.
+    const g = signals.trends;
+    add(
+      "trends",
+      g.interest_score,
+      g.interest_score,
+      g.related_queries.map((q) => ({
+        title: q,
+        url: `https://trends.google.com/trends/explore?q=${encodeURIComponent(q)}`,
+        score: 0,
+      }))
+    );
   }
 
   if (snapshotRows.length === 0) {
@@ -83,7 +132,7 @@ export async function runMonitor(monitor: MonitorWithSubculture): Promise<void> 
     where: { monitorId: monitor.id },
     select: { platform: true, postCount: true, capturedAt: true },
     orderBy: { capturedAt: "desc" },
-    take: 20,
+    take: 60, // ~10 runs across six platforms
   });
 
   const signal = computeAccelerationSignal(existing);

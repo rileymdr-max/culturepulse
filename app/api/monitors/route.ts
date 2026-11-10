@@ -4,11 +4,11 @@ import { requireSession, badRequest, serverError, paymentRequired } from "@/lib/
 import { canCreateMonitor } from "@/lib/plans";
 import { getEffectivePlan } from "@/lib/admin";
 import { prisma, withDbRetry } from "@/lib/prisma";
-import { computeAccelerationSignal } from "@/lib/acceleration";
+import { computeAccelerationSignal, MONITOR_PLATFORMS } from "@/lib/acceleration";
 
 const createSchema = z.object({
   subcultureId: z.string().min(1),
-  platforms: z.array(z.enum(["reddit", "twitter"])).min(1).default(["reddit", "twitter"]),
+  platforms: z.array(z.enum(MONITOR_PLATFORMS)).min(1).default([...MONITOR_PLATFORMS]),
 });
 
 export async function GET(req: NextRequest) {
@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
         },
         snapshots: {
           orderBy: { capturedAt: "desc" },
-          take: 16,
+          take: 48, // 8 runs × 6 platforms
         },
       },
       orderBy: { createdAt: "desc" },
@@ -90,7 +90,7 @@ export async function POST(req: NextRequest) {
         subculture: {
           select: { id: true, name: true, slug: true, category: true, description: true },
         },
-        snapshots: { orderBy: { capturedAt: "desc" }, take: 16 },
+        snapshots: { orderBy: { capturedAt: "desc" }, take: 48 },
       },
     });
 

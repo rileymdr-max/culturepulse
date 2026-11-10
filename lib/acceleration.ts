@@ -4,10 +4,14 @@
  * Three-component score:
  *   Velocity    — % above 7-run baseline (the what)
  *   Momentum    — is velocity itself rising or falling? (the direction)
- *   Cross-Platform — do Reddit AND Twitter agree? (the signal strength)
+ *   Cross-Platform — do the platforms agree? (the signal strength)
  *
  * Combined into a Breakout Score (0–100) that surfaces pre-mainstream moments.
  */
+
+/** Every platform a monitor can snapshot. Order sets UI and tie-break order. */
+export const MONITOR_PLATFORMS = ["reddit", "twitter", "tiktok", "youtube", "instagram", "trends"] as const;
+export type MonitorPlatform = (typeof MONITOR_PLATFORMS)[number];
 
 export interface SnapshotLike {
   platform: string;
@@ -28,10 +32,7 @@ export interface AccelerationSignal {
   crossPlatformStrength: number;       // 0–100
   breakoutScore: number;               // 0–100 composite
   isBreakout: boolean;
-  platform: {
-    reddit: PlatformAccel;
-    twitter: PlatformAccel;
-  };
+  platform: Record<MonitorPlatform, PlatformAccel>;
 }
 
 function velocityFor(counts: number[]): number | null {
@@ -57,22 +58,22 @@ function momentumFor(counts: number[]): Momentum {
   return "stable";
 }
 
-function crossPlatformStrength(
-  redditVel: number | null,
-  twitterVel: number | null
-): number {
-  if (redditVel === null && twitterVel === null) return 0;
-  if (redditVel === null || twitterVel === null) return 30;
+/**
+ * How strongly the platforms with data agree. With exactly Reddit + Twitter
+ * this matches the original two-platform rules.
+ */
+function crossPlatformStrength(vels: number[]): number {
+  if (vels.length === 0) return 0;
+  if (vels.length === 1) return 30;
 
-  const bothPositive = redditVel > 0 && twitterVel > 0;
-  const bothNegative = redditVel < 0 && twitterVel < 0;
-
-  if (bothPositive) {
-    // Strength proportional to geometric mean of both velocities, capped at 100
-    const strength = Math.sqrt(Math.abs(redditVel) * Math.abs(twitterVel));
-    return Math.round(Math.min(100, strength / 1.5));
+  const positive = vels.filter((v) => v > 0);
+  if (positive.length === vels.length || (positive.length >= 2 && positive.length * 2 > vels.length)) {
+    // Geometric mean of the rising platforms, scaled by the share that are rising
+    const geo = Math.exp(positive.reduce((s, v) => s + Math.log(v), 0) / positive.length);
+    const share = positive.length / vels.length;
+    return Math.round(Math.min(100, (geo / 1.5) * share));
   }
-  if (bothNegative) return 15; // both cooling — consistent but weak
+  if (vels.every((v) => v < 0)) return 15; // all cooling — consistent but weak
   return 20; // platforms disagree
 }
 
@@ -94,27 +95,26 @@ export function computeAccelerationSignal(snapshots: SnapshotLike[]): Accelerati
       .filter((s) => s.platform === platform)
       .sort((a, b) => new Date(b.capturedAt).getTime() - new Date(a.capturedAt).getTime());
 
-  const redditSnaps = byPlatform("reddit");
-  const twitterSnaps = byPlatform("twitter");
-
-  const redditCounts = redditSnaps.map((s) => s.postCount);
-  const twitterCounts = twitterSnaps.map((s) => s.postCount);
-
-  const redditVel = velocityFor(redditCounts);
-  const twitterVel = velocityFor(twitterCounts);
+  const counts = Object.fromEntries(
+    MONITOR_PLATFORMS.map((p) => [p, byPlatform(p).map((s) => s.postCount)])
+  ) as Record<MonitorPlatform, number[]>;
+  const vel = Object.fromEntries(
+    MONITOR_PLATFORMS.map((p) => [p, velocityFor(counts[p])])
+  ) as Record<MonitorPlatform, number | null>;
 
   // Aggregate velocity: average across platforms that have data
-  const vels = [redditVel, twitterVel].filter((v): v is number => v !== null);
+  const vels = MONITOR_PLATFORMS.map((p) => vel[p]).filter((v): v is number => v !== null);
   const velocity = vels.length > 0 ? Math.round(vels.reduce((a, b) => a + b, 0) / vels.length) : 0;
 
-  // Momentum: use the platform with more data, fall back to aggregate counts
-  const allCounts = [...redditCounts, ...twitterCounts]
-    .slice(0, 8)
-    .map((n) => n);
-  const dominantCounts = redditCounts.length >= twitterCounts.length ? redditCounts : twitterCounts;
-  const momentum = momentumFor(dominantCounts.length >= 4 ? dominantCounts : allCounts);
+  // Momentum: use the platform with the most history (first in order on ties).
+  // Counts from different platforms aren't mixed — momentumFor reads "stable"
+  // until one platform has 4+ runs.
+  const dominantCounts = MONITOR_PLATFORMS.map((p) => counts[p]).reduce((best, c) =>
+    c.length > best.length ? c : best
+  );
+  const momentum = momentumFor(dominantCounts);
 
-  const cp = crossPlatformStrength(redditVel, twitterVel);
+  const cp = crossPlatformStrength(vels);
   const score = breakoutScore(velocity, momentum, cp);
 
   return {
@@ -123,9 +123,8 @@ export function computeAccelerationSignal(snapshots: SnapshotLike[]): Accelerati
     crossPlatformStrength: cp,
     breakoutScore: score,
     isBreakout: score >= 70 || velocity >= 50,
-    platform: {
-      reddit: { velocity: redditVel, postCount: redditCounts[0] ?? null },
-      twitter: { velocity: twitterVel, postCount: twitterCounts[0] ?? null },
-    },
+    platform: Object.fromEntries(
+      MONITOR_PLATFORMS.map((p) => [p, { velocity: vel[p], postCount: counts[p][0] ?? null }])
+    ) as Record<MonitorPlatform, PlatformAccel>,
   };
 }

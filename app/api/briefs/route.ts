@@ -94,7 +94,7 @@ export async function POST(req: NextRequest) {
       const monitor = await prisma.monitor.findFirst({
         where: { id: monitorId, userId: session.user.id },
         include: {
-          snapshots: { orderBy: { capturedAt: "desc" }, take: 16 },
+          snapshots: { orderBy: { capturedAt: "desc" }, take: 48 },
         },
       });
 
@@ -104,7 +104,7 @@ export async function POST(req: NextRequest) {
 
         // Build top posts from the latest snapshots
         const topPosts: BriefTopPost[] = [];
-        const platforms = ["reddit", "twitter"];
+        const platforms = ["reddit", "twitter", "tiktok", "youtube", "instagram"];
         for (const platform of platforms) {
           const latestSnap = monitor.snapshots.find((s) => s.platform === platform);
           if (latestSnap && Array.isArray(latestSnap.topPosts)) {
