@@ -375,7 +375,8 @@ export default function SignalBoardPage() {
     setIsRunningAll(true);
     setRunAllResult(null);
     try {
-      const res = await fetch("/api/monitors/run");
+      const res = await fetch("/api/monitors/run-mine", { method: "POST" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = await res.json();
       setRunAllResult(json);
       await refetch();

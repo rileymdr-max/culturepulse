@@ -1,21 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
+import { rejectUnlessCron } from "@/lib/cron-auth";
 import { runAllActiveMonitors } from "@/lib/monitor-engine";
 
-// Called by Vercel Cron every 6 hours.
+// Called by Vercel Cron every 6 hours for every user's monitors.
 // Vercel injects Authorization: Bearer {CRON_SECRET} automatically.
+// The Signal Board's "Run all now" uses /api/monitors/run-mine instead.
 export const maxDuration = 300;
 // Never prerender: this route sends emails / runs scrapers and must only run when called.
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
-  const cronSecret = process.env.CRON_SECRET;
-
-  if (cronSecret) {
-    const auth = req.headers.get("authorization") ?? "";
-    if (auth !== `Bearer ${cronSecret}`) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-  }
+  const denied = rejectUnlessCron(req);
+  if (denied) return denied;
 
   try {
     const { ran, failed, skipped } = await runAllActiveMonitors();

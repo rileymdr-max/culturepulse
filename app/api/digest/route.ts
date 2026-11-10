@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { rejectUnlessCron } from "@/lib/cron-auth";
 import { prisma } from "@/lib/prisma";
 import { sendWeeklyDigest, type DigestMonitor } from "@/lib/email";
 import { computeAccelerationScore } from "@/lib/monitor-engine";
@@ -9,14 +10,8 @@ export const maxDuration = 60;
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
-  const cronSecret = process.env.CRON_SECRET;
-
-  if (cronSecret) {
-    const auth = req.headers.get("authorization") ?? "";
-    if (auth !== `Bearer ${cronSecret}`) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-  }
+  const denied = rejectUnlessCron(req);
+  if (denied) return denied;
 
   try {
     const sent = await sendDigestToAllUsers();
