@@ -5,8 +5,10 @@ const VIDEO_URL: string | null = null; // e.g. "https://www.loom.com/embed/abc12
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Radio, ArrowRight, Play, Loader2, Zap, ChevronRight } from "lucide-react";
+import { ArrowRight, Play, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { BRAND_ROOT, BTN_GO, CARD, D, M, STICKER, Wordmark } from "@/components/marketing/brand";
+import { FormNotice } from "@/components/marketing/auth-shell";
 import type { BrandAuditResult, MatchedSubculture, DiscoveredSubculture } from "@/lib/types/brand-audit";
 
 // ─── Loading messages that rotate while the audit runs ───────────────────────
@@ -22,19 +24,24 @@ const LOADING_MESSAGES = [
   "Almost there — finalizing your profile…",
 ];
 
+const KICKER = cn(M, "text-xs font-medium uppercase tracking-[0.1em] text-[#0B6B45]");
+
 // ─── Step indicator ───────────────────────────────────────────────────────────
 function Steps({ current }: { current: 1 | 2 | 3 }) {
   return (
-    <div className="flex items-center gap-2">
-      {[1, 2, 3].map((n) => (
-        <div
-          key={n}
-          className={cn(
-            "h-1.5 rounded-full transition-all duration-500",
-            n === current ? "w-8 bg-indigo-600" : n < current ? "w-4 bg-indigo-300" : "w-4 bg-border"
-          )}
-        />
-      ))}
+    <div className="flex items-center gap-3">
+      <span className={cn(M, "hidden text-xs text-[#66625A] sm:inline")}>Step {current} of 3</span>
+      <div className="flex items-center gap-1.5" aria-hidden>
+        {[1, 2, 3].map((n) => (
+          <div
+            key={n}
+            className={cn(
+              "h-2.5 rounded-full border-2 border-[#111110] transition-all duration-500",
+              n === current ? "w-9 bg-[#0B6B45]" : n < current ? "w-4 bg-[#0B6B45]" : "w-4 bg-transparent"
+            )}
+          />
+        ))}
+      </div>
     </div>
   );
 }
@@ -42,52 +49,40 @@ function Steps({ current }: { current: 1 | 2 | 3 }) {
 // ─── Step 1: Video ────────────────────────────────────────────────────────────
 function StepWatch({ onNext }: { onNext: () => void }) {
   return (
-    <div className="flex flex-col items-center gap-8 w-full max-w-2xl mx-auto">
-      <div className="text-center space-y-2">
-        <p className="text-sm font-semibold text-indigo-600 tracking-wide uppercase">Welcome to CulturePulse</p>
-        <h1 className="text-3xl font-bold text-foreground leading-tight">
-          Understand the subcultures<br />your audience actually lives in
+    <div className="mx-auto flex w-full max-w-3xl flex-col items-center gap-8">
+      <div className="space-y-4 text-center">
+        <p className={KICKER}>Welcome to CulturePulse</p>
+        <h1 className={cn(D, "text-5xl leading-[0.92] sm:text-6xl lg:text-7xl")}>
+          Find the <span className="text-[#0B6B45]">subcultures</span> your audience actually lives in
         </h1>
-        <p className="text-muted-foreground">
-          A 90-second walkthrough of how it works — then we'll run a live audit on your brand.
+        <p className="mx-auto max-w-xl text-lg text-[#3B3832]">
+          A 90-second walkthrough of how it works, then we&rsquo;ll run a live audit on your brand.
         </p>
       </div>
 
-      {/* Video frame */}
-      <div className="w-full aspect-video rounded-2xl border border-border bg-card overflow-hidden relative shadow-sm">
+      <div className={cn(CARD, "relative aspect-video w-full max-w-2xl overflow-hidden")}>
         {VIDEO_URL ? (
-          <iframe
-            src={VIDEO_URL}
-            className="w-full h-full"
-            allow="autoplay; fullscreen"
-            allowFullScreen
-          />
+          <iframe src={VIDEO_URL} className="h-full w-full" allow="autoplay; fullscreen" allowFullScreen />
         ) : (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-gradient-to-br from-indigo-50 to-slate-50 dark:from-indigo-950/30 dark:to-slate-900">
-            <div className="h-16 w-16 rounded-full bg-indigo-600/10 border border-indigo-600/20 flex items-center justify-center">
-              <Play className="h-7 w-7 text-indigo-500 ml-1" />
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-[#C7F2D9]">
+            <div className="flex h-16 w-16 items-center justify-center rounded-full border-2 border-[#111110] bg-[#FFFDF8] shadow-[3px_3px_0_#111110]">
+              <Play className="ml-1 h-7 w-7 text-[#0B6B45]" aria-hidden />
             </div>
             <div className="text-center">
-              <p className="font-semibold text-foreground">Demo video coming soon</p>
-              <p className="text-sm text-muted-foreground mt-0.5">We're putting the finishing touches on it</p>
+              <p className={cn(D, "text-2xl")}>Demo video coming soon</p>
+              <p className="mt-1 text-[15px] text-[#2E3A33]">We&rsquo;re putting the finishing touches on it.</p>
             </div>
           </div>
         )}
       </div>
 
-      <div className="flex flex-col items-center gap-3 w-full">
-        <button
-          onClick={onNext}
-          className="flex items-center gap-2 px-6 py-3 rounded-xl bg-indigo-600 text-white font-semibold text-sm hover:bg-indigo-700 transition-colors shadow-sm"
-        >
+      <div className="flex w-full flex-col items-center gap-4">
+        <button onClick={onNext} className={BTN_GO}>
           See what it finds about your brand
-          <ArrowRight className="h-4 w-4" />
+          <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" aria-hidden />
         </button>
-        <button
-          onClick={onNext}
-          className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-        >
-          Skip video →
+        <button onClick={onNext} className="text-sm font-medium text-[#66625A] hover:text-[#111110]">
+          Skip the video
         </button>
       </div>
     </div>
@@ -140,74 +135,66 @@ function StepAudit({
   }
 
   return (
-    <div className="flex flex-col items-center gap-8 w-full max-w-lg mx-auto">
+    <div className="mx-auto flex w-full max-w-xl flex-col items-center gap-10">
       {!loading ? (
         <>
-          <div className="text-center space-y-2">
-            <p className="text-sm font-semibold text-indigo-600 tracking-wide uppercase">Step 2 of 3</p>
-            <h2 className="text-3xl font-bold text-foreground">What's your brand's handle?</h2>
-            <p className="text-muted-foreground text-sm">
-              We'll scan Twitter, TikTok, Reddit, Instagram, YouTube, and Pinterest to surface the
-              subcultures your audience actually belongs to.
+          <div className="space-y-4 text-center">
+            <p className={KICKER}>Your first audit</p>
+            <h2 className={cn(D, "text-5xl leading-[0.92] sm:text-6xl")}>What&rsquo;s your brand&rsquo;s handle?</h2>
+            <p className="text-[17px] text-[#3B3832]">
+              We&rsquo;ll scan Twitter, TikTok, Reddit, Instagram, YouTube and Pinterest to surface the subcultures
+              your audience actually belongs to.
             </p>
           </div>
 
-          <form onSubmit={handleSubmit} className="w-full space-y-4">
+          <form onSubmit={handleSubmit} className={cn(CARD, "w-full space-y-5 p-6 sm:p-7")}>
+            {error && <FormNotice tone="error">{error}</FormNotice>}
+            <label htmlFor="handle" className="sr-only">
+              Brand handle
+            </label>
             <div className="relative">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-medium select-none">@</span>
+              <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-lg font-bold text-[#66625A]">
+                @
+              </span>
               <input
+                id="handle"
                 type="text"
                 value={handle}
                 onChange={(e) => setHandle(e.target.value)}
                 placeholder="yourbrand"
                 autoFocus
-                className="w-full pl-8 pr-4 py-3.5 rounded-xl border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-base"
+                className="w-full rounded-full border-2 border-[#111110] bg-white py-4 pl-10 pr-5 text-lg placeholder:text-[#8F8A80] focus:outline-none focus:ring-4 focus:ring-[#0B6B45]/25"
               />
             </div>
-
-            {error && (
-              <p className="text-sm text-destructive bg-destructive/10 rounded-lg px-3 py-2">{error}</p>
-            )}
-
-            <button
-              type="submit"
-              disabled={!handle.trim()}
-              className="w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-indigo-600 text-white font-semibold hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-sm"
-            >
+            <button type="submit" disabled={!handle.trim()} className={cn(BTN_GO, "w-full")}>
               Analyze my brand
-              <ArrowRight className="h-4 w-4" />
+              <ArrowRight className="h-4 w-4" aria-hidden />
             </button>
           </form>
 
-          <p className="text-xs text-muted-foreground text-center">
-            Takes 30–60 seconds · Results are yours to keep in your dashboard
+          <p className={cn(M, "text-center text-xs text-[#66625A]")}>
+            Takes 30–60 seconds · Results stay in your dashboard
           </p>
         </>
       ) : (
-        <div className="flex flex-col items-center gap-6 py-8">
+        <div className={cn(CARD, "flex w-full flex-col items-center gap-6 px-6 py-10")} aria-live="polite">
           <div className="relative h-20 w-20">
-            <div className="absolute inset-0 rounded-full border-4 border-indigo-100 dark:border-indigo-900" />
-            <div className="absolute inset-0 rounded-full border-4 border-t-indigo-600 animate-spin" />
-            <div className="absolute inset-0 flex items-center justify-center">
-              <Radio className="h-7 w-7 text-indigo-500" />
-            </div>
+            <div className="absolute inset-0 rounded-full border-[5px] border-[#C7F2D9]" />
+            <div className="absolute inset-0 animate-spin rounded-full border-[5px] border-transparent border-t-[#0B6B45]" />
           </div>
-          <div className="text-center space-y-1">
-            <p className="font-semibold text-foreground">Scanning @{handle.replace(/^@/, "")}…</p>
-            <p
-              key={msgIdx}
-              className="text-sm text-muted-foreground animate-in fade-in duration-500"
-            >
+          <div className="space-y-2 text-center">
+            <p className={cn(D, "text-3xl")}>Scanning @{handle.replace(/^@/, "")}</p>
+            <p key={msgIdx} className="animate-in fade-in text-[15px] text-[#4A463F] duration-500">
               {LOADING_MESSAGES[msgIdx]}
             </p>
           </div>
-          <div className="flex gap-1.5">
+          <div className="flex gap-1.5" aria-hidden>
             {LOADING_MESSAGES.map((_, i) => (
               <div
                 key={i}
                 className={cn(
-                  "h-1 w-6 rounded-full transition-all duration-500",
-                  i === msgIdx ? "bg-indigo-600" : i < msgIdx ? "bg-indigo-300" : "bg-border"
+                  "h-1.5 w-6 rounded-full transition-all duration-500",
+                  i <= msgIdx ? "bg-[#0B6B45]" : "bg-[#DDD6C8]"
                 )}
               />
             ))}
@@ -219,6 +206,12 @@ function StepAudit({
 }
 
 // ─── Step 3: Results ──────────────────────────────────────────────────────────
+const STRENGTH: Record<string, string> = {
+  strong: "bg-[#0B6B45] text-white",
+  moderate: "bg-[#C7F2D9] text-[#0B4A30]",
+  emerging: "bg-[#F2EDE3] text-[#4A463F]",
+};
+
 function StepResults({
   handle,
   result,
@@ -231,94 +224,90 @@ function StepResults({
   const top3 = result.matched_subcultures.slice(0, 3);
   const discoveries = result.discovered_subcultures.slice(0, 2);
 
-  const strengthColor: Record<string, string> = {
-    strong:   "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300",
-    moderate: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
-    emerging: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300",
-  };
-
   return (
-    <div className="flex flex-col items-center gap-8 w-full max-w-2xl mx-auto">
-      <div className="text-center space-y-2">
-        <p className="text-sm font-semibold text-indigo-600 tracking-wide uppercase">Your brand audit</p>
-        <h2 className="text-3xl font-bold text-foreground">
-          Here's what we found about{" "}
-          <span className="text-indigo-600">@{handle}</span>
+    <div className="mx-auto flex w-full max-w-3xl flex-col items-center gap-10">
+      <div className="space-y-4 text-center">
+        <p className={KICKER}>Your brand audit</p>
+        <h2 className={cn(D, "text-5xl leading-[0.92] sm:text-6xl")}>
+          Here&rsquo;s what we found about <span className="text-[#0B6B45]">@{handle}</span>
         </h2>
-        <p className="text-muted-foreground text-sm">{result.audience_summary}</p>
+        <p className="mx-auto max-w-2xl text-[17px] text-[#3B3832]">{result.audience_summary}</p>
       </div>
 
       {/* Matched subcultures */}
-      <div className="w-full space-y-3">
-        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-          Top subcultures in your audience
-        </p>
-        {top3.map((sc: MatchedSubculture, i: number) => (
-          <div key={sc.slug} className="flex items-start gap-4 p-4 rounded-xl bg-card border border-border">
-            <span className="text-2xl font-bold text-indigo-200 dark:text-indigo-900 leading-none mt-0.5 w-6 shrink-0">
-              {i + 1}
-            </span>
-            <div className="flex-1 min-w-0 space-y-1.5">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-semibold text-foreground">{sc.name}</span>
-                <span className={cn("text-xs font-medium px-2 py-0.5 rounded-full", strengthColor[sc.match_strength])}>
-                  {sc.match_strength}
-                </span>
-                <span className="ml-auto text-sm font-bold text-indigo-600">{sc.match_pct}%</span>
-              </div>
-              {/* Match bar */}
-              <div className="h-1 w-full bg-border rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-indigo-500 rounded-full transition-all duration-1000"
-                  style={{ width: `${sc.match_pct}%` }}
-                />
-              </div>
-              <p className="text-sm text-muted-foreground leading-snug">{sc.why}</p>
-              <div className="flex flex-wrap gap-1 pt-0.5">
-                {sc.key_signals.slice(0, 3).map((sig) => (
-                  <span key={sig} className="text-xs bg-accent text-accent-foreground px-2 py-0.5 rounded-full">
-                    {sig}
+      <section className="w-full">
+        <h3 className={cn(D, "mb-4 text-2xl")}>Top subcultures in your audience</h3>
+        <div className={cn(CARD, "overflow-hidden")}>
+          {top3.map((sc: MatchedSubculture, i: number) => (
+            <div
+              key={sc.slug}
+              className={cn("grid grid-cols-[32px_1fr] gap-4 p-5 sm:p-6", i > 0 && "border-t-2 border-[#111110]")}
+            >
+              <span className={cn(D, "text-3xl leading-none text-[#0B6B45]")}>{i + 1}</span>
+              <div className="min-w-0 space-y-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className={cn(D, "text-2xl")}>{sc.name}</span>
+                  <span
+                    className={cn(
+                      "rounded-full border-2 border-[#111110] px-2.5 py-0.5 text-xs font-bold capitalize",
+                      STRENGTH[sc.match_strength] ?? STRENGTH.emerging
+                    )}
+                  >
+                    {sc.match_strength}
                   </span>
-                ))}
+                  <span className={cn(D, "ml-auto text-3xl tabular-nums text-[#0B6B45]")}>{sc.match_pct}%</span>
+                </div>
+                <div className="h-3 w-full overflow-hidden rounded-full border-2 border-[#111110] bg-[#F2EDE3]">
+                  <div
+                    className="h-full bg-[#0B6B45] transition-all duration-1000"
+                    style={{ width: `${sc.match_pct}%` }}
+                  />
+                </div>
+                <p className="text-[15px] leading-snug text-[#4A463F]">{sc.why}</p>
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  {sc.key_signals.slice(0, 3).map((sig) => (
+                    <span key={sig} className={cn(M, "rounded-full bg-[#F2EDE3] px-2.5 py-1 text-[11px]")}>
+                      {sig}
+                    </span>
+                  ))}
+                </div>
               </div>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Discovered subcultures */}
-      {discoveries.length > 0 && (
-        <div className="w-full space-y-3">
-          <div className="flex items-center gap-2">
-            <Zap className="h-3.5 w-3.5 text-amber-500" />
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-              New subcultures discovered in your audience
-            </p>
-          </div>
-          {discoveries.map((sc: DiscoveredSubculture) => (
-            <div key={sc.provisional_slug} className="p-4 rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/40">
-              <div className="flex items-center gap-2 mb-1.5">
-                <span className="font-semibold text-foreground">{sc.name}</span>
-                <span className="text-xs bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 font-medium px-2 py-0.5 rounded-full">
-                  New · {sc.estimated_audience_pct}% of audience
-                </span>
-              </div>
-              <p className="text-sm text-muted-foreground leading-snug">{sc.description}</p>
             </div>
           ))}
         </div>
+      </section>
+
+      {/* Discovered subcultures */}
+      {discoveries.length > 0 && (
+        <section className="w-full">
+          <h3 className={cn(D, "mb-4 flex items-center gap-2 text-2xl")}>
+            <Zap className="h-5 w-5 fill-[#FFE14D] text-[#111110]" aria-hidden />
+            New subcultures discovered in your audience
+          </h3>
+          <div className="grid gap-5 sm:grid-cols-2">
+            {discoveries.map((sc: DiscoveredSubculture, i: number) => (
+              <div
+                key={sc.provisional_slug}
+                className={cn(CARD, "bg-[#FFF6C2] p-5", i === 0 ? "sm:-rotate-1" : "sm:rotate-1")}
+              >
+                <span className={cn(STICKER, "bg-[#FFE14D] px-3 py-1 text-xs shadow-none")}>
+                  New · {sc.estimated_audience_pct}% of audience
+                </span>
+                <p className={cn(D, "mt-3 text-2xl")}>{sc.name}</p>
+                <p className="mt-1 text-[15px] leading-snug text-[#4A463F]">{sc.description}</p>
+              </div>
+            ))}
+          </div>
+        </section>
       )}
 
-      <div className="w-full flex flex-col items-center gap-3">
-        <button
-          onClick={onEnterDashboard}
-          className="w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-indigo-600 text-white font-semibold hover:bg-indigo-700 transition-colors shadow-sm"
-        >
+      <div className="flex w-full flex-col items-center gap-4">
+        <button onClick={onEnterDashboard} className={cn(BTN_GO, "w-full sm:w-auto")}>
           Explore your full dashboard
-          <ChevronRight className="h-4 w-4" />
+          <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" aria-hidden />
         </button>
-        <p className="text-xs text-muted-foreground">
-          Your full audit lives in the Brand Audit tab — run it on any brand at any time.
+        <p className="text-center text-sm text-[#66625A]">
+          Your full audit lives in the Brand Audit tab. Run it on any brand, any time.
         </p>
       </div>
     </div>
@@ -339,23 +328,15 @@ export default function OnboardingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      {/* Top bar */}
-      <header className="border-b border-border bg-card/80 backdrop-blur-md">
-        <div className="max-w-screen-md mx-auto px-6 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="relative">
-              <Radio className="h-5 w-5 text-indigo-500" />
-              <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-indigo-500 animate-pulse" />
-            </div>
-            <span className="font-bold text-foreground tracking-tight text-sm">CulturePulse</span>
-          </div>
+    <div className={cn(BRAND_ROOT, "flex min-h-screen flex-col overflow-x-hidden")}>
+      <header className="sticky top-0 z-30 border-b-2 border-[#111110] bg-[#F2EDE3]/90 backdrop-blur-md">
+        <div className="mx-auto flex h-[72px] max-w-[1360px] items-center justify-between px-4 sm:px-6 lg:px-11">
+          <Wordmark />
           <Steps current={step} />
         </div>
       </header>
 
-      {/* Content */}
-      <main className="flex-1 flex items-start justify-center px-4 sm:px-6 py-12 overflow-y-auto">
+      <main className="flex flex-1 items-start justify-center px-4 py-10 sm:px-6 sm:py-12">
         <div className="w-full">
           {step === 1 && <StepWatch onNext={() => setStep(2)} />}
           {step === 2 && (
@@ -368,11 +349,7 @@ export default function OnboardingPage() {
             />
           )}
           {step === 3 && auditResult && (
-            <StepResults
-              handle={auditHandle}
-              result={auditResult}
-              onEnterDashboard={handleEnterDashboard}
-            />
+            <StepResults handle={auditHandle} result={auditResult} onEnterDashboard={handleEnterDashboard} />
           )}
         </div>
       </main>
