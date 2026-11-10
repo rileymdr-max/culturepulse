@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { ArrowLeft, ArrowRight, AlertCircle, Bell, Check, Loader2, FileText, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -34,11 +35,45 @@ function Section({ title, children, className }: { title: string; children: Reac
   );
 }
 
-function Chips({ items }: { items: string[] }) {
+/**
+ * Short terms render as chips; phrases (long average length) render as a list.
+ * Long lists show the first `limit` items with a Show all toggle.
+ */
+function Chips({ items, limit = 15 }: { items: string[]; limit?: number }) {
+  const [expanded, setExpanded] = useState(false);
   if (!items.length) return <p className="text-sm text-muted-foreground">None recorded yet.</p>;
+
+  const avg = items.reduce((n, s) => n + s.length, 0) / items.length;
+  const asList = avg > 26;
+  const shown = expanded ? items : items.slice(0, limit);
+  const hidden = items.length - shown.length;
+
   return (
-    <div className="flex flex-wrap gap-1.5">
-      {items.map((item) => <span key={item} className={chip}>{item}</span>)}
+    <div>
+      {asList ? (
+        <ul className="space-y-1.5 text-sm leading-relaxed">
+          {shown.map((item) => (
+            <li key={item} className="flex gap-2">
+              <span aria-hidden className="mt-2 h-1 w-1 shrink-0 rounded-full bg-muted-foreground" />
+              {item}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <div className="flex flex-wrap gap-1.5">
+          {shown.map((item) => <span key={item} className={chip}>{item}</span>)}
+        </div>
+      )}
+      {items.length > limit && (
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="mt-3 text-sm font-medium text-primary underline-offset-4 hover:underline"
+        >
+          {expanded ? "Show fewer" : `Show all ${items.length}`}
+          {!expanded && <span className="sr-only"> ({hidden} more)</span>}
+        </button>
+      )}
     </div>
   );
 }
