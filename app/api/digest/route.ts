@@ -5,6 +5,8 @@ import { computeAccelerationScore } from "@/lib/monitor-engine";
 
 // Called by Vercel Cron every Monday at 8 AM UTC.
 export const maxDuration = 60;
+// Never prerender: this route sends emails / runs scrapers and must only run when called.
+export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   const cronSecret = process.env.CRON_SECRET;

@@ -4,6 +4,8 @@ import { runAllActiveMonitors } from "@/lib/monitor-engine";
 // Called by Vercel Cron every 6 hours.
 // Vercel injects Authorization: Bearer {CRON_SECRET} automatically.
 export const maxDuration = 300;
+// Never prerender: this route sends emails / runs scrapers and must only run when called.
+export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   const cronSecret = process.env.CRON_SECRET;
