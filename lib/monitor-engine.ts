@@ -26,7 +26,14 @@ function buildSearchQuery(subculture: Subculture): string {
 
 export async function runMonitor(monitor: MonitorWithSubculture): Promise<void> {
   const query = buildSearchQuery(monitor.subculture);
-  const signals = await enrichSubcultureWithSignals(query);
+  // Only scrape what this monitor stores. Snapshots are reddit + twitter only,
+  // so skipping TikTok/YouTube/Instagram/Trends avoids their slower actors.
+  const platforms = monitor.platforms.filter((p) => p === "reddit" || p === "twitter");
+  if (platforms.length === 0) {
+    await prisma.monitor.update({ where: { id: monitor.id }, data: { lastRunAt: new Date() } });
+    return;
+  }
+  const signals = await enrichSubcultureWithSignals(query, platforms);
 
   const snapshotRows: Array<{
     monitorId: string;
@@ -97,29 +104,89 @@ export async function runMonitor(monitor: MonitorWithSubculture): Promise<void> 
   });
 }
 
-export async function runAllActiveMonitors(): Promise<{
+/** Max monitors scraped at once. Each runs up to 2 Apify actors, so 4 → ≤8 concurrent Apify runs. */
+export const MONITOR_CONCURRENCY = 4;
+/**
+ * Stop starting new monitors after this long. A monitor takes at most ~65s
+ * (Twitter actor 50s + 15s abort margin), so anything started before 200s
+ * finishes inside the 300s function limit. Monitors not started are reported
+ * as skipped and, being oldest by lastRunAt, go first next run.
+ */
+export const MONITOR_START_BUDGET_MS = 200_000;
+
+export type MonitorRunResult = {
+  monitorId: string;
+  status: "ok" | "failed" | "skipped";
+  error?: string;
+  durationMs?: number;
+};
+
+export type MonitorRunSummary = {
   ran: number;
   failed: number;
   skipped: number;
-}> {
-  const monitors = await prisma.monitor.findMany({
-    where: { status: "active" },
-    include: { subculture: true },
-  });
+  results: MonitorRunResult[];
+};
 
-  let ran = 0;
-  let failed = 0;
-  const skipped = 0;
+/**
+ * Runs monitors with a concurrency cap. One monitor failing never stops the
+ * others; each gets its own result entry with status and error message.
+ */
+export async function runMonitors(
+  monitors: MonitorWithSubculture[],
+  {
+    concurrency = MONITOR_CONCURRENCY,
+    startBudgetMs = MONITOR_START_BUDGET_MS,
+    logTag = "monitor-engine",
+  }: { concurrency?: number; startBudgetMs?: number; logTag?: string } = {}
+): Promise<MonitorRunSummary> {
+  const startedAt = Date.now();
+  const results: MonitorRunResult[] = new Array(monitors.length);
+  let next = 0;
 
-  for (const monitor of monitors) {
-    try {
-      await runMonitor(monitor);
-      ran++;
-    } catch (err) {
-      console.error(`[monitor-engine] failed monitor ${monitor.id}:`, err);
-      failed++;
+  async function worker() {
+    while (next < monitors.length) {
+      const i = next++;
+      const monitor = monitors[i];
+      if (Date.now() - startedAt > startBudgetMs) {
+        results[i] = { monitorId: monitor.id, status: "skipped", error: "Time budget reached" };
+        continue;
+      }
+      const t0 = Date.now();
+      try {
+        await runMonitor(monitor);
+        results[i] = { monitorId: monitor.id, status: "ok", durationMs: Date.now() - t0 };
+      } catch (err) {
+        console.error(`[${logTag}] failed monitor ${monitor.id}:`, err);
+        results[i] = {
+          monitorId: monitor.id,
+          status: "failed",
+          error: err instanceof Error ? err.message : String(err),
+          durationMs: Date.now() - t0,
+        };
+      }
     }
   }
 
-  return { ran, failed, skipped };
+  await Promise.all(
+    Array.from({ length: Math.max(1, Math.min(concurrency, monitors.length)) }, worker)
+  );
+
+  const count = (s: MonitorRunResult["status"]) => results.filter((r) => r.status === s).length;
+  const summary = { ran: count("ok"), failed: count("failed"), skipped: count("skipped"), results };
+  console.log(
+    `[${logTag}] ran=${summary.ran} failed=${summary.failed} skipped=${summary.skipped} ` +
+      `in ${Math.round((Date.now() - startedAt) / 1000)}s`
+  );
+  return summary;
+}
+
+export async function runAllActiveMonitors(): Promise<MonitorRunSummary> {
+  const monitors = await prisma.monitor.findMany({
+    where: { status: "active" },
+    include: { subculture: true },
+    // Least recently run first, so anything skipped on a busy run goes first next time.
+    orderBy: { lastRunAt: { sort: "asc", nulls: "first" } },
+  });
+  return runMonitors(monitors, { logTag: "monitors/run" });
 }

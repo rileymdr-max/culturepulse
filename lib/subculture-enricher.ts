@@ -488,15 +488,27 @@ async function enrichTrends(query: string): Promise<TrendsSignal | undefined> {
 
 // ─── Main enricher ────────────────────────────────────────────────────────────
 
-export async function enrichSubcultureWithSignals(query: string): Promise<SubcultureSignalData> {
+export type SignalPlatform = "reddit" | "tiktok" | "twitter" | "youtube" | "instagram" | "trends";
+
+/**
+ * Scrapes live signals for a query. Pass `platforms` to scrape only those
+ * sources (e.g. monitors only store reddit + twitter, so skipping the slower
+ * TikTok/Instagram actors saves up to ~90s per run). Omit it to scrape all.
+ */
+export async function enrichSubcultureWithSignals(
+  query: string,
+  platforms?: readonly string[]
+): Promise<SubcultureSignalData> {
+  const want = (p: SignalPlatform) => !platforms || platforms.includes(p);
+  const skip = Promise.resolve(undefined);
   const [redditResult, tiktokResult, twitterResult, youtubeResult, instagramResult, trendsResult] =
     await Promise.allSettled([
-      enrichReddit(query),
-      enrichTikTok(query),
-      enrichTwitter(query),
-      enrichYouTube(query),
-      enrichInstagram(query),
-      enrichTrends(query),
+      want("reddit") ? enrichReddit(query) : skip,
+      want("tiktok") ? enrichTikTok(query) : skip,
+      want("twitter") ? enrichTwitter(query) : skip,
+      want("youtube") ? enrichYouTube(query) : skip,
+      want("instagram") ? enrichInstagram(query) : skip,
+      want("trends") ? enrichTrends(query) : skip,
     ]);
 
   return {
