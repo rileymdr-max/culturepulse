@@ -196,7 +196,7 @@ model Monitor {
   userId       String
   subcultureId String
   status       String    @default("active") // active | paused
-  platforms    String[]  // ["reddit", "twitter"]
+  platforms    String[]  // any of MONITOR_PLATFORMS in lib/acceleration.ts
   lastRunAt             DateTime?
   lastBreakoutAlertAt   DateTime?
   createdAt             DateTime  @default(now())
@@ -318,7 +318,7 @@ model AuditLog {
 model MonitorSnapshot {
   id         String   @id @default(cuid())
   monitorId  String
-  platform   String   // "reddit" | "twitter"
+  platform   String   // reddit | twitter | tiktok | youtube | instagram | trends
   postCount  Int
   engagement Int
   topPosts   Json     // { title, url, score, comments? }[]
