@@ -7,9 +7,8 @@ import { NavHeader } from "@/components/nav-header";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useMonitors } from "@/hooks/use-monitors";
-import { useBriefs } from "@/hooks/use-briefs";
 import { useWorkspaces } from "@/hooks/use-workspace";
-import { useCheckout, useBillingPortal, useCurrentPlan } from "@/hooks/use-billing";
+import { useCheckout, useBillingInfo, useBillingPortal, useCurrentPlan } from "@/hooks/use-billing";
 import { PLANS, PLAN_ORDER, hasPlanAccess, type PlanId } from "@/lib/plans";
 
 const price = (n: number) => `$${n.toLocaleString("en-US")}`;
@@ -74,6 +73,12 @@ function PlanCard({ planId, currentPlanId, onManage, managing }: {
             {f}
           </li>
         ))}
+        {plan.comingSoon?.map((f) => (
+          <li key={f} className="flex gap-2.5 text-muted-foreground">
+            <span className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+            {f} <span className="text-xs">(coming soon)</span>
+          </li>
+        ))}
       </ul>
 
       <div className="mt-8">
@@ -125,12 +130,13 @@ function BillingPageInner() {
   const plan = PLANS[currentPlan];
 
   const { data: monitorsData } = useMonitors();
-  const { data: briefsData } = useBriefs();
+  const { data: billingData } = useBillingInfo();
   const { data: wsData } = useWorkspaces();
   const { mutate: openPortal, isPending: openingPortal } = useBillingPortal();
 
   const monitorCount = monitorsData?.monitors?.length ?? 0;
-  const briefCount = briefsData?.briefs?.length ?? 0;
+  const briefCount = billingData?.usage?.briefsThisMonth ?? 0;
+  const auditCount = billingData?.usage?.brandAudits ?? 0;
   const wsCount = wsData?.workspaces?.length ?? 0;
   const paid = currentPlan !== "free";
 
@@ -179,12 +185,17 @@ function BillingPageInner() {
           </div>
           <div className="space-y-5">
             <UsageMeter label="Active monitors" used={monitorCount} limit={plan.limits.monitors} />
-            <UsageMeter label="Content briefs" used={briefCount} limit={plan.limits.briefs} />
+            <UsageMeter label="Content briefs this month" used={briefCount} limit={plan.limits.briefs} />
+            <UsageMeter
+              label={plan.limits.brandAuditPeriod === "lifetime" ? "Trial Brand Audit" : "Brand Audits this month"}
+              used={auditCount}
+              limit={plan.limits.brandAudits}
+            />
             {hasPlanAccess(currentPlan, "agency") && (
               <UsageMeter label="Workspaces" used={wsCount} limit={plan.limits.workspaces} />
             )}
             {!hasPlanAccess(currentPlan, "pro") && (
-              <p className="text-sm text-muted-foreground">Creating your own subculture profiles is available on Pro and above.</p>
+              <p className="text-sm text-muted-foreground">Brand Audits, Compare and creating your own subculture profiles are included on Pro and above.</p>
             )}
           </div>
         </section>

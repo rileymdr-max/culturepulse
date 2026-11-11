@@ -22,10 +22,16 @@ async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
   return res.json();
 }
 
+export interface PlanUsage {
+  briefsThisMonth: number;
+  /** Brand Audits in the plan's period: this month, or ever on trial plans. */
+  brandAudits: number;
+}
+
 export function useBillingInfo() {
   return useQuery({
     queryKey: ["billing"],
-    queryFn: () => fetchJson<{ billing: BillingInfo }>("/api/billing"),
+    queryFn: () => fetchJson<{ billing: BillingInfo; usage: PlanUsage }>("/api/billing"),
   });
 }
 

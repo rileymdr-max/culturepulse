@@ -9,6 +9,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useBrandAudit } from "@/hooks/use-brand-audit";
 import { useAudience } from "@/hooks/use-audience";
 import { useCreateBrief } from "@/hooks/use-briefs";
+import { useBillingInfo, useCurrentPlan } from "@/hooks/use-billing";
+import { canCreateCustomSubculture, getPlan } from "@/lib/plans";
 import { formatNumber } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import type { BrandAuditResult, MatchedSubculture, DiscoveredSubculture } from "@/lib/types/brand-audit";
@@ -58,6 +60,36 @@ function MeterBar({ value, className, fill = "bg-primary" }: { value: number; cl
     <div className={cn("h-1.5 overflow-hidden rounded-full bg-muted", className)}>
       <div className={cn("h-full rounded-full", fill)} style={{ width: `${Math.min(100, Math.max(0, value))}%` }} />
     </div>
+  );
+}
+
+// Allowance ──────────────────────────────────────────────────────────────────
+
+/** How many Brand Audits the plan has left, with an upgrade link when none are. */
+function AuditAllowance() {
+  const plan = getPlan(useCurrentPlan());
+  const { data } = useBillingInfo();
+  const { brandAudits: limit, brandAuditPeriod } = plan.limits;
+  if (limit === -1 || !data?.usage) return null;
+  const left = Math.max(0, limit - data.usage.brandAudits);
+  const trial = brandAuditPeriod === "lifetime";
+
+  return (
+    <p className="mt-3 text-sm text-muted-foreground">
+      {trial
+        ? left > 0
+          ? "Your plan includes 1 trial Brand Audit."
+          : "You’ve used your trial Brand Audit."
+        : `${left} of ${limit} Brand Audits left this month.`}
+      {left === 0 && (
+        <>
+          {" "}
+          <Link href="/dashboard/billing" className="font-medium text-foreground underline underline-offset-4">
+            {trial ? "Upgrade to Pro for 5 a month" : "Upgrade to Studio for unlimited"}
+          </Link>
+        </>
+      )}
+    </p>
   );
 }
 
@@ -156,6 +188,7 @@ export default function BrandAuditPage() {
           <p className="mt-2 max-w-2xl text-muted-foreground">
             Enter a brand’s social handle to see which subcultures make up its audience, and which ones haven’t been mapped yet.
           </p>
+          <AuditAllowance />
         </header>
 
         {/* Input */}
@@ -504,6 +537,7 @@ function DiscoveredRow({ rank, sub }: { rank: number; sub: DiscoveredSubculture 
   const [addState, setAddState] = useState<AddState>("idle");
   const [savedSlug, setSavedSlug] = useState<string | null>(null);
   const { mutate: createBrief, isPending: isGeneratingBrief, data: briefResult } = useCreateBrief();
+  const canSave = canCreateCustomSubculture(useCurrentPlan());
 
   async function handleAddToLibrary() {
     setAddState("loading");
@@ -585,6 +619,12 @@ function DiscoveredRow({ rank, sub }: { rank: number; sub: DiscoveredSubculture 
               <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden />
             </Link>
           </>
+        ) : !canSave ? (
+          <Link href="/dashboard/billing">
+            <Button size="sm" variant="outline">
+              <Plus className="h-3.5 w-3.5" />Add to Library · Pro
+            </Button>
+          </Link>
         ) : (
           <Button
             size="sm"

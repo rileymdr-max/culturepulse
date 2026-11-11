@@ -16,8 +16,10 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { hasAnalysisTools } from "@/lib/plans";
+import { getUserPlan } from "@/lib/plan-usage";
 import { z } from "zod";
-import { requireSession, enforceRateLimit, badRequest, serverError } from "@/lib/api-helpers";
+import { requireSession, enforceRateLimit, badRequest, serverError, paymentRequired } from "@/lib/api-helpers";
 import { getCommunitiesForComparison } from "@/lib/platforms";
 import { computePairwiseScores } from "@/lib/similarity";
 import type { CommunityData } from "@/lib/platforms";
@@ -37,6 +39,13 @@ export async function POST(req: NextRequest) {
   // ── Rate limit: 20 compares / minute ─────────────────────────────────────
   const rateLimitError = await enforceRateLimit(req, session.user.id, "compare", 20);
   if (rateLimitError) return rateLimitError;
+
+  // ── Plan: Compare is a Pro feature ──
+  const plan = await getUserPlan(session.user.id, session.user.email);
+  if (!plan) return serverError("User not found.");
+  if (!hasAnalysisTools(plan)) {
+    return paymentRequired("Compare is available on Pro and above. Upgrade to compare communities.");
+  }
 
   // ── Validate ──────────────────────────────────────────────────────────────
   let body: unknown;

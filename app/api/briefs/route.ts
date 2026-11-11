@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireSession, badRequest, serverError, paymentRequired } from "@/lib/api-helpers";
-import { canGenerateBrief } from "@/lib/plans";
-import { getEffectivePlan } from "@/lib/admin";
+import { canGenerateBrief, getPlan } from "@/lib/plans";
+import { countBriefsThisMonth, getUserPlan } from "@/lib/plan-usage";
 import { prisma, withDbRetry } from "@/lib/prisma";
 import { generateContentBrief, type BriefTopPost } from "@/lib/content-intelligence";
 import { computeAccelerationSignal } from "@/lib/acceleration";
@@ -57,17 +57,16 @@ export async function POST(req: NextRequest) {
   const { subcultureId, subcultureSlug, monitorId } = parsed.data;
 
   try {
-    // Admin always gets agency plan — skip DB lookup for plan check
-    const effectivePlan = getEffectivePlan(session.user.email, "free");
-    if (effectivePlan === "free") {
-      // Non-admin: look up actual plan from DB
-      const user = await withDbRetry(() =>
-        prisma.user.findUnique({ where: { id: session.user.id }, select: { plan: true } })
+    const plan = await getUserPlan(session.user.id, session.user.email);
+    if (!plan) return serverError("User not found.");
+    const usedThisMonth = await countBriefsThisMonth(session.user.id);
+    if (!canGenerateBrief(plan, usedThisMonth)) {
+      const limit = getPlan(plan).limits.briefs;
+      return paymentRequired(
+        limit === 0
+          ? "Content briefs are available on Starter and above. Upgrade to generate briefs."
+          : `You've used all ${limit} content briefs on your ${getPlan(plan).name} plan this month. Upgrade for more.`
       );
-      if (!user) return serverError("User not found.");
-      if (!canGenerateBrief(user.plan)) {
-        return paymentRequired("Content brief generation is available on Starter and above. Upgrade to generate briefs.");
-      }
     }
 
     let subculture = await withDbRetry(() =>

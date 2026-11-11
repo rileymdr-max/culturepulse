@@ -15,7 +15,9 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { requireSession, enforceRateLimit, badRequest, serverError } from "@/lib/api-helpers";
+import { requireSession, enforceRateLimit, badRequest, serverError, paymentRequired } from "@/lib/api-helpers";
+import { canRunBrandAudit, getPlan } from "@/lib/plans";
+import { countBrandAudits, getUserPlan } from "@/lib/plan-usage";
 import { runBrandAudit } from "@/lib/brand-audit";
 import { prisma } from "@/lib/prisma";
 
@@ -62,6 +64,18 @@ export async function POST(req: NextRequest) {
   const { handles, platform, excludedPlatforms } = parsed.data;
 
   try {
+    const plan = await getUserPlan(session.user.id, session.user.email);
+    if (!plan) return serverError("User not found.");
+    const used = await countBrandAudits(session.user.id, plan);
+    if (!canRunBrandAudit(plan, used)) {
+      const { limits, name } = getPlan(plan);
+      return paymentRequired(
+        limits.brandAuditPeriod === "lifetime"
+          ? "You've used your trial Brand Audit. Brand Audits are included on Pro and above."
+          : `You've used all ${limits.brandAudits} Brand Audits on your ${name} plan this month. Upgrade to Studio for unlimited audits.`
+      );
+    }
+
     const result = await runBrandAudit(handles, platform, excludedPlatforms);
 
     // Fire-and-forget: save audit to history (don't block the response)

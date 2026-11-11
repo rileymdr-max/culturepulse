@@ -3,7 +3,7 @@
 import { useState, useCallback } from "react";
 import {
   TrendingUp, TrendingDown, Minus, Trash2, Pause, Play,
-  AlertCircle, BookOpen, ArrowUpRight, FileText, Loader2, RefreshCw, Check,
+  AlertCircle, BookOpen, ArrowUpRight, FileText, Loader2, RefreshCw, Check, Lock,
 } from "lucide-react";
 import Link from "next/link";
 import {
@@ -28,6 +28,8 @@ import {
   type MonitorTopPost,
 } from "@/hooks/use-monitors";
 import { useCreateBrief } from "@/hooks/use-briefs";
+import { useCurrentPlan } from "@/hooks/use-billing";
+import { getPlan } from "@/lib/plans";
 import { useQueryClient } from "@tanstack/react-query";
 
 const PLATFORM_LABEL: Record<string, string> = {
@@ -261,6 +263,7 @@ function MonitorCard({ monitor }: { monitor: MonitorData }) {
   const { mutate: runNow, isPending: isRunning } = useRunMonitor();
   const { mutate: createBrief, isPending: isGeneratingBrief, data: briefResult } = useCreateBrief();
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const { limits } = getPlan(useCurrentPlan());
 
   const { signal } = monitor;
   const tier = signalTier(signal);
@@ -325,8 +328,9 @@ function MonitorCard({ monitor }: { monitor: MonitorData }) {
         </div>
       </header>
 
-      {/* Acceleration breakdown */}
-      <div>
+      {/* Acceleration breakdown (Starter and above; a locked preview on Free) */}
+      <div className="relative">
+        <div className={cn(!limits.accelerationScores && "pointer-events-none select-none blur-[6px]")} aria-hidden={!limits.accelerationScores}>
         <div className="grid grid-cols-3 divide-x-2 divide-[#E4DDD0] rounded-xl border-2 border-[#E4DDD0]">
           <Metric label="Velocity">
             <span className={cn(signal.velocity > 0 && TIER[tier].text)}>{signed(signal.velocity)}</span>
@@ -342,6 +346,16 @@ function MonitorCard({ monitor }: { monitor: MonitorData }) {
           <p className={cn(M, "mt-2 text-xs text-[#5E5A52] tabular-nums")}>
             {perPlatform.map(({ p, v }) => `${platformLabel(p)} ${signed(v)}`).join(" · ")}
           </p>
+        )}
+        </div>
+        {!limits.accelerationScores && (
+          <Link
+            href="/dashboard/billing"
+            className="absolute inset-0 flex items-center justify-center gap-1.5 text-sm font-bold underline-offset-4 hover:underline"
+          >
+            <Lock className="h-3.5 w-3.5" aria-hidden />
+            Acceleration scoring is on Starter and above
+          </Link>
         )}
       </div>
 
@@ -378,6 +392,10 @@ function MonitorCard({ monitor }: { monitor: MonitorData }) {
         {briefResult?.brief ? (
           <Link href={`/dashboard/briefs/${briefResult.brief.id}`} className={BTN_GO_SM}>
             <Check className="h-3.5 w-3.5" aria-hidden />View brief
+          </Link>
+        ) : limits.briefs === 0 ? (
+          <Link href="/dashboard/billing" className={BTN_GO_SM}>
+            <Lock className="h-3.5 w-3.5" aria-hidden />Briefs on Starter
           </Link>
         ) : (
           <button
