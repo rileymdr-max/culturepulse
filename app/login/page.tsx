@@ -8,12 +8,14 @@ import { cn } from "@/lib/utils";
 import { BTN_GO, INPUT, LABEL } from "@/components/marketing/brand";
 import { AuthShell, FormNotice } from "@/components/marketing/auth-shell";
 import { DemoButton } from "@/components/demo";
+import { PENDING_APPROVAL_ERROR } from "@/lib/approval";
 
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") ?? "/dashboard";
   const justRegistered = searchParams.get("registered") === "true";
+  const justRequested = searchParams.get("pending") === "true";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -32,7 +34,9 @@ function LoginForm() {
         redirect: false,
       });
 
-      if (result?.error) {
+      if (result?.error === PENDING_APPROVAL_ERROR) {
+        setError("Your account is waiting for approval. We’ll email you as soon as it’s ready.");
+      } else if (result?.error) {
         setError("That email and password don’t match. Check them and try again.");
       } else {
         router.push(callbackUrl);
@@ -49,6 +53,12 @@ function LoginForm() {
     <>
       {justRegistered && !error && (
         <FormNotice tone="success">Your account is ready. Sign in to get started.</FormNotice>
+      )}
+      {justRequested && !error && (
+        <FormNotice tone="success">
+          Thanks for signing up! Your account is waiting for approval. We&rsquo;ll email you as soon as it&rsquo;s
+          ready. In the meantime, explore the live demo below.
+        </FormNotice>
       )}
       {error && <FormNotice tone="error">{error}</FormNotice>}
 

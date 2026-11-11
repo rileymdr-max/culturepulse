@@ -45,7 +45,14 @@ interface AuditLogEntry {
 export default function AdminPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
-  const [tab, setTab] = useState<"library" | "audits">("library");
+  const [tab, setTab] = useState<"signups" | "library" | "audits">("library");
+  const [pendingCount, setPendingCount] = useState(0);
+
+  // Deep link from the "new sign-up" email: /dashboard/admin?tab=signups
+  useEffect(() => {
+    const t = new URLSearchParams(window.location.search).get("tab");
+    if (t === "signups" || t === "library" || t === "audits") setTab(t);
+  }, []);
 
   useEffect(() => {
     if (status === "unauthenticated") router.replace("/login");
@@ -82,6 +89,7 @@ export default function AdminPage() {
         {/* Tab bar */}
         <div className="flex gap-1 border-b border-border">
           {([
+            { key: "signups", label: pendingCount ? `Sign-ups (${pendingCount})` : "Sign-ups", icon: Users },
             { key: "library", label: "Subculture Library", icon: Layers },
             { key: "audits",  label: "Audit History",      icon: BarChart2 },
           ] as const).map(({ key, label, icon: Icon }) => (
@@ -101,6 +109,7 @@ export default function AdminPage() {
           ))}
         </div>
 
+        <SignupsTab visible={tab === "signups"} onPendingCount={setPendingCount} />
         {tab === "library" && <LibraryTab />}
         {tab === "audits"  && <AuditsTab />}
       </main>
@@ -279,6 +288,119 @@ function LibraryTab() {
           </table>
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── Sign-ups tab ─────────────────────────────────────────────────────────────
+
+interface SignupUser {
+  id: string;
+  name: string | null;
+  email: string;
+  createdAt: string;
+  approvedAt: string | null;
+}
+
+/** Always mounted (so the tab label can show the pending count); renders only when visible. */
+function SignupsTab({ visible, onPendingCount }: { visible: boolean; onPendingCount: (n: number) => void }) {
+  const [pending, setPending] = useState<SignupUser[]>([]);
+  const [approved, setApproved] = useState<SignupUser[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  const load = () =>
+    fetch("/api/admin/users")
+      .then((r) => r.json())
+      .then((d) => {
+        setPending(d.pending ?? []);
+        setApproved(d.approved ?? []);
+        onPendingCount(d.pending?.length ?? 0);
+      })
+      .finally(() => setLoading(false));
+
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function act(user: SignupUser, action: "approve" | "decline") {
+    if (action === "decline" && !window.confirm(`Decline ${user.email}? Their pending account will be deleted.`)) return;
+    setBusy(user.id);
+    setNotice(null);
+    try {
+      const res = await fetch(`/api/admin/users/${user.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+      const d = await res.json();
+      if (!res.ok) setNotice(d.error ?? "Something went wrong.");
+      else if (action === "approve")
+        setNotice(
+          d.emailed
+            ? `Approved ${user.email}. They've been emailed.`
+            : `Approved ${user.email}, but the email didn't send. Let them know they can sign in.`
+        );
+      else setNotice(`Declined ${user.email}.`);
+      await load();
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  if (!visible) return null;
+
+  const fmt = (iso: string) =>
+    new Date(iso).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+
+  return (
+    <div className="space-y-8">
+      {notice && <p className="rounded-lg border border-border bg-card px-4 py-3 text-sm">{notice}</p>}
+
+      <section className="space-y-3">
+        <h2 className="text-sm font-semibold text-foreground">Waiting for approval</h2>
+        {loading ? (
+          <Skeleton className="h-14 rounded-lg" />
+        ) : pending.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No one is waiting. New sign-ups appear here and you&rsquo;ll get an email.</p>
+        ) : (
+          <div className="rounded-xl border border-border overflow-hidden divide-y divide-border">
+            {pending.map((u) => (
+              <div key={u.id} className="bg-card flex flex-wrap items-center gap-3 px-4 py-3">
+                <div className="flex-1 min-w-[200px]">
+                  <p className="text-sm font-medium text-foreground">{u.name ?? "No name"}</p>
+                  <p className="text-xs text-muted-foreground">{u.email} · signed up {fmt(u.createdAt)}</p>
+                </div>
+                <Button size="sm" disabled={busy === u.id} onClick={() => act(u, "approve")}>
+                  <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
+                  Approve
+                </Button>
+                <Button size="sm" variant="outline" disabled={busy === u.id} onClick={() => act(u, "decline")}>
+                  Decline
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-sm font-semibold text-foreground">Recently approved</h2>
+        {!loading && (
+          <div className="rounded-xl border border-border overflow-hidden divide-y divide-border">
+            {approved.map((u) => (
+              <div key={u.id} className="bg-card flex flex-wrap items-center gap-3 px-4 py-2.5">
+                <p className="flex-1 min-w-[200px] text-sm text-foreground">
+                  {u.name ?? "No name"} <span className="text-muted-foreground">· {u.email}</span>
+                </p>
+                <p className="text-xs text-muted-foreground">approved {u.approvedAt ? fmt(u.approvedAt) : ""}</p>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
     </div>
   );
 }

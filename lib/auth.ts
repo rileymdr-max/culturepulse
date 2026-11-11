@@ -12,6 +12,9 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getEffectivePlan } from "@/lib/plans";
 import { getOrRefreshDemoUser, isDemoEmail } from "@/lib/demo";
+import { PENDING_APPROVAL_ERROR } from "@/lib/approval";
+
+const isAdmin = (email: string) => email === "rileymdr@gmail.com";
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -48,6 +51,11 @@ export const authOptions: NextAuthOptions = {
           user.hashedPassword
         );
         if (!passwordValid) return null;
+
+        // New sign-ups wait for admin approval (see /dashboard/admin → Sign-ups).
+        if (!user.approvedAt && !isAdmin(user.email)) {
+          throw new Error(PENDING_APPROVAL_ERROR);
+        }
 
         return {
           id: user.id,

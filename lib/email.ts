@@ -202,3 +202,47 @@ export async function sendWeeklyDigest(payload: WeeklyDigestPayload): Promise<vo
 function escHtml(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
+
+// ─── Sign-up approval ─────────────────────────────────────────────────────────
+
+const SITE_URL = (process.env.NEXTAUTH_URL || "https://www.culture-pulse.com").replace(/\/$/, "");
+
+function simpleEmailHtml(heading: string, paragraphs: string[], cta: { label: string; href: string }): string {
+  return `<!doctype html><html><body style="margin:0;padding:32px 16px;background:#F2EDE3;font-family:Helvetica,Arial,sans-serif;color:#111110;">
+  <div style="max-width:520px;margin:0 auto;background:#FFFDF8;border:2px solid #111110;border-radius:16px;padding:32px;">
+    <p style="margin:0 0 20px;font-size:14px;font-weight:800;letter-spacing:1px;">CULTURE<span style="color:#0B6B45;">PULSE</span></p>
+    <h1 style="margin:0 0 16px;font-size:24px;line-height:1.2;">${escHtml(heading)}</h1>
+    ${paragraphs.map((p) => `<p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:#3B3832;">${p}</p>`).join("")}
+    <a href="${cta.href}" style="display:inline-block;margin-top:8px;background:#0B6B45;color:#ffffff;font-weight:700;font-size:15px;text-decoration:none;padding:12px 24px;border-radius:999px;">${escHtml(cta.label)}</a>
+  </div>
+</body></html>`;
+}
+
+/** Tells the admin someone signed up and is waiting for approval. */
+export async function sendSignupRequest(payload: { toEmail: string; name: string; email: string }): Promise<void> {
+  await getResend().emails.send({
+    from: FROM,
+    to: payload.toEmail,
+    subject: `New CulturePulse sign-up: ${payload.name}`,
+    html: simpleEmailHtml(
+      "Someone wants in",
+      [`<strong>${escHtml(payload.name)}</strong> (${escHtml(payload.email)}) created an account and is waiting for your approval.`],
+      { label: "Review sign-ups", href: `${SITE_URL}/dashboard/admin?tab=signups` }
+    ),
+  });
+}
+
+/** Tells a new user their account was approved. */
+export async function sendAccountApproved(payload: { toEmail: string; toName: string | null }): Promise<void> {
+  const first = payload.toName?.split(" ")[0];
+  await getResend().emails.send({
+    from: FROM,
+    to: payload.toEmail,
+    subject: "You're in: your CulturePulse account is ready",
+    html: simpleEmailHtml(
+      first ? `You're in, ${first}` : "You're in",
+      ["Your CulturePulse account has been approved. Sign in to set up your first monitor and see which subcultures are about to break out."],
+      { label: "Sign in", href: `${SITE_URL}/login` }
+    ),
+  });
+}

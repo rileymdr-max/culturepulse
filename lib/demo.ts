@@ -38,7 +38,7 @@ export async function getOrRefreshDemoUser() {
   let demo = await prisma.user.findUnique({ where: { email: DEMO_EMAIL } });
   if (!demo) {
     demo = await prisma.user.create({
-      data: { email: DEMO_EMAIL, name: DEMO_NAME, plan: DEMO_PLAN, onboardedAt: new Date() },
+      data: { email: DEMO_EMAIL, name: DEMO_NAME, plan: DEMO_PLAN, onboardedAt: new Date(), approvedAt: new Date() },
     });
     await syncDemoData(demo.id).catch((err) => console.error("[demo] initial sync failed", err));
     return demo;

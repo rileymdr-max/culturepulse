@@ -33,7 +33,7 @@ export default function RegisterPage() {
       if (!res.ok) {
         setError(data.error ?? "We couldn’t create your account. Please try again.");
       } else {
-        router.push("/login?registered=true");
+        router.push(data.pending ? "/login?pending=true" : "/login?registered=true");
       }
     } catch {
       setError("Something went wrong on our side. Please try again.");
@@ -50,7 +50,7 @@ export default function RegisterPage() {
         </>
       }
       title="Create your account"
-      subtitle="Free plan with one monitor. No credit card."
+      subtitle="Free plan with one monitor. No credit card. New accounts are reviewed, usually within a day."
       switchPrompt="Already have an account?"
       switchHref="/login"
       switchLabel="Sign in"

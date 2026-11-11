@@ -60,6 +60,8 @@ model User {
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
   onboardedAt    DateTime?
+  /// Null until an admin approves the sign-up; unapproved users can't sign in.
+  approvedAt     DateTime?
   /// Set while "Run all now" is running for this user; blocks overlapping runs.
   monitorRunStartedAt DateTime?
 
