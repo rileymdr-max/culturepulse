@@ -6,6 +6,9 @@ import { ArrowLeft, AlertCircle, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { RadarChart, Radar, PolarGrid, PolarAngleAxis, ResponsiveContainer, Tooltip } from "recharts";
 import { NavHeader } from "@/components/nav-header";
+import { PlanGate } from "@/components/plan-gate";
+import { useCurrentPlan } from "@/hooks/use-billing";
+import { hasAnalysisTools } from "@/lib/plans";
 import { TrendingTopicsList } from "@/components/trending-topics-list";
 import { TrendingContentGrid } from "@/components/trending-content-grid";
 import { TopVoicesList } from "@/components/top-voices-list";
@@ -124,7 +127,8 @@ function ComparePageInner() {
     .map((id) => decodeURIComponent(id.trim()))
     .filter(Boolean);
 
-  const { data, isLoading, error } = useCompare(communityIds);
+  const canCompare = hasAnalysisTools(useCurrentPlan());
+  const { data, isLoading, error } = useCompare(canCompare ? communityIds : []);
   const communities = (data?.communities ?? []).filter((c): c is CommunityData => c !== null);
   const pairLabels = data?.pairLabels ?? [];
   const tokenColors = useTokenColors(SERIES_TOKENS);
@@ -145,7 +149,13 @@ function ComparePageInner() {
             : "Compare communities"}
         </h1>
 
-        {communityIds.length < 2 && !isLoading && (
+        {!canCompare && (
+          <PlanGate requiredPlan="pro" feature="Compare" className="mt-8">
+            {null}
+          </PlanGate>
+        )}
+
+        {canCompare && communityIds.length < 2 && !isLoading && (
           <div className="mt-8 rounded-xl border border-dashed border-border px-6 py-16 text-center">
             <h2 className="text-lg font-semibold">Nothing to compare yet</h2>
             <p className="mx-auto mt-2 max-w-md text-muted-foreground">

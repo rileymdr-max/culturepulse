@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { enrichSubcultureWithSignals, recheckInstagramEngagement } from "@/lib/subculture-enricher";
 import { computeAccelerationSignal, type SnapshotLike } from "@/lib/acceleration";
 import { sendBreakoutAlert } from "@/lib/email";
+import { getEffectivePlan, getPlan } from "@/lib/plans";
 import type { Monitor, Subculture } from "@prisma/client";
 
 /**
@@ -178,9 +179,10 @@ export async function runMonitor(monitor: MonitorWithSubculture): Promise<void> 
     // Fire alert in background — a failed email must not fail the monitor run
     const user = await prisma.user.findUnique({
       where: { id: monitor.userId },
-      select: { email: true, name: true },
+      select: { email: true, name: true, plan: true },
     });
-    if (user?.email) {
+    // Real-time breakout alerts are a Pro feature.
+    if (user?.email && getPlan(getEffectivePlan(user.email, user.plan)).limits.breakoutAlerts) {
       const latestSnap = snapshotRows[0];
       const topPost = Array.isArray(latestSnap?.topPosts) && latestSnap.topPosts.length > 0
         ? (latestSnap.topPosts[0] as { title: string; url: string; score: number })

@@ -1,3 +1,4 @@
+import { getEffectivePlan, getPlan } from "@/lib/plans";
 import { DEMO_EMAIL } from "@/lib/demo-policy";
 import { NextRequest, NextResponse } from "next/server";
 import { rejectUnlessCron } from "@/lib/cron-auth";
@@ -35,6 +36,7 @@ async function sendDigestToAllUsers(): Promise<number> {
       id: true,
       email: true,
       name: true,
+      plan: true,
       monitors: {
         where: { status: "active" },
         include: {
@@ -58,6 +60,8 @@ async function sendDigestToAllUsers(): Promise<number> {
   let sent = 0;
   for (const user of users) {
     if (!user.email) continue;
+    // The weekly digest is included on Starter and above.
+    if (!getPlan(getEffectivePlan(user.email, user.plan)).limits.weeklyDigest) continue;
 
     const monitors: DigestMonitor[] = user.monitors.map((m) => {
       const engagements = m.snapshots.map((s) => s.engagement);

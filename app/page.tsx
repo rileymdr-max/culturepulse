@@ -180,7 +180,7 @@ export default async function HomePage() {
         <section id="pricing" className="scroll-mt-20 border-t-2 border-[#111110] bg-[#FFFDF8]">
           <div className="mx-auto max-w-[1360px] px-4 py-20 sm:px-6 lg:px-11 lg:py-24">
             <h2 className={cn(D, "max-w-3xl text-5xl leading-[0.95] sm:text-6xl lg:text-7xl")}>
-              Plans from <span className="text-[#0B6B45]">$0</span>. Upgrade when you need more monitors.
+              Plans from <span className="text-[#0B6B45]">$0</span>. Upgrade when you need more depth.
             </h2>
             <div className="mt-14 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
               {PLAN_ORDER.map((id) => {
@@ -216,6 +216,12 @@ export default async function HomePage() {
                             aria-hidden
                           />
                           {f}
+                        </li>
+                      ))}
+                      {plan.comingSoon?.map((f) => (
+                        <li key={f} className={cn("flex gap-2.5", featured ? "text-white/70" : "text-[#66625A]")}>
+                          <span className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+                          {f} (coming soon)
                         </li>
                       ))}
                     </ul>

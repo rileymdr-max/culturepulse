@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { requireSession, badRequest, serverError } from "@/lib/api-helpers";
+import { requireSession, badRequest, serverError, paymentRequired } from "@/lib/api-helpers";
+import { canCreateCustomSubculture } from "@/lib/plans";
+import { getUserPlan } from "@/lib/plan-usage";
 import { generateSubcultureProfile } from "@/lib/subculture-generator";
 import { enrichSubcultureWithSignals } from "@/lib/subculture-enricher";
 import { prisma, withDbRetry } from "@/lib/prisma";
@@ -19,7 +21,7 @@ const generateSchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
-  const { error: authError } = await requireSession();
+  const { session, error: authError } = await requireSession();
   if (authError) return authError;
 
   let body: unknown;
@@ -35,6 +37,16 @@ export async function POST(req: NextRequest) {
   }
 
   const { name, seed, save, profile: prebuiltProfile, signal_data: prebuiltSignals } = parsed.data;
+
+  // ── Plan: previews (save: false) power Search on every plan; saving a new
+  // subculture to the library is the Pro "custom subculture" feature.
+  if (save) {
+    const plan = await getUserPlan(session.user.id, session.user.email);
+    if (!plan) return serverError("User not found.");
+    if (!canCreateCustomSubculture(plan)) {
+      return paymentRequired("Adding subcultures to your library is available on Pro and above.");
+    }
+  }
 
   try {
     let profile: SubcultureProfile;

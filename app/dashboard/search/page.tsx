@@ -14,6 +14,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import type { SubcultureProfile, SubcultureSignalData } from "@/lib/types/subculture";
 import { useCreateBrief } from "@/hooks/use-briefs";
+import { useCurrentPlan } from "@/hooks/use-billing";
+import { canCreateCustomSubculture } from "@/lib/plans";
 
 const RECENT_KEY = "speedbag:recent-discoveries";
 const SESSION_KEY = "culturepulse-search";
@@ -294,6 +296,7 @@ function ProfileCard({
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [savedSlug, setSavedSlug] = useState<string | null>(null);
   const { mutate: createBrief, isPending: isGeneratingBrief, data: briefResult, isError: isBriefError, reset: resetBrief } = useCreateBrief();
+  const canSave = canCreateCustomSubculture(useCurrentPlan());
 
   async function handleAddToLibrary() {
     setSaveState("saving");
@@ -384,6 +387,12 @@ function ProfileCard({
                   </Button>
                 </Link>
               </div>
+            ) : !canSave ? (
+              <Link href="/dashboard/billing">
+                <Button size="sm" variant="outline" className="gap-1.5">
+                  <Plus className="h-3.5 w-3.5" />Add to Library · Pro
+                </Button>
+              </Link>
             ) : (
               <Button
                 size="sm"

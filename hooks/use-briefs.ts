@@ -70,6 +70,7 @@ export function useCreateBrief() {
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["briefs"] });
+      qc.invalidateQueries({ queryKey: ["billing"] });
     },
   });
 }

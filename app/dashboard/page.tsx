@@ -4,12 +4,14 @@ import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowRight, Check, FileText, Loader2, Search } from "lucide-react";
+import { ArrowRight, Check, FileText, Loader2, Lock, Search } from "lucide-react";
 import { NavHeader } from "@/components/nav-header";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useMonitors, type MonitorData } from "@/hooks/use-monitors";
 import { useBriefs, useCreateBrief } from "@/hooks/use-briefs";
+import { useCurrentPlan } from "@/hooks/use-billing";
+import { getPlan } from "@/lib/plans";
 import { signalTier, type SignalTier } from "@/lib/signal-tier";
 import { urgencyOf } from "@/lib/brief-urgency";
 import { MONITOR_PLATFORMS } from "@/lib/acceleration";
@@ -280,6 +282,7 @@ function LeadCard({ monitor: m, total }: { monitor: MonitorData; total: number }
   const tier = signalTier(m.signal);
   const moving = movingPlatforms(m);
   const top = moving[0];
+  const { limits } = getPlan(useCurrentPlan());
   const up = moving.filter((x) => x.v > 0).slice(0, 2);
   const { mutate: createBrief, isPending, data: briefResult } = useCreateBrief();
 
@@ -320,7 +323,11 @@ function LeadCard({ monitor: m, total }: { monitor: MonitorData; total: number }
 
       <Sparkline series={trendSeries(m)} height={88} stroke={F2.green} fill={F2.mint} className="px-6" />
 
-      <dl className="grid grid-cols-2 border-t-2 border-[#111110] sm:grid-cols-4">
+      <div className="relative border-t-2 border-[#111110]">
+      <dl
+        className={cn("grid grid-cols-2 sm:grid-cols-4", !limits.accelerationScores && "pointer-events-none select-none blur-[6px]")}
+        aria-hidden={!limits.accelerationScores}
+      >
         {[
           { k: "Velocity", v: signed(m.signal.velocity) },
           { k: "Momentum", v: m.signal.momentum },
@@ -341,12 +348,27 @@ function LeadCard({ monitor: m, total }: { monitor: MonitorData; total: number }
           </div>
         ))}
       </dl>
+      {!limits.accelerationScores && (
+        <Link
+          href="/dashboard/billing"
+          className="absolute inset-0 flex items-center justify-center gap-1.5 text-sm font-bold underline-offset-4 hover:underline"
+        >
+          <Lock className="h-3.5 w-3.5" aria-hidden />
+          Acceleration scoring is on Starter and above
+        </Link>
+      )}
+      </div>
 
       <div className="flex flex-wrap items-center gap-3 border-t-2 border-[#111110] px-5 py-4">
         {briefResult?.brief ? (
           <Link href={`/dashboard/briefs/${briefResult.brief.id}`} className={BTN_GO_SM}>
             <Check className="h-3.5 w-3.5" aria-hidden />
             View brief
+          </Link>
+        ) : limits.briefs === 0 ? (
+          <Link href="/dashboard/billing" className={BTN_GO_SM}>
+            <Lock className="h-3.5 w-3.5" aria-hidden />
+            Briefs on Starter
           </Link>
         ) : (
           <button
