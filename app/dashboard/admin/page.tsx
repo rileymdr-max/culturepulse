@@ -325,8 +325,13 @@ function SignupsTab({ visible, onPendingCount }: { visible: boolean; onPendingCo
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function act(user: SignupUser, action: "approve" | "decline") {
+  async function act(user: SignupUser, action: "approve" | "decline" | "remove") {
     if (action === "decline" && !window.confirm(`Decline ${user.email}? Their pending account will be deleted.`)) return;
+    if (
+      action === "remove" &&
+      !window.confirm(`Remove ${user.email}? Their account and everything in it (monitors, briefs, audits) will be permanently deleted.`)
+    )
+      return;
     setBusy(user.id);
     setNotice(null);
     try {
@@ -343,7 +348,7 @@ function SignupsTab({ visible, onPendingCount }: { visible: boolean; onPendingCo
             ? `Approved ${user.email}. They've been emailed.`
             : `Approved ${user.email}, but the email didn't send. Let them know they can sign in.`
         );
-      else setNotice(`Declined ${user.email}.`);
+      else setNotice(action === "remove" ? `Removed ${user.email}.` : `Declined ${user.email}.`);
       await load();
     } finally {
       setBusy(null);
@@ -396,6 +401,17 @@ function SignupsTab({ visible, onPendingCount }: { visible: boolean; onPendingCo
                   {u.name ?? "No name"} <span className="text-muted-foreground">· {u.email}</span>
                 </p>
                 <p className="text-xs text-muted-foreground">approved {u.approvedAt ? fmt(u.approvedAt) : ""}</p>
+                {u.email !== ADMIN_EMAIL && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    disabled={busy === u.id}
+                    onClick={() => act(u, "remove")}
+                    className="text-muted-foreground hover:text-destructive"
+                  >
+                    Remove
+                  </Button>
+                )}
               </div>
             ))}
           </div>

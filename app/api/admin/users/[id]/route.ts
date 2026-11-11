@@ -2,6 +2,7 @@
  * PATCH /api/admin/users/:id   { action: "approve" | "decline" }
  *  - approve: the user can sign in; they get a "You're in" email.
  *  - decline: the pending account is deleted (they can sign up again later).
+ *  - remove:  deletes any non-admin account, approved or not, with all its data.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -9,8 +10,11 @@ import { z } from "zod";
 import { requireAdmin } from "@/lib/admin";
 import { prisma } from "@/lib/prisma";
 import { sendAccountApproved } from "@/lib/email";
+import { DEMO_EMAIL } from "@/lib/demo-policy";
 
-const bodySchema = z.object({ action: z.enum(["approve", "decline"]) });
+const ADMIN_EMAIL = "rileymdr@gmail.com";
+
+const bodySchema = z.object({ action: z.enum(["approve", "decline", "remove"]) });
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const { error } = await requireAdmin();
@@ -24,6 +28,14 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     select: { id: true, email: true, name: true, approvedAt: true },
   });
   if (!user) return NextResponse.json({ error: "User not found." }, { status: 404 });
+
+  if (parsed.data.action === "remove") {
+    if (user.email === ADMIN_EMAIL || user.email === DEMO_EMAIL) {
+      return NextResponse.json({ error: "This account can't be removed." }, { status: 400 });
+    }
+    await prisma.user.delete({ where: { id: user.id } });
+    return NextResponse.json({ ok: true, removed: true });
+  }
 
   if (parsed.data.action === "decline") {
     if (user.approvedAt) {
