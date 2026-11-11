@@ -23,8 +23,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
       })
   );
 
+  // Light only: the F2 brand has no dark design. forcedTheme overrides any
+  // "dark" a browser saved from the old theme toggle.
   return (
-    <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
+    <ThemeProvider attribute="class" defaultTheme="light" forcedTheme="light" enableSystem={false}>
       <SessionProvider>
         <QueryClientProvider client={queryClient}>
           {children}
