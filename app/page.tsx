@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Check, Search, ArrowUpRight } from "lucide-react";
 import { prisma } from "@/lib/prisma";
+import { isAdmin } from "@/lib/admin";
 import { PLANS, PLAN_ORDER } from "@/lib/plans";
 import { PendingLink } from "@/components/pending-link";
 import { DemoButton } from "@/components/demo";
@@ -23,7 +24,8 @@ export default async function HomePage() {
       where: { id: session.user.id },
       select: { onboardedAt: true },
     });
-    redirect(user?.onboardedAt ? "/dashboard" : "/onboarding");
+    // Onboarding is for new sign-ups; the admin account never needs it.
+    redirect(user?.onboardedAt || isAdmin(session.user.email) ? "/dashboard" : "/onboarding");
   }
 
   return (
