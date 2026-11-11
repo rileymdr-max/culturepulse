@@ -118,6 +118,8 @@ export interface InstagramSignal {
   top_posts: InstagramPost[];
   top_hashtags: string[];
   total_likes: number;
+  /** Posting rate on the hashtag, estimated from the newest posts' timestamps. */
+  posts_per_day?: number;
   scraped_at: string;
 }
 

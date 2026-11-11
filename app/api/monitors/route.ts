@@ -4,7 +4,7 @@ import { requireSession, badRequest, serverError, paymentRequired } from "@/lib/
 import { canCreateMonitor } from "@/lib/plans";
 import { getEffectivePlan } from "@/lib/admin";
 import { prisma, withDbRetry } from "@/lib/prisma";
-import { computeAccelerationSignal, MONITOR_PLATFORMS } from "@/lib/acceleration";
+import { computeAccelerationSignal, isComparableSnapshot, MONITOR_PLATFORMS } from "@/lib/acceleration";
 
 const createSchema = z.object({
   subcultureId: z.string().min(1),
@@ -35,10 +35,10 @@ export async function GET(req: NextRequest) {
       orderBy: { createdAt: "desc" },
     }));
 
-    const monitorsWithSignals = monitors.map((m) => ({
-      ...m,
-      signal: computeAccelerationSignal(m.snapshots),
-    }));
+    const monitorsWithSignals = monitors.map((m) => {
+      const snapshots = m.snapshots.filter(isComparableSnapshot);
+      return { ...m, snapshots, signal: computeAccelerationSignal(snapshots) };
+    });
 
     return NextResponse.json({ monitors: monitorsWithSignals });
   } catch (err) {

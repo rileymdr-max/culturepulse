@@ -328,20 +328,38 @@ interface ApifyInstagramPost {
   commentsCount?: number;
   ownerUsername?: string;
   hashtags?: string[];
+  timestamp?: string;
 }
 
 async function enrichInstagram(query: string): Promise<InstagramSignal | undefined> {
   try {
     const { primary } = extractKeyTerms(query);
-    // Use the top keyword as a hashtag URL — most reliable way to get real posts
-    const hashtag = primary.split(" ")[0].toLowerCase();
-    const posts = await runActor<ApifyInstagramPost>("apify/instagram-scraper", {
-      resultsType: "posts",
-      directUrls: [`https://www.instagram.com/explore/tags/${encodeURIComponent(hashtag)}/`],
-      resultsLimit: 20,
-    }, 60);
+    // Hashtag search. The first word alone ("#home" for "home coffee") pulls
+    // unrelated posts, so try the first two words joined ("#homecoffee") and
+    // only fall back to the single word if that tag has nothing recent.
+    // Only posts from the last 7 days count, so each run measures current
+    // activity instead of re-reading the same evergreen top posts.
+    const words = primary.toLowerCase().split(" ").filter(Boolean);
+    const tags = [words.slice(0, 2).join(""), words[0]].filter(
+      (t, i, a): t is string => Boolean(t) && a.indexOf(t) === i
+    );
+    const scrapeTag = (tag: string) =>
+      runActor<ApifyInstagramPost>("apify/instagram-scraper", {
+        resultsType: "posts",
+        directUrls: [`https://www.instagram.com/explore/tags/${encodeURIComponent(tag)}/`],
+        resultsLimit: 20,
+        onlyPostsNewerThan: "7 days",
+      }, 60);
 
-    if (!posts.length) return undefined;
+    let posts: ApifyInstagramPost[] = [];
+    for (const tag of tags) {
+      posts = await scrapeTag(tag);
+      if (posts.length) break;
+    }
+    if (!posts.length) {
+      console.warn(`[enricher] Instagram found no recent posts for ${tags.map((t) => "#" + t).join(" or ")}`);
+      return undefined;
+    }
 
     const topPosts: InstagramPost[] = posts
       .filter((p) => p.url)
@@ -350,8 +368,8 @@ async function enrichInstagram(query: string): Promise<InstagramSignal | undefin
       .map((p) => ({
         caption: (p.caption ?? "").slice(0, 150),
         url: p.url!,
-        likes: p.likesCount ?? 0,
-        comments: p.commentsCount ?? 0,
+        likes: Math.max(0, p.likesCount ?? 0), // -1 means the owner hid likes
+        comments: Math.max(0, p.commentsCount ?? 0),
         owner: p.ownerUsername,
       }));
 
@@ -370,13 +388,27 @@ async function enrichInstagram(query: string): Promise<InstagramSignal | undefin
       .slice(0, 12)
       .map(([tag]) => `#${tag}`);
 
-    const totalLikes = posts.reduce((s, p) => s + (p.likesCount ?? 0), 0);
+    const totalLikes = posts.reduce((s, p) => s + Math.max(0, p.likesCount ?? 0), 0);
+
+    // Posting rate: the newest posts on a tag are minutes old with ~0 likes, so
+    // likes don't measure activity. How fast new posts arrive does: N posts
+    // spanning T hours ≈ N / T × 24 posts a day.
+    const times = posts
+      .map((p) => (p.timestamp ? Date.parse(p.timestamp) : NaN))
+      .filter((t) => Number.isFinite(t))
+      .sort((a, b) => b - a);
+    let postsPerDay: number | undefined;
+    if (times.length >= 2) {
+      const spanHours = Math.max((times[0] - times[times.length - 1]) / 3_600_000, 1 / 60);
+      postsPerDay = Math.round(((times.length - 1) / spanHours) * 24);
+    }
 
     return {
       posts_found: posts.length,
       top_posts: topPosts,
       top_hashtags: topHashtags,
       total_likes: totalLikes,
+      posts_per_day: postsPerDay,
       scraped_at: new Date().toISOString(),
     };
   } catch (err) {

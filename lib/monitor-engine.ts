@@ -89,10 +89,14 @@ export async function runMonitor(monitor: MonitorWithSubculture): Promise<void> 
 
   if (signals.instagram && wants("instagram")) {
     const i = signals.instagram;
-    add(
+    // Engagement column holds posts/day for Instagram (see enrichInstagram).
+    // Skip the row if the rate couldn't be estimated rather than save a 0.
+    if (i.posts_per_day === undefined) {
+      console.warn("[monitor] Instagram returned posts without timestamps; skipping");
+    } else add(
       "instagram",
       i.posts_found,
-      i.total_likes,
+      i.posts_per_day,
       i.top_posts.map((p) => ({
         title: p.caption ?? (p.owner ? `@${p.owner}` : "Instagram post"),
         url: p.url,

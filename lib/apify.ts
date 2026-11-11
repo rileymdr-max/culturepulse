@@ -38,6 +38,21 @@ export async function runActor<T = Record<string, unknown>>(
 
   if (!res.ok) {
     const text = await res.text().catch(() => "");
+    // A timed-out run has usually saved some items already (TikTok pushes
+    // videos as it goes). Keep those instead of losing the platform this run.
+    const runId = /TIMED-OUT/.test(text) ? text.match(/run ID: ([A-Za-z0-9]+)/)?.[1] : undefined;
+    if (runId) {
+      const partial = await fetch(
+        `${APIFY_BASE}/actor-runs/${runId}/dataset/items?token=${token}&format=json&clean=true`,
+        { signal: AbortSignal.timeout(15_000) }
+      )
+        .then((r) => (r.ok ? (r.json() as Promise<T[]>) : []))
+        .catch(() => [] as T[]);
+      if (partial.length > 0) {
+        console.warn(`[apify] ${actorId} timed out; using ${partial.length} partial results`);
+        return partial;
+      }
+    }
     throw new Error(`Apify error ${res.status}: ${text.slice(0, 200)}`);
   }
 

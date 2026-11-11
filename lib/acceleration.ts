@@ -95,10 +95,21 @@ function breakoutScore(
   return Math.round(Math.min(100, Math.max(0, raw)));
 }
 
+/** Instagram switched from summed likes (on off-topic posts) to posts/day on
+ *  2026-11-11. Older Instagram rows use a different unit, so they're ignored
+ *  instead of reading as a huge fake spike. */
+const INSTAGRAM_METRIC_SINCE = Date.parse("2026-11-11T16:00:00Z");
+
+/** False for snapshots in an outdated unit (old Instagram likes rows). */
+export function isComparableSnapshot(s: { platform: string; capturedAt: string | Date }): boolean {
+  return s.platform !== "instagram" || new Date(s.capturedAt).getTime() >= INSTAGRAM_METRIC_SINCE;
+}
+
 export function computeAccelerationSignal(snapshots: SnapshotLike[]): AccelerationSignal {
   const byPlatform = (platform: string) =>
     snapshots
       .filter((s) => s.platform === platform)
+      .filter(isComparableSnapshot)
       .sort((a, b) => new Date(b.capturedAt).getTime() - new Date(a.capturedAt).getTime());
 
   const counts = Object.fromEntries(
