@@ -60,6 +60,8 @@ model User {
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
   onboardedAt    DateTime?
+  /// Set while "Run all now" is running for this user; blocks overlapping runs.
+  monitorRunStartedAt DateTime?
 
   // Billing
   plan                 String   @default("free") // free | starter | pro | agency

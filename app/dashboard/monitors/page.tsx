@@ -96,8 +96,9 @@ function buildChartData(snapshots: MonitorData["snapshots"]): ChartPoint[] {
   );
   for (const s of sorted) {
     if (!(CHART_PLATFORMS as readonly string[]).includes(s.platform)) continue;
+    // Key by minute so two runs in the same hour stay separate points.
     const name = new Date(s.capturedAt).toLocaleString(undefined, {
-      month: "short", day: "numeric", hour: "numeric",
+      month: "short", day: "numeric", hour: "numeric", minute: "2-digit",
     });
     const point = byRun.get(name) ?? { name };
     point[`${s.platform as ChartPlatform}Raw`] = s.engagement;
@@ -134,15 +135,17 @@ function ChartTooltip({ active, payload, label }: any) {
   );
 }
 
+// One distinct hue per platform, all ≥5:1 on the card background (#FFFDF8).
+// Trends is dashed because it measures search interest, not posts.
 const SERIES_COLOR: Record<ChartPlatform, string> = {
-  reddit: F2.green,
-  twitter: F2.violet,
-  tiktok: F2.ink,
-  youtube: F2.green,
-  instagram: F2.violet,
-  trends: F2.ink,
+  reddit: F2.green,    // #0B6B45  6.4:1
+  twitter: F2.ink,     // #111110 18.6:1
+  tiktok: "#A3245C",   // rose     7.0:1
+  youtube: "#8A6A00",  // ochre (F2 yellow, deepened) 5.0:1
+  instagram: F2.violet, // #742A9E 8.0:1
+  trends: F2.muted,    // #5E5A52  6.8:1
 };
-const DASHED: ReadonlySet<ChartPlatform> = new Set(["youtube", "instagram", "trends"]);
+const DASHED: ReadonlySet<ChartPlatform> = new Set(["trends"]);
 const AXIS_TICK = { fontSize: 11, fill: F2.muted };
 
 function VolumeChart({ snapshots }: { snapshots: MonitorData["snapshots"] }) {
@@ -156,7 +159,7 @@ function VolumeChart({ snapshots }: { snapshots: MonitorData["snapshots"] }) {
     );
   }
 
-  // F2 palette, solid then dashed, so six platforms stay distinguishable.
+  // Distinct colour per platform; Trends dashed.
   const series = CHART_PLATFORMS.map((key) => ({
     key,
     color: SERIES_COLOR[key],
@@ -204,7 +207,9 @@ function VolumeChart({ snapshots }: { snapshots: MonitorData["snapshots"] }) {
         <span>Engagement change since first run shown</span>
         {series.map((s) => (
           <span key={s.key} className="flex items-center gap-1.5">
-            <span className="h-2 w-2 rounded-full" style={{ background: s.color }} />
+            <svg width="16" height="8" aria-hidden className="shrink-0">
+              <line x1="0" y1="4" x2="16" y2="4" stroke={s.color} strokeWidth="2.5" strokeDasharray={s.dash ? "4 2" : undefined} />
+            </svg>
             {platformLabel(s.key)}
           </span>
         ))}
@@ -467,7 +472,9 @@ export default function SignalBoardPage() {
   const { data, isLoading, error, refetch } = useMonitors();
   const [sort, setSort] = useState<SortKey>("score");
   const [isRunningAll, setIsRunningAll] = useState(false);
-  const [runAllResult, setRunAllResult] = useState<{ ran: number; failed: number; skipped: number } | null>(null);
+  const [runAllResult, setRunAllResult] = useState<
+    { ran: number; failed: number; skipped: number; alreadyRunning?: boolean } | null
+  >(null);
   const queryClient = useQueryClient();
   const nextRun = useNextCronRun();
 
@@ -476,6 +483,10 @@ export default function SignalBoardPage() {
     setRunAllResult(null);
     try {
       const res = await fetch("/api/monitors/run-mine", { method: "POST" });
+      if (res.status === 409) {
+        setRunAllResult({ ran: 0, failed: 0, skipped: 0, alreadyRunning: true });
+        return;
+      }
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = await res.json();
       setRunAllResult(json);
@@ -553,9 +564,15 @@ export default function SignalBoardPage() {
           >
             {runAllResult.failed > 0 ? <AlertCircle className="h-4 w-4 shrink-0" /> : <Check className="h-4 w-4 shrink-0" />}
             <span className="tabular-nums">
-              Ran {runAllResult.ran} monitor{runAllResult.ran !== 1 && "s"}
-              {runAllResult.failed > 0 && ` · ${runAllResult.failed} failed`}
-              {runAllResult.skipped > 0 && ` · ${runAllResult.skipped} skipped (budget limit)`}
+              {runAllResult.alreadyRunning ? (
+                "A run is already in progress. Refresh in a minute or two to see the results."
+              ) : (
+                <>
+                  Ran {runAllResult.ran} monitor{runAllResult.ran !== 1 && "s"}
+                  {runAllResult.failed > 0 && ` · ${runAllResult.failed} failed`}
+                  {runAllResult.skipped > 0 && ` · ${runAllResult.skipped} skipped (budget limit)`}
+                </>
+              )}
             </span>
           </div>
         )}
