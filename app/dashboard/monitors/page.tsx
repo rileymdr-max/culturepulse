@@ -146,6 +146,9 @@ const SERIES_COLOR: Record<ChartPlatform, string> = {
   trends: F2.muted,    // #5E5A52  6.8:1
 };
 const DASHED: ReadonlySet<ChartPlatform> = new Set(["trends"]);
+/** Compact y-axis labels so large swings fit: +6000% → +6k%. */
+const axisPercent = (v: number) =>
+  Math.abs(v) >= 1000 ? `${v > 0 ? "+" : v < 0 ? "−" : ""}${+(Math.abs(v) / 1000).toFixed(1)}k%` : signed(v);
 const AXIS_TICK = { fontSize: 11, fill: F2.muted };
 
 function VolumeChart({ snapshots }: { snapshots: MonitorData["snapshots"] }) {
@@ -183,8 +186,8 @@ function VolumeChart({ snapshots }: { snapshots: MonitorData["snapshots"] }) {
             tick={AXIS_TICK}
             tickLine={false}
             axisLine={false}
-            width={44}
-            tickFormatter={(v: number) => signed(v)}
+            width={52}
+            tickFormatter={axisPercent}
           />
           <ReferenceLine y={0} stroke={F2.muted} strokeWidth={1} />
           <Tooltip content={<ChartTooltip />} cursor={{ stroke: F2.ink, strokeDasharray: "3 3" }} />
