@@ -164,7 +164,7 @@ async function enrichTikTok(query: string): Promise<TikTokSignal | undefined> {
       resultsPerPage: 15,
       shouldDownloadVideos: false,
       shouldDownloadCovers: false,
-    }, 90);
+    }, 90, 1024); // 1 GB = 4× the CPU of the 256 MB default; ~47s instead of timing out at 90s
 
     if (!videos.length) return undefined;
 
