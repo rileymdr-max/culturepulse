@@ -389,55 +389,33 @@ async function enrichInstagram(query: string): Promise<InstagramSignal | undefin
 // Uses the unofficial Google Trends explore + widgetdata APIs.
 // Returns current interest score (0–100), trend direction, and related queries.
 
+// Google blocks direct calls to its unofficial Trends API (HTTP 429, even from a
+// home connection), so this goes through Apify's official Google Trends actor,
+// which uses residential proxies. ~$0.005 per search term, ~55 s per run.
+interface ApifyTrendsItem {
+  interestOverTime_timelineData?: Array<{ value?: number[]; isPartial?: boolean }>;
+  relatedQueries_top?: Array<{ query?: string }>;
+}
+
 async function enrichTrends(query: string): Promise<TrendsSignal | undefined> {
   try {
     const { primary } = extractKeyTerms(query);
+    // timeRange omitted = past 12 months (weekly points)
+    const [item] = await runActor<ApifyTrendsItem>("apify/google-trends-scraper", {
+      searchTerms: [primary],
+      isMultiple: false,
+      maxItems: 1,
+    }, 75);
 
-    // Step 1: get widget tokens
-    const exploreReq = JSON.stringify({
-      comparisonItem: [{ keyword: primary, geo: "", time: "today 12-m" }],
-      category: 0,
-      property: "",
-    });
-    const exploreUrl =
-      `https://trends.google.com/trends/api/explore?hl=en-US&tz=0` +
-      `&req=${encodeURIComponent(exploreReq)}`;
-
-    const exploreRes = await fetch(exploreUrl, {
-      headers: { "User-Agent": "Mozilla/5.0 (compatible; CulturePulse/1.0)" },
-      signal: AbortSignal.timeout(10000),
-    });
-    if (!exploreRes.ok) return undefined;
-
-    const exploreRaw = await exploreRes.text();
-    const exploreJson = JSON.parse(exploreRaw.replace(/^\)\]\}'/, "")) as {
-      widgets?: Array<{ id?: string; token?: string; request?: unknown }>;
-    };
-
-    const timeWidget = exploreJson.widgets?.find((w) => w.id === "TIMESERIES");
-    const relatedWidget = exploreJson.widgets?.find((w) => w.id === "RELATED_QUERIES");
-    if (!timeWidget?.token) return undefined;
-
-    // Step 2: fetch time-series interest data
-    const timeReq = JSON.stringify(timeWidget.request);
-    const timeUrl =
-      `https://trends.google.com/trends/api/widgetdata/multiline?hl=en-US&tz=0` +
-      `&req=${encodeURIComponent(timeReq)}&token=${encodeURIComponent(timeWidget.token)}`;
-
-    const timeRes = await fetch(timeUrl, {
-      headers: { "User-Agent": "Mozilla/5.0 (compatible; CulturePulse/1.0)" },
-      signal: AbortSignal.timeout(8000),
-    });
-    if (!timeRes.ok) return undefined;
-
-    const timeRaw = await timeRes.text();
-    const timeJson = JSON.parse(timeRaw.replace(/^\)\]\}'/, "")) as {
-      default?: { timelineData?: Array<{ value?: number[] }> };
-    };
-
-    const timeline = timeJson.default?.timelineData ?? [];
-    const values = timeline.map((p) => p.value?.[0] ?? 0).filter((v) => v > 0);
-    if (!values.length) return undefined;
+    // Skip the current, partial week: it always reads low.
+    const values = (item?.interestOverTime_timelineData ?? [])
+      .filter((p) => !p.isPartial)
+      .map((p) => p.value?.[0] ?? 0)
+      .filter((v) => v > 0);
+    if (!values.length) {
+      console.warn(`[enricher] Google Trends returned no interest data for "${primary}"`);
+      return undefined;
+    }
 
     const currentScore = values[values.length - 1] ?? 0;
     const recentAvg = values.slice(-4).reduce((a, b) => a + b, 0) / Math.min(4, values.length);
@@ -446,30 +424,10 @@ async function enrichTrends(query: string): Promise<TrendsSignal | undefined> {
       recentAvg > earlyAvg * 1.15 ? "rising" :
       recentAvg < earlyAvg * 0.85 ? "declining" : "stable";
 
-    // Step 3: fetch related queries (best-effort)
-    const relatedQueries: string[] = [];
-    if (relatedWidget?.token) {
-      try {
-        const relReq = JSON.stringify(relatedWidget.request);
-        const relUrl =
-          `https://trends.google.com/trends/api/widgetdata/relatedsearches?hl=en-US&tz=0` +
-          `&req=${encodeURIComponent(relReq)}&token=${encodeURIComponent(relatedWidget.token)}`;
-        const relRes = await fetch(relUrl, {
-          headers: { "User-Agent": "Mozilla/5.0 (compatible; CulturePulse/1.0)" },
-          signal: AbortSignal.timeout(8000),
-        });
-        if (relRes.ok) {
-          const relRaw = await relRes.text();
-          const relJson = JSON.parse(relRaw.replace(/^\)\]\}'/, "")) as {
-            default?: { rankedList?: Array<{ rankedKeyword?: Array<{ query?: string }> }> };
-          };
-          const topList = relJson.default?.rankedList?.[0]?.rankedKeyword ?? [];
-          for (const item of topList.slice(0, 10)) {
-            if (item.query) relatedQueries.push(item.query);
-          }
-        }
-      } catch { /* related queries are best-effort */ }
-    }
+    const relatedQueries = (item?.relatedQueries_top ?? [])
+      .map((r) => r.query)
+      .filter((q): q is string => !!q)
+      .slice(0, 10);
 
     return {
       interest_score: currentScore,
