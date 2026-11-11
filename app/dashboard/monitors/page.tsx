@@ -14,6 +14,7 @@ import { NavHeader } from "@/components/nav-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { signalTier, type SignalTier } from "@/lib/signal-tier";
+import { MONITOR_AUTO_RUN, MONITOR_REFRESH_COPY } from "@/lib/monitor-schedule";
 import {
   BRAND_ROOT, D, M, F2, PANEL, EYEBROW, BTN_GO_SM, BTN_LINE_SM, BTN_GHOST_SM,
 } from "@/components/marketing/brand";
@@ -150,7 +151,7 @@ function VolumeChart({ snapshots }: { snapshots: MonitorData["snapshots"] }) {
   if (data.length < 2) {
     return (
       <div className="flex min-h-16 items-center rounded-xl bg-[#F2EDE3] px-4 py-3 text-sm text-[#5E5A52]">
-        Engagement chart appears after the second run. Monitors refresh every 6 hours.
+        Engagement chart appears after the second run. {MONITOR_REFRESH_COPY.charAt(0).toUpperCase() + MONITOR_REFRESH_COPY.slice(1)}.
       </div>
     );
   }
@@ -528,7 +529,9 @@ export default function SignalBoardPage() {
 
           {n > 0 && (
             <div className="flex flex-wrap items-center gap-3">
-              <span className={cn(M, "text-xs text-[#5E5A52] tabular-nums")}>Next auto-run in {nextRun}</span>
+              <span className={cn(M, "text-xs text-[#5E5A52] tabular-nums")}>
+                {MONITOR_AUTO_RUN ? `Next auto-run in ${nextRun}` : "Auto-runs paused · run manually"}
+              </span>
               <button type="button" className={BTN_LINE_SM} disabled={isRunningAll} onClick={handleRunAll}>
                 <RefreshCw className={cn("h-3.5 w-3.5", isRunningAll && "animate-spin")} />
                 {isRunningAll ? "Running all…" : "Run all now"}
@@ -620,7 +623,7 @@ export default function SignalBoardPage() {
           <div className="mt-8 rounded-2xl border-2 border-dashed border-[#111110] bg-[#FFFDF8] px-6 py-16 text-center">
             <h2 className="text-xl font-bold">No subcultures on your Signal Board yet</h2>
             <p className="mx-auto mt-2 max-w-md text-[#5E5A52]">
-              Open any profile in the Library and choose Start monitoring. Its Breakout Score updates every 6 hours.
+              Open any profile in the Library and choose Start monitoring. Its Breakout Score updates after each run; {MONITOR_REFRESH_COPY}.
             </p>
             <Link href="/dashboard/subcultures" className={cn(BTN_GO_SM, "mt-6 h-11 px-5 text-[15px]")}>
               <BookOpen className="h-4 w-4" aria-hidden />Browse the Library

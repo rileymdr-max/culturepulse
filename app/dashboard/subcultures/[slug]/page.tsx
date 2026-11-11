@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { MONITOR_REFRESH_COPY } from "@/lib/monitor-schedule";
 import { ArrowLeft, ArrowRight, AlertCircle, Bell, Check, Loader2, FileText, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -92,7 +93,7 @@ function LiveSignal({ monitor }: { monitor: MonitorData }) {
     return (
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-muted px-5 py-4 text-sm">
         <span className="text-muted-foreground">
-          On your Signal Board. The Breakout Score appears after the first run; monitors refresh every 6 hours.
+          On your Signal Board. The Breakout Score appears after the first run; {MONITOR_REFRESH_COPY}.
         </span>
         <Link href="/dashboard/monitors" className="group inline-flex items-center gap-1 font-medium text-primary">
           Open Signal Board
