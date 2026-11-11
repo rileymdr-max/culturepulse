@@ -746,7 +746,7 @@ function DiscoverPageInner() {
               </div>
             )}
 
-            <div className="rounded-xl border border-border bg-card p-5">
+            <div className="rounded-2xl border-[1.5px] border-foreground bg-card shadow-[3px_3px_0_hsl(var(--foreground))] p-5">
               <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-3">Try these</p>
               <div className="space-y-2">
                 {SUGGESTIONS.map((q) => (

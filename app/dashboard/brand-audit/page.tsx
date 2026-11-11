@@ -395,7 +395,7 @@ function AuditResults({ data, isCached, onClear }: { data: BrandAuditResult; isC
           title="Subculture DNA"
           meta={`${data.matched_subcultures?.length ?? 0} ${(data.matched_subcultures?.length ?? 0) === 1 ? "match" : "matches"} from your Library, ranked by fit`}
         />
-        <ol className="mt-4 divide-y divide-border overflow-hidden rounded-xl border border-border bg-card">
+        <ol className="mt-4 divide-y divide-border overflow-hidden rounded-2xl border-[1.5px] border-foreground bg-card shadow-[3px_3px_0_hsl(var(--foreground))]">
           {(data.matched_subcultures ?? []).map((sub, i) => (
             <MatchedRow key={sub.slug} rank={i + 1} sub={sub} />
           ))}
@@ -409,7 +409,7 @@ function AuditResults({ data, isCached, onClear }: { data: BrandAuditResult; isC
             title="New discoveries"
             meta={`${data.discovered_subcultures?.length ?? 0} ${(data.discovered_subcultures?.length ?? 0) === 1 ? "subculture" : "subcultures"} not yet in your Library`}
           />
-          <ol className="mt-4 divide-y divide-border overflow-hidden rounded-xl border border-border bg-card">
+          <ol className="mt-4 divide-y divide-border overflow-hidden rounded-2xl border-[1.5px] border-foreground bg-card shadow-[3px_3px_0_hsl(var(--foreground))]">
             {(data.discovered_subcultures ?? []).map((sub, i) => (
               <DiscoveredRow key={sub.provisional_slug} rank={i + 1} sub={sub} />
             ))}
@@ -613,7 +613,7 @@ function CommunityBreakdown({ data }: { data: AudienceResult }) {
         title="Where their audience gathers"
         meta={`${data.communities.length} communities · ~${formatNumber(data.estimated_total_audience)} followers`}
       />
-      <ol className="mt-4 divide-y divide-border overflow-hidden rounded-xl border border-border bg-card">
+      <ol className="mt-4 divide-y divide-border overflow-hidden rounded-2xl border-[1.5px] border-foreground bg-card shadow-[3px_3px_0_hsl(var(--foreground))]">
         {data.communities.map((c, i) => (
           <li key={c.community_id ?? i} className="flex items-start gap-4 p-5">
             <span className="w-6 shrink-0 pt-0.5 text-right text-sm font-medium tabular-nums text-muted-foreground">{i + 1}</span>
@@ -667,7 +667,7 @@ function AuditSkeleton() {
       </div>
       <div>
         <Skeleton className="h-7 w-44" />
-        <div className="mt-4 divide-y divide-border rounded-xl border border-border bg-card">
+        <div className="mt-4 divide-y divide-border rounded-2xl border-[1.5px] border-foreground bg-card shadow-[3px_3px_0_hsl(var(--foreground))]">
           {[0, 1, 2].map((i) => (
             <div key={i} className="space-y-3 p-5">
               <div className="flex justify-between gap-4">

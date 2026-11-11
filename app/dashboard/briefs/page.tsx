@@ -73,7 +73,7 @@ export default function BriefsPage() {
         )}
 
         {isLoading && (
-          <div aria-hidden className="mt-8 divide-y divide-border rounded-xl border border-border bg-card">
+          <div aria-hidden className="mt-8 divide-y divide-border rounded-2xl border-[1.5px] border-foreground bg-card shadow-[3px_3px_0_hsl(var(--foreground))]">
             {Array.from({ length: 4 }).map((_, i) => (
               <div key={i} className="space-y-2 px-5 py-4">
                 <Skeleton className="h-5 w-3/4" />
@@ -99,7 +99,7 @@ export default function BriefsPage() {
         )}
 
         {n > 0 && (
-          <ol className="mt-8 divide-y divide-border overflow-hidden rounded-xl border border-border bg-card">
+          <ol className="mt-8 divide-y divide-border overflow-hidden rounded-2xl border-[1.5px] border-foreground bg-card shadow-[3px_3px_0_hsl(var(--foreground))]">
             {briefs.map((b) => <BriefRow key={b.id} brief={b} />)}
           </ol>
         )}

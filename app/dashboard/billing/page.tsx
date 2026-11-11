@@ -166,7 +166,7 @@ function BillingPageInner() {
         )}
 
         {/* Usage */}
-        <section className="mt-10 grid gap-8 rounded-xl border border-border bg-card p-6 lg:grid-cols-[1fr_2fr]">
+        <section className="mt-10 grid gap-8 rounded-2xl border-[1.5px] border-foreground bg-card shadow-[3px_3px_0_hsl(var(--foreground))] p-6 lg:grid-cols-[1fr_2fr]">
           <div>
             <h2 className="text-lg font-semibold tracking-tight">Usage</h2>
             <p className="mt-1 text-sm text-muted-foreground">What your {plan.name} plan includes, and how much you’ve used.</p>

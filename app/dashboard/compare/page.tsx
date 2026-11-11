@@ -83,7 +83,7 @@ function ColumnSection({ title, children }: { title: string; children: React.Rea
 function CompareColumn({ community, color }: { community: CommunityData; color: string }) {
   return (
     <div className="flex min-w-0 flex-col gap-8">
-      <div className="rounded-xl border border-border bg-card p-5">
+      <div className="rounded-2xl border-[1.5px] border-foreground bg-card shadow-[3px_3px_0_hsl(var(--foreground))] p-5">
         <p className="flex items-center gap-2 text-sm text-muted-foreground capitalize">
           <span className="h-2.5 w-2.5 rounded-full" style={{ background: color }} aria-hidden />
           {community.platform}
@@ -172,7 +172,7 @@ function ComparePageInner() {
             <h2 className="text-sm font-semibold">Similarity</h2>
             <ul className="mt-3 flex flex-wrap gap-3">
               {pairLabels.map((pair, i) => (
-                <li key={i} className="flex items-center gap-4 rounded-xl border border-border bg-card px-4 py-3">
+                <li key={i} className="flex items-center gap-4 rounded-2xl border-[1.5px] border-foreground bg-card shadow-[3px_3px_0_hsl(var(--foreground))] px-4 py-3">
                   <span className="max-w-[10rem] truncate text-sm">{pair.a}</span>
                   <span className="text-center">
                     <span className="block text-2xl font-semibold leading-none tracking-tight tabular-nums">{pair.score}</span>
@@ -189,7 +189,7 @@ function ComparePageInner() {
 
         {/* Radar */}
         {communities.length >= 2 && (
-          <section className="mt-8 rounded-xl border border-border bg-card p-6">
+          <section className="mt-8 rounded-2xl border-[1.5px] border-foreground bg-card shadow-[3px_3px_0_hsl(var(--foreground))] p-6">
             <h2 className="text-lg font-semibold tracking-tight">What they talk about</h2>
             <p className="mt-1 text-sm text-muted-foreground">Relative conversation volume across shared categories</p>
             <CategoryRadar communities={communities} colors={colors} />

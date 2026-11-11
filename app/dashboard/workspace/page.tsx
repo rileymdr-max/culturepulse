@@ -45,7 +45,7 @@ function WorkspaceCard({ ws, currentUserId }: { ws: WorkspaceSummary; currentUse
   }
 
   return (
-    <article className="flex flex-col rounded-xl border border-border bg-card p-6">
+    <article className="flex flex-col rounded-2xl border-[1.5px] border-foreground bg-card shadow-[3px_3px_0_hsl(var(--foreground))] p-6">
       {/* Header */}
       <header className="flex items-center gap-3">
         {ws.brandLogo ? (

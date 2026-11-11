@@ -112,7 +112,7 @@ export default function WelcomePage() {
         {auditActive && (
           <Link
             href="/dashboard/brand-audit"
-            className="group mt-6 flex items-center justify-between gap-4 rounded-xl border border-border bg-card px-5 py-4 transition-colors hover:border-primary/40"
+            className="group mt-6 flex items-center justify-between gap-4 rounded-2xl border-[1.5px] border-foreground bg-card shadow-[3px_3px_0_hsl(var(--foreground))] px-5 py-4 transition-colors hover:border-primary/40"
           >
             <span className="text-sm">
               <span className="font-medium">Audience Audit in progress.</span>{" "}
@@ -238,7 +238,7 @@ function Panel({
   children: React.ReactNode;
 }) {
   return (
-    <section className="flex flex-col rounded-xl border border-border bg-card">
+    <section className="flex flex-col rounded-2xl border-[1.5px] border-foreground bg-card shadow-[3px_3px_0_hsl(var(--foreground))]">
       <div className="flex items-center justify-between gap-4 px-5 pt-5">
         <h2 className="font-semibold">{title}</h2>
         <Link

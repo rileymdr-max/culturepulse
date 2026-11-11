@@ -40,7 +40,7 @@ function SubcultureCard({ s }: { s: SubcultureSummary }) {
   return (
     <Link
       href={`/dashboard/subcultures/${s.slug}`}
-      className="group flex h-full flex-col rounded-xl border border-border bg-card p-5 transition-colors hover:border-primary/40"
+      className="group flex h-full flex-col rounded-2xl border-[1.5px] border-foreground bg-card shadow-[3px_3px_0_hsl(var(--foreground))] p-5 transition-colors hover:border-primary/40"
     >
       <p className="text-xs font-medium text-muted-foreground">{s.category}</p>
       <h3 className="mt-1 font-semibold tracking-tight transition-colors group-hover:text-primary">{s.name}</h3>
@@ -55,7 +55,7 @@ function SubcultureCard({ s }: { s: SubcultureSummary }) {
 
 function CardSkeleton() {
   return (
-    <div aria-hidden className="flex h-44 flex-col gap-3 rounded-xl border border-border bg-card p-5">
+    <div aria-hidden className="flex h-44 flex-col gap-3 rounded-2xl border-[1.5px] border-foreground bg-card shadow-[3px_3px_0_hsl(var(--foreground))] p-5">
       <Skeleton className="h-3.5 w-20" />
       <Skeleton className="h-5 w-40" />
       <Skeleton className="h-4 w-full" />
@@ -97,7 +97,7 @@ function GenerateDialog({ onClose }: { onClose: () => void }) {
         role="dialog"
         aria-modal="true"
         aria-labelledby="generate-title"
-        className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-lg animate-in zoom-in-95 duration-150"
+        className="w-full max-w-md rounded-2xl border-[1.5px] border-foreground bg-card shadow-[3px_3px_0_hsl(var(--foreground))] p-6 shadow-lg animate-in zoom-in-95 duration-150"
       >
         {data ? (
           <div>
