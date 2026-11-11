@@ -140,7 +140,7 @@ function BillingPageInner() {
 
       <main className="mx-auto w-full max-w-screen-xl flex-1 px-4 py-10 sm:px-6">
         <header>
-          <h1 className="text-3xl font-semibold tracking-tight">Billing</h1>
+          <h1 className="text-4xl tracking-tight">Billing</h1>
           <p className="mt-2 text-muted-foreground">
             You’re on the <span className="font-medium text-foreground">{plan.name}</span> plan
             {plan.price > 0 && <span className="tabular-nums"> ({price(plan.price)}/mo)</span>}.
@@ -166,7 +166,7 @@ function BillingPageInner() {
         )}
 
         {/* Usage */}
-        <section className="mt-10 grid gap-8 rounded-xl border border-border bg-card p-6 lg:grid-cols-[1fr_2fr]">
+        <section className="mt-10 grid gap-8 rounded-2xl border-[1.5px] border-foreground bg-card shadow-[3px_3px_0_hsl(var(--foreground))] p-6 lg:grid-cols-[1fr_2fr]">
           <div>
             <h2 className="text-lg font-semibold tracking-tight">Usage</h2>
             <p className="mt-1 text-sm text-muted-foreground">What your {plan.name} plan includes, and how much you’ve used.</p>

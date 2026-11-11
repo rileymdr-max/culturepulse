@@ -45,7 +45,7 @@ function WorkspaceCard({ ws, currentUserId }: { ws: WorkspaceSummary; currentUse
   }
 
   return (
-    <article className="flex flex-col rounded-xl border border-border bg-card p-6">
+    <article className="flex flex-col rounded-2xl border-[1.5px] border-foreground bg-card shadow-[3px_3px_0_hsl(var(--foreground))] p-6">
       {/* Header */}
       <header className="flex items-center gap-3">
         {ws.brandLogo ? (
@@ -208,7 +208,7 @@ export default function WorkspacePage() {
 
       <main className="mx-auto w-full max-w-screen-xl flex-1 px-4 py-10 sm:px-6">
         <header>
-          <h1 className="text-3xl font-semibold tracking-tight">Workspaces</h1>
+          <h1 className="text-4xl tracking-tight">Workspaces</h1>
           <p className="mt-2 max-w-2xl text-muted-foreground">
             Shared spaces for each client or team, with their own members and branding.
           </p>

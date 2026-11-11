@@ -17,7 +17,7 @@ export function PulseIndicator({
   return (
     <div className={cn("flex items-center gap-2 text-xs text-muted-foreground", className)}>
       {isRefetching ? (
-        <RefreshCw className="h-3 w-3 animate-spin text-indigo-500" />
+        <RefreshCw className="h-3 w-3 animate-spin text-primary" />
       ) : (
         <span className="relative flex h-2 w-2">
           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />

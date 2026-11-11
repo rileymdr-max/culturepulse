@@ -51,7 +51,7 @@ function SourceBadge({ source }: { source: "reddit" | "tiktok" | "twitter" | "yo
     youtube:   { label: "YouTube",        cls: "text-red-500 bg-red-500/10 border-red-500/20" },
     instagram: { label: "Instagram",      cls: "text-purple-500 bg-purple-500/10 border-purple-500/20" },
     trends:    { label: "Google Trends",  cls: "text-green-500 bg-green-500/10 border-green-500/20" },
-    ai:        { label: "AI Analysis",    cls: "text-indigo-500 bg-indigo-500/10 border-indigo-500/20" },
+    ai:        { label: "AI Analysis",    cls: "text-primary bg-primary/10 border-primary/20" },
   };
   const { label, cls } = configs[source];
   return (
@@ -324,7 +324,7 @@ function ProfileCard({
   ].filter(Boolean);
 
   return (
-    <Card className="border-indigo-500/20 bg-card">
+    <Card className="border-primary/20 bg-card">
       <CardContent className="p-6 space-y-5">
 
         {/* Header */}
@@ -341,7 +341,7 @@ function ProfileCard({
                   Live data · {platformsFound.join(", ")}
                 </span>
               ) : (
-                <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-indigo-500 bg-indigo-500/10 border border-indigo-500/20 px-1.5 py-0.5 rounded">
+                <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-primary bg-primary/10 border border-primary/20 px-1.5 py-0.5 rounded">
                   <Sparkles className="h-2.5 w-2.5" />
                   AI Analysis
                 </span>
@@ -355,7 +355,7 @@ function ProfileCard({
               <div className="flex items-center gap-2 flex-wrap">
                 {briefResult?.brief ? (
                   <Link href={`/dashboard/briefs/${briefResult.brief.id}`}>
-                    <Button size="sm" className="gap-1.5 bg-indigo-600 hover:bg-indigo-700">
+                    <Button size="sm" className="gap-1.5 bg-primary hover:bg-primary">
                       <FileText className="h-3.5 w-3.5" />
                       View Brief
                     </Button>
@@ -364,7 +364,7 @@ function ProfileCard({
                   <Button
                     size="sm"
                     variant="outline"
-                    className="gap-1.5 border-indigo-500/40 text-indigo-500 hover:text-indigo-400 hover:border-indigo-500/60"
+                    className="gap-1.5 border-primary/40 text-primary hover:text-primary hover:border-primary/60"
                     disabled={isGeneratingBrief}
                     onClick={() => { if (isBriefError) resetBrief(); createBrief({ subcultureSlug: savedSlug }); }}
                   >
@@ -415,7 +415,7 @@ function ProfileCard({
           </div>
           <div className="flex flex-wrap gap-1.5">
             {profile.keywords.slice(0, 10).map((k) => (
-              <span key={k} className="px-2 py-0.5 rounded-full bg-indigo-500/8 text-indigo-500 border border-indigo-500/15 text-[11px] font-medium">
+              <span key={k} className="px-2 py-0.5 rounded-full bg-primary/8 text-primary border border-primary/15 text-[11px] font-medium">
                 {k}
               </span>
             ))}
@@ -473,7 +473,7 @@ function ProfileCard({
                 <span className={cn(
                   "text-[10px] font-medium px-1.5 py-0.5 rounded",
                   p.engagement_level === "primary"
-                    ? "bg-indigo-500/10 text-indigo-500"
+                    ? "bg-primary/10 text-primary"
                     : p.engagement_level === "secondary"
                     ? "bg-muted text-muted-foreground"
                     : "text-muted-foreground/50"
@@ -527,7 +527,7 @@ function ProfileCard({
             </Link>
             <Link
               href={`/dashboard/monitors`}
-              className="inline-flex items-center gap-1 text-xs text-indigo-500 hover:text-indigo-400 transition-colors"
+              className="inline-flex items-center gap-1 text-xs text-primary hover:text-primary transition-colors"
             >
               Start monitoring <ChevronRight className="h-3 w-3" />
             </Link>
@@ -634,7 +634,7 @@ function DiscoverPageInner() {
       <main className="flex-1 max-w-screen-lg mx-auto w-full px-4 sm:px-6 py-8 pb-24 space-y-8">
 
         <div>
-          <h1 className="text-2xl font-bold text-foreground mb-1">Discover Subcultures</h1>
+          <h1 className="text-3xl text-foreground mb-1">Discover Subcultures</h1>
           <p className="text-sm text-muted-foreground">
             Describe any audience or niche — we scrape Reddit, TikTok, Twitter, YouTube, and Google Trends in real time, then build a full intelligence profile grounded in live data.
           </p>
@@ -650,7 +650,7 @@ function DiscoverPageInner() {
               placeholder={'Describe an audience or subculture… e.g. "sourdough bakers who document their process online"'}
               rows={3}
               disabled={isLoading}
-              className="w-full rounded-xl border border-input bg-background px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground/60 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500/50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="w-full rounded-xl border border-input bg-background px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground/60 resize-none focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             />
             <div className="absolute bottom-3 right-3 flex items-center gap-2">
               <span className="text-[10px] text-muted-foreground/40 hidden sm:block">⌘↩ to run</span>
@@ -672,8 +672,8 @@ function DiscoverPageInner() {
         {isLoading && (
           <div className="flex flex-col items-center justify-center py-16 gap-4">
             <div className="relative">
-              <div className="h-12 w-12 rounded-full border-2 border-indigo-500/20 border-t-indigo-500 animate-spin" />
-              <TrendingUp className="absolute inset-0 m-auto h-5 w-5 text-indigo-500" />
+              <div className="h-12 w-12 rounded-full border-2 border-primary/20 border-t-primary animate-spin" />
+              <TrendingUp className="absolute inset-0 m-auto h-5 w-5 text-primary" />
             </div>
             <div className="text-center space-y-1.5">
               <p className="text-sm font-medium text-foreground">Scraping live signals…</p>
@@ -736,7 +736,7 @@ function DiscoverPageInner() {
                     <button
                       key={q}
                       onClick={() => { setPrompt(q); handleDiscover(q); }}
-                      className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-full border border-border bg-muted/50 text-muted-foreground hover:text-foreground hover:border-indigo-500/50 hover:bg-indigo-500/5 transition-all duration-150 text-left max-w-xs truncate"
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-full border border-border bg-muted/50 text-muted-foreground hover:text-foreground hover:border-primary/50 hover:bg-primary/5 transition-all duration-150 text-left max-w-xs truncate"
                     >
                       <TrendingUp className="h-3 w-3 shrink-0" />
                       <span className="truncate">{q}</span>
@@ -746,7 +746,7 @@ function DiscoverPageInner() {
               </div>
             )}
 
-            <div className="rounded-xl border border-border bg-card p-5">
+            <div className="rounded-2xl border-[1.5px] border-foreground bg-card shadow-[3px_3px_0_hsl(var(--foreground))] p-5">
               <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-3">Try these</p>
               <div className="space-y-2">
                 {SUGGESTIONS.map((q) => (
@@ -755,7 +755,7 @@ function DiscoverPageInner() {
                     onClick={() => { setPrompt(q); handleDiscover(q); }}
                     className="w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-all duration-150 group"
                   >
-                    <TrendingUp className="h-3.5 w-3.5 shrink-0 text-indigo-500/50 group-hover:text-indigo-500 transition-colors" />
+                    <TrendingUp className="h-3.5 w-3.5 shrink-0 text-primary/50 group-hover:text-primary transition-colors" />
                     {q}
                   </button>
                 ))}

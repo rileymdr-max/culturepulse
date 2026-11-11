@@ -25,7 +25,7 @@ export function CommunityCard({
   const encodedId = encodeURIComponent(community.community_id);
 
   return (
-    <Card className="flex flex-col hover:border-blue-800/60 transition-colors">
+    <Card className="flex flex-col hover:border-primary/60 transition-colors">
       <CardContent className="flex flex-col gap-3 p-5">
         {/* Header row */}
         <div className="flex items-start justify-between gap-2">

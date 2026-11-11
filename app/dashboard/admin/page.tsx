@@ -70,11 +70,11 @@ export default function AdminPage() {
       <NavHeader />
       <main className="flex-1 max-w-screen-xl mx-auto w-full px-4 sm:px-6 py-8 space-y-6">
         <div className="flex items-center gap-3">
-          <div className="h-8 w-8 rounded-lg bg-indigo-500/10 flex items-center justify-center">
-            <Radio className="h-4 w-4 text-indigo-500" />
+          <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
+            <Radio className="h-4 w-4 text-primary" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-foreground">Admin</h1>
+            <h1 className="text-3xl text-foreground">Admin</h1>
             <p className="text-xs text-muted-foreground">CulturePulse internal view — {ADMIN_EMAIL}</p>
           </div>
         </div>
@@ -91,7 +91,7 @@ export default function AdminPage() {
               className={cn(
                 "flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors",
                 tab === key
-                  ? "border-indigo-500 text-foreground"
+                  ? "border-primary text-foreground"
                   : "border-transparent text-muted-foreground hover:text-foreground"
               )}
             >
@@ -167,7 +167,7 @@ function LibraryTab() {
             onClick={() => setFilter(s)}
             className={cn(
               "rounded-xl border p-3 text-left transition-colors",
-              filter === s ? "border-indigo-500/50 bg-indigo-500/5" : "border-border bg-card hover:border-border/80"
+              filter === s ? "border-primary/50 bg-primary/5" : "border-border bg-card hover:border-border/80"
             )}
           >
             <p className="text-xl font-bold text-foreground">{counts[s]}</p>
@@ -210,7 +210,7 @@ function LibraryTab() {
                     <div className="flex items-center gap-2">
                       <span className="font-medium text-foreground">{s.name}</span>
                       {s.generatedByAi && (
-                        <Sparkles className="h-3 w-3 text-amber-500 shrink-0" />
+                        <Sparkles className="h-3 w-3 text-tier-trending shrink-0" />
                       )}
                     </div>
                     <p className="text-xs text-muted-foreground truncate max-w-xs mt-0.5 sm:hidden">{s.category}</p>
@@ -361,7 +361,7 @@ function AuditsTab() {
                       </p>
                       <div className="flex flex-wrap gap-1.5">
                         {log.result.matched_subcultures.map((s) => (
-                          <span key={s.slug} className="px-2 py-0.5 rounded-full bg-indigo-500/8 text-indigo-500 border border-indigo-500/15 text-[11px] font-medium">
+                          <span key={s.slug} className="px-2 py-0.5 rounded-full bg-primary/8 text-primary border border-primary/15 text-[11px] font-medium">
                             {s.name} · {s.match_pct}%
                           </span>
                         ))}
@@ -373,11 +373,11 @@ function AuditsTab() {
                   {log.result.discovered_subcultures?.length > 0 && (
                     <div>
                       <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-2 flex items-center gap-1.5">
-                        <Sparkles className="h-3 w-3 text-amber-500" /> New discoveries
+                        <Sparkles className="h-3 w-3 text-tier-trending" /> New discoveries
                       </p>
                       <div className="flex flex-wrap gap-1.5">
                         {log.result.discovered_subcultures.map((s) => (
-                          <span key={s.provisional_slug} className="px-2 py-0.5 rounded-full bg-amber-500/8 text-amber-700 dark:text-amber-400 border border-amber-500/15 text-[11px] font-medium">
+                          <span key={s.provisional_slug} className="px-2 py-0.5 rounded-full bg-[#FFE14D]/40 text-foreground border border-foreground/20 text-[11px] font-medium">
                             {s.name} · ~{s.estimated_audience_pct}%
                           </span>
                         ))}
@@ -416,7 +416,7 @@ function StatusBadge({ status }: { status: AdminSubculture["status"] }) {
       "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide border",
       status === "approved" ? "bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/25" :
       status === "archived" ? "bg-muted text-muted-foreground border-border" :
-      "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/25"
+      "bg-[#FFE14D]/40 text-foreground border-foreground/20"
     )}>
       {status === "approved" && <CheckCircle2 className="h-2.5 w-2.5" />}
       {status === "archived" && <Archive className="h-2.5 w-2.5" />}

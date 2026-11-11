@@ -202,7 +202,7 @@ export default function SubcultureDetailPage() {
       <Shell>
         {backLink}
         <div className="mt-8 rounded-xl border border-dashed border-border px-6 py-16 text-center">
-          <h1 className="text-lg font-semibold">We couldn’t find that profile</h1>
+          <h1 className="text-lg">We couldn’t find that profile</h1>
           <p className="mt-2 text-muted-foreground">It may have been removed from the Library.</p>
         </div>
       </Shell>
@@ -222,7 +222,7 @@ export default function SubcultureDetailPage() {
             {s.category}
             {s.status !== "approved" && <span className="font-medium text-tier-trending"> · Draft</span>}
           </p>
-          <h1 className="mt-1 text-3xl font-semibold tracking-tight sm:text-4xl">{s.name}</h1>
+          <h1 className="mt-1 text-4xl tracking-tight sm:text-5xl">{s.name}</h1>
           <p className="mt-3 leading-relaxed text-muted-foreground">{s.description}</p>
         </div>
 

@@ -102,8 +102,8 @@ export default function JoinPage() {
 
           {inviteState === "ready" && invite && (
             <>
-              <div className="h-12 w-12 rounded-full bg-blue-500/10 border border-blue-500/20 flex items-center justify-center mx-auto">
-                <CheckCircle className="h-6 w-6 text-blue-400" />
+              <div className="h-12 w-12 rounded-full bg-accent border border-primary/30 flex items-center justify-center mx-auto">
+                <CheckCircle className="h-6 w-6 text-primary" />
               </div>
               <div>
                 <p className="font-medium text-foreground">
@@ -121,7 +121,7 @@ export default function JoinPage() {
 
           {inviteState === "accepting" && (
             <div className="flex flex-col items-center gap-3 py-4">
-              <Loader2 className="h-6 w-6 animate-spin text-blue-400" />
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
               <p className="text-sm text-muted-foreground">Joining workspace…</p>
             </div>
           )}

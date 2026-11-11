@@ -93,7 +93,7 @@ export default function WelcomePage() {
             </>
           ) : (
             <>
-              <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
+              <h1 className="text-4xl tracking-tight sm:text-5xl">
                 {getGreeting(session?.user?.name ?? session?.user?.email)}
               </h1>
               {/* On error the Signal Board panel explains it; don't imply "no monitors" here */}
@@ -112,7 +112,7 @@ export default function WelcomePage() {
         {auditActive && (
           <Link
             href="/dashboard/brand-audit"
-            className="group mt-6 flex items-center justify-between gap-4 rounded-xl border border-border bg-card px-5 py-4 transition-colors hover:border-primary/40"
+            className="group mt-6 flex items-center justify-between gap-4 rounded-2xl border-[1.5px] border-foreground bg-card shadow-[3px_3px_0_hsl(var(--foreground))] px-5 py-4 transition-colors hover:border-primary/40"
           >
             <span className="text-sm">
               <span className="font-medium">Audience Audit in progress.</span>{" "}
@@ -202,7 +202,7 @@ function SearchBox({ recent }: { recent: string[] }) {
           autoComplete="off"
         />
         {/* Concentric: outer rounded-xl 12px − p-2 8px = rounded-sm 4px */}
-        <Button type="submit" size="lg" className="rounded-sm" disabled={pending || !q.trim()}>
+        <Button type="submit" size="lg" disabled={pending || !q.trim()}>
           {pending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
           Discover
         </Button>
@@ -238,7 +238,7 @@ function Panel({
   children: React.ReactNode;
 }) {
   return (
-    <section className="flex flex-col rounded-xl border border-border bg-card">
+    <section className="flex flex-col rounded-2xl border-[1.5px] border-foreground bg-card shadow-[3px_3px_0_hsl(var(--foreground))]">
       <div className="flex items-center justify-between gap-4 px-5 pt-5">
         <h2 className="font-semibold">{title}</h2>
         <Link
