@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { enrichSubcultureWithSignals } from "@/lib/subculture-enricher";
 import { computeAccelerationSignal, type SnapshotLike } from "@/lib/acceleration";
+import { sendBreakoutAlert } from "@/lib/email";
 import type { Monitor, Subculture } from "@prisma/client";
 
 /**
@@ -137,13 +138,40 @@ export async function runMonitor(monitor: MonitorWithSubculture): Promise<void> 
 
   const signal = computeAccelerationSignal(existing);
 
+  const shouldAlert =
+    signal.isBreakout &&
+    (monitor.lastBreakoutAlertAt === null ||
+      Date.now() - new Date(monitor.lastBreakoutAlertAt).getTime() > 24 * 60 * 60 * 1000);
+
   await prisma.monitor.update({
     where: { id: monitor.id },
     data: {
       lastRunAt: new Date(),
-      ...(signal.isBreakout ? { lastBreakoutAlertAt: new Date() } : {}),
+      ...(shouldAlert ? { lastBreakoutAlertAt: new Date() } : {}),
     },
   });
+
+  if (shouldAlert) {
+    // Fire alert in background — a failed email must not fail the monitor run
+    const user = await prisma.user.findUnique({
+      where: { id: monitor.userId },
+      select: { email: true, name: true },
+    });
+    if (user?.email) {
+      const latestSnap = snapshotRows[0];
+      const topPost = Array.isArray(latestSnap?.topPosts) && latestSnap.topPosts.length > 0
+        ? (latestSnap.topPosts[0] as { title: string; url: string; score: number })
+        : undefined;
+      sendBreakoutAlert({
+        toEmail: user.email,
+        toName: user.name ?? "there",
+        subcultureName: monitor.subculture.name,
+        breakoutScore: signal.breakoutScore,
+        platforms: monitor.platforms,
+        topPost,
+      }).catch((err) => console.error("[monitor-engine] breakout alert send failed:", err));
+    }
+  }
 }
 
 /** Max monitors scraped at once. Each runs up to 5 Apify actors, so 4 → ≤20 concurrent Apify runs. */
