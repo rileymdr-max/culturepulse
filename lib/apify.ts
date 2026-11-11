@@ -13,18 +13,20 @@ const APIFY_BASE = "https://api.apify.com/v2";
  * @param actorId    - e.g. "apify/twitter-scraper"
  * @param input      - Actor-specific input object
  * @param timeoutSecs - Max seconds to wait for the run (default 60)
+ * @param memoryMb   - Actor memory in MB (default 256)
  */
 export async function runActor<T = Record<string, unknown>>(
   actorId: string,
   input: Record<string, unknown>,
-  timeoutSecs = 60
+  timeoutSecs = 60,
+  memoryMb = 256
 ): Promise<T[]> {
   const token = process.env.APIFY_API_TOKEN;
   if (!token) throw new Error("APIFY_API_TOKEN is not configured");
 
   const url =
     `${APIFY_BASE}/acts/${encodeURIComponent(actorId)}/run-sync-get-dataset-items` +
-    `?token=${token}&timeout=${timeoutSecs}&memory=256&format=json`;
+    `?token=${token}&timeout=${timeoutSecs}&memory=${memoryMb}&format=json`;
 
   const res = await fetch(url, {
     method: "POST",

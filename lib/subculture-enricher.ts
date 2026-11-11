@@ -59,79 +59,76 @@ function extractKeyTerms(query: string): { primary: string; hashtags: string[] }
 }
 
 // ─── Reddit ───────────────────────────────────────────────────────────────────
-// Uses Reddit's public search JSON API — no Apify, no auth required.
-
-async function fetchSubredditSize(sub: string): Promise<number | undefined> {
-  try {
-    const res = await fetch(`https://www.reddit.com/r/${sub}/about.json`, {
-      headers: { "User-Agent": "CulturePulse/1.0 (signal enrichment)" },
-      signal: AbortSignal.timeout(6000),
-    });
-    if (!res.ok) return undefined;
-    const data = await res.json() as { data?: { subscribers?: number } };
-    return data?.data?.subscribers;
-  } catch {
-    return undefined;
-  }
-}
+// Uses Apify's harshmaur/reddit-scraper. The official apify/reddit-scraper (and
+// several others) crawl 0 pages for search queries as of Nov 2026, and some
+// return posts with score/comments zeroed; this one returns full vote data and
+// subreddit sizes. Billed per post saved (~$0.0018) plus a small start fee.
 
 interface ApifyRedditPost {
   title?: string;
-  communityName?: string;
+  parsedCommunityName?: string;
+  communityName?: string; // "r/name"
   score?: number;
-  commentCount?: number;
-  url?: string;
+  commentsCount?: number;
+  postUrl?: string;
+  subredditSubscribers?: number;
 }
 
 async function enrichReddit(query: string): Promise<RedditSignal | undefined> {
   try {
     const { primary } = extractKeyTerms(query);
-    const posts = await runActor<ApifyRedditPost>("apify/reddit-scraper", {
-      scrapeMode: "posts",
-      searchQueries: [primary],
+    const posts = await runActor<ApifyRedditPost>("harshmaur/reddit-scraper", {
+      searchTerms: [primary],
+      searchPosts: true,
+      searchComments: false,
+      searchCommunities: false,
+      crawlCommentsPerPost: false,
+      includeNSFW: false,
       searchSort: "relevance",
-      searchTimeFilter: "year",
-      maxSearchResultsPerQuery: 40,
-    }, 45);
+      searchTime: "year",
+      maxPostsCount: 25,
+    }, 75, 512);
 
-    if (!posts.length) return undefined;
+    if (!posts.length) {
+      console.warn(`[enricher] Reddit returned no posts for "${primary}"`);
+      return undefined;
+    }
+
+    const subOf = (p: ApifyRedditPost) =>
+      (p.parsedCommunityName ?? p.communityName ?? "").replace(/^r\//, "").trim();
 
     // Group by subreddit
-    const subredditMap = new Map<string, { posts: ApifyRedditPost[]; engagement: number }>();
+    const subredditMap = new Map<string, { posts: ApifyRedditPost[]; engagement: number; subscribers?: number }>();
     for (const p of posts) {
-      const sub = (p.communityName ?? "").replace(/^r\//, "").trim();
+      const sub = subOf(p);
       if (!sub) continue;
       const entry = subredditMap.get(sub) ?? { posts: [], engagement: 0 };
       entry.posts.push(p);
-      entry.engagement += (p.score ?? 0) + (p.commentCount ?? 0) * 3;
+      entry.engagement += (p.score ?? 0) + (p.commentsCount ?? 0) * 3;
+      entry.subscribers ??= p.subredditSubscribers ?? undefined;
       subredditMap.set(sub, entry);
     }
 
-    const topSubs = Array.from(subredditMap.entries())
+    const communities: RedditCommunity[] = Array.from(subredditMap.entries())
       .sort(([, a], [, b]) => b.engagement - a.engagement)
-      .slice(0, 5);
-
-    const subscriberCounts = await Promise.all(
-      topSubs.map(([sub]) => fetchSubredditSize(sub))
-    );
-
-    const communities: RedditCommunity[] = topSubs.map(([sub, data], i) => ({
-      subreddit: sub,
-      posts_found: data.posts.length,
-      engagement: data.engagement,
-      subscriber_count: subscriberCounts[i],
-    }));
+      .slice(0, 5)
+      .map(([sub, data]) => ({
+        subreddit: sub,
+        posts_found: data.posts.length,
+        engagement: data.engagement,
+        subscriber_count: data.subscribers,
+      }));
 
     const topPosts: RedditPost[] = posts
-      .filter((p) => p.title && p.url)
+      .filter((p) => p.title && p.postUrl)
       .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
       .slice(0, 10)
       .map((p) => ({
         title: p.title!,
-        url: p.url!,
-        subreddit: (p.communityName ?? "unknown").replace(/^r\//, ""),
+        url: p.postUrl!,
+        subreddit: subOf(p) || "unknown",
         score: p.score ?? 0,
-        comments: p.commentCount ?? 0,
+        comments: p.commentsCount ?? 0,
       }));
 
     return {
