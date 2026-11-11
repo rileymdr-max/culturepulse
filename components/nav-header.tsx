@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useCurrentPlan } from "@/hooks/use-billing";
 import { PLANS } from "@/lib/plans";
+import { useQuery } from "@tanstack/react-query";
 
 interface NavHeaderProps {
   onOpenSaved?: () => void;
@@ -21,6 +22,20 @@ export function NavHeader({ onOpenSaved, compareCount = 0, onOpenCompare }: NavH
   const pathname = usePathname();
   const currentPlan = useCurrentPlan();
   const plan = PLANS[currentPlan];
+  const isAdminUser = session?.user?.email === "rileymdr@gmail.com";
+
+  // Admin only: how many sign-ups are waiting for approval (badge on "Admin").
+  const { data: pendingSignups = 0 } = useQuery({
+    queryKey: ["admin-pending-signups"],
+    enabled: isAdminUser,
+    refetchInterval: 5 * 60 * 1000,
+    queryFn: async () => {
+      const res = await fetch("/api/admin/users");
+      if (!res.ok) return 0;
+      const d = await res.json();
+      return (d.pending?.length as number) ?? 0;
+    },
+  });
 
   const navLinks = [
     { href: "/dashboard/search", label: "Search" },
@@ -51,7 +66,7 @@ export function NavHeader({ onOpenSaved, compareCount = 0, onOpenCompare }: NavH
             return (
               <Link
                 key={link.href}
-                href={link.href}
+                href={link.href === "/dashboard/admin" && pendingSignups > 0 ? "/dashboard/admin?tab=signups" : link.href}
                 className={cn(
                   "px-3 py-1.5 rounded-full text-sm font-medium transition-colors whitespace-nowrap",
                   active
@@ -60,6 +75,14 @@ export function NavHeader({ onOpenSaved, compareCount = 0, onOpenCompare }: NavH
                 )}
               >
                 {link.label}
+                {link.href === "/dashboard/admin" && pendingSignups > 0 && (
+                  <span
+                    className="ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[#FFE14D] px-1.5 text-[11px] font-bold tabular-nums text-[#111110] ring-[1.5px] ring-inset ring-[#111110]"
+                    title={`${pendingSignups} sign-up${pendingSignups === 1 ? "" : "s"} waiting for approval`}
+                  >
+                    {pendingSignups}
+                  </span>
+                )}
               </Link>
             );
           })}
