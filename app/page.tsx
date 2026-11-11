@@ -76,6 +76,42 @@ export default async function HomePage() {
           <HeroSignalCard />
         </section>
 
+        {/* ── Demo video ── */}
+        <section id="demo" className="scroll-mt-20 border-t-2 border-[#111110]">
+          <div className="mx-auto max-w-[1360px] px-4 py-20 sm:px-6 lg:px-11 lg:py-24">
+            <div className="flex flex-wrap items-end justify-between gap-x-10 gap-y-6">
+              <div>
+                <span className={cn(STICKER, "-rotate-2 bg-[#FFE14D]")}>See it in action</span>
+                <h2 className={cn(D, "mt-7 max-w-4xl text-5xl leading-[0.95] sm:text-6xl lg:text-7xl")}>
+                  Two ways in. One <span className="text-[#0B6B45]">brief</span> out.
+                </h2>
+              </div>
+              <p className="max-w-md text-lg leading-relaxed text-[#3B3832]">
+                Describe any audience, or start from a brand&rsquo;s handle. Either way, CulturePulse finds the
+                subculture and writes the brief. Under a minute, sound on.
+              </p>
+            </div>
+            <figure className="mt-12">
+              <div className={cn(CARD, "overflow-hidden")}>
+                <video
+                  className="block aspect-video w-full bg-[#F2EDE3]"
+                  src="/videos/culturepulse-demo.mp4"
+                  poster="/videos/culturepulse-demo-poster.jpg"
+                  controls
+                  playsInline
+                  preload="metadata"
+                  aria-label="CulturePulse product demo with voiceover"
+                >
+                  <track kind="captions" src="/videos/culturepulse-demo.en.vtt" srcLang="en" label="English" />
+                </video>
+              </div>
+              <figcaption className={cn(M, "mt-4 text-[11px] text-[#66625A]")}>
+                Product demo, 54 seconds. Example brands and data.
+              </figcaption>
+            </figure>
+          </div>
+        </section>
+
         {/* ── How it works ── */}
         <section id="how" className="scroll-mt-20 border-t-2 border-[#111110]">
           <div className="mx-auto max-w-[1360px] px-4 py-20 sm:px-6 lg:px-11 lg:py-24">
@@ -301,6 +337,7 @@ function SiteNav() {
           <Wordmark />
         </Link>
         <nav className="hidden gap-7 text-[15px] font-medium text-[#66625A] md:flex">
+          <a href="#demo" className="hover:text-[#111110]">Demo</a>
           <a href="#how" className="hover:text-[#111110]">How it works</a>
           <a href="#features" className="hover:text-[#111110]">Audience Audit</a>
           <a href="#pricing" className="hover:text-[#111110]">Pricing</a>
