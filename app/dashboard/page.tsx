@@ -202,7 +202,7 @@ function SearchBox({ recent }: { recent: string[] }) {
           autoComplete="off"
         />
         {/* Concentric: outer rounded-xl 12px − p-2 8px = rounded-sm 4px */}
-        <Button type="submit" size="lg" className="rounded-sm" disabled={pending || !q.trim()}>
+        <Button type="submit" size="lg" disabled={pending || !q.trim()}>
           {pending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
           Discover
         </Button>
