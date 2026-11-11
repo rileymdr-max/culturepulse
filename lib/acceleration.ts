@@ -2,7 +2,7 @@
  * Acceleration Scoring engine — Step 3 of the Speedbag architecture.
  *
  * Three-component score:
- *   Velocity    — % above 7-run baseline (the what)
+ *   Velocity    — engagement % above 7-run baseline (the what)
  *   Momentum    — is velocity itself rising or falling? (the direction)
  *   Cross-Platform — do the platforms agree? (the signal strength)
  *
@@ -16,6 +16,12 @@ export type MonitorPlatform = (typeof MONITOR_PLATFORMS)[number];
 export interface SnapshotLike {
   platform: string;
   postCount: number;
+  /**
+   * Likes/views/comments on the posts found (search interest for Trends).
+   * Scored instead of postCount, which always hits the scraper's result cap.
+   * Optional so old callers still work; falls back to postCount.
+   */
+  engagement?: number;
   capturedAt: string | Date;
 }
 
@@ -96,8 +102,9 @@ export function computeAccelerationSignal(snapshots: SnapshotLike[]): Accelerati
       .sort((a, b) => new Date(b.capturedAt).getTime() - new Date(a.capturedAt).getTime());
 
   const counts = Object.fromEntries(
-    MONITOR_PLATFORMS.map((p) => [p, byPlatform(p).map((s) => s.postCount)])
+    MONITOR_PLATFORMS.map((p) => [p, byPlatform(p).map((s) => s.engagement ?? s.postCount)])
   ) as Record<MonitorPlatform, number[]>;
+  const latestPostCount = (p: MonitorPlatform) => byPlatform(p)[0]?.postCount ?? null;
   const vel = Object.fromEntries(
     MONITOR_PLATFORMS.map((p) => [p, velocityFor(counts[p])])
   ) as Record<MonitorPlatform, number | null>;
@@ -124,7 +131,7 @@ export function computeAccelerationSignal(snapshots: SnapshotLike[]): Accelerati
     breakoutScore: score,
     isBreakout: score >= 70 || velocity >= 50,
     platform: Object.fromEntries(
-      MONITOR_PLATFORMS.map((p) => [p, { velocity: vel[p], postCount: counts[p][0] ?? null }])
+      MONITOR_PLATFORMS.map((p) => [p, { velocity: vel[p], postCount: latestPostCount(p) }])
     ) as Record<MonitorPlatform, PlatformAccel>,
   };
 }

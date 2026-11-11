@@ -131,7 +131,7 @@ export async function runMonitor(monitor: MonitorWithSubculture): Promise<void> 
   // Compute acceleration from new + existing snapshots to detect breakouts
   const existing: SnapshotLike[] = await prisma.monitorSnapshot.findMany({
     where: { monitorId: monitor.id },
-    select: { platform: true, postCount: true, capturedAt: true },
+    select: { platform: true, postCount: true, engagement: true, capturedAt: true },
     orderBy: { capturedAt: "desc" },
     take: 60, // ~10 runs across six platforms
   });

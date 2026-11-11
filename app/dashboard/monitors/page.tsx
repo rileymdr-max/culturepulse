@@ -7,8 +7,8 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import {
-  AreaChart, Area, XAxis, YAxis, Tooltip,
-  ResponsiveContainer, CartesianGrid,
+  LineChart, Line, XAxis, YAxis, Tooltip,
+  ResponsiveContainer, CartesianGrid, ReferenceLine,
 } from "recharts";
 import { NavHeader } from "@/components/nav-header";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -70,20 +70,48 @@ function TierChip({ tier, className }: { tier: SignalTier; className?: string })
 
 // ─── Chart ────────────────────────────────────────────────────────────────────
 
-function buildChartData(snapshots: MonitorData["snapshots"]) {
-  const byRun = new Map<string, Partial<Record<string, number>>>();
+const CHART_PLATFORMS = VELOCITY_PLATFORMS;
+type ChartPlatform = (typeof CHART_PLATFORMS)[number];
+type ChartPoint = { name: string } & Partial<Record<ChartPlatform | `${ChartPlatform}Raw`, number>>;
+
+const ENGAGEMENT_UNIT: Record<ChartPlatform, string> = {
+  reddit: "upvotes + comments",
+  twitter: "likes + reposts",
+  tiktok: "views",
+  youtube: "views",
+  instagram: "likes",
+  trends: "search interest",
+};
+
+/**
+ * One point per run (last 8). Each platform is plotted as % change in
+ * engagement from its first run in the window, so platforms measured in
+ * views, likes and search interest share one axis. Raw values go in `<p>Raw`.
+ */
+function buildChartData(snapshots: MonitorData["snapshots"]): ChartPoint[] {
+  const byRun = new Map<string, ChartPoint>();
   const sorted = [...snapshots].sort(
     (a, b) => new Date(a.capturedAt).getTime() - new Date(b.capturedAt).getTime()
   );
   for (const s of sorted) {
-    const key = new Date(s.capturedAt).toLocaleString(undefined, {
-      month: "short", day: "numeric", hour: "numeric", minute: "2-digit",
+    if (!(CHART_PLATFORMS as readonly string[]).includes(s.platform)) continue;
+    const name = new Date(s.capturedAt).toLocaleString(undefined, {
+      month: "short", day: "numeric", hour: "numeric",
     });
-    const existing = byRun.get(key) ?? {};
-    if ((VOLUME_PLATFORMS as readonly string[]).includes(s.platform)) existing[s.platform] = s.postCount;
-    byRun.set(key, existing);
+    const point = byRun.get(name) ?? { name };
+    point[`${s.platform as ChartPlatform}Raw`] = s.engagement;
+    byRun.set(name, point);
   }
-  return Array.from(byRun.entries()).slice(-8).map(([name, v]) => ({ name, ...v }));
+  const points = Array.from(byRun.values()).slice(-8);
+  for (const p of CHART_PLATFORMS) {
+    const base = points.map((pt) => pt[`${p}Raw`]).find((v): v is number => !!v && v > 0);
+    if (base === undefined) continue;
+    for (const pt of points) {
+      const raw = pt[`${p}Raw`];
+      if (raw !== undefined) pt[p] = Math.round((raw / base - 1) * 100);
+    }
+  }
+  return points;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -92,23 +120,29 @@ function ChartTooltip({ active, payload, label }: any) {
   return (
     <div className="rounded-lg border-2 border-[#111110] bg-[#FFFDF8] px-3 py-2 text-xs shadow-[3px_3px_0_#111110]">
       <p className="mb-1 text-[#5E5A52]">{label}</p>
-      {payload.map((p: { dataKey: string; value: number; color: string }) => (
+      {payload.map((p: { dataKey: ChartPlatform; value: number; color: string; payload: ChartPoint }) => (
         <p key={p.dataKey} className="flex items-center gap-1.5 tabular-nums">
           <span className="h-2 w-2 rounded-full" style={{ background: p.color }} />
-          {platformLabel(p.dataKey)}: <strong className="font-bold">{p.value} posts</strong>
+          {platformLabel(p.dataKey)}: <strong className="font-bold">{signed(p.value)}</strong>
+          <span className="text-[#5E5A52]">
+            ({(p.payload[`${p.dataKey}Raw`] ?? 0).toLocaleString()} {ENGAGEMENT_UNIT[p.dataKey]})
+          </span>
         </p>
       ))}
     </div>
   );
 }
 
-const SERIES_COLOR = {
+const SERIES_COLOR: Record<ChartPlatform, string> = {
   reddit: F2.green,
   twitter: F2.violet,
   tiktok: F2.ink,
   youtube: F2.green,
   instagram: F2.violet,
-} as const;
+  trends: F2.ink,
+};
+const DASHED: ReadonlySet<ChartPlatform> = new Set(["youtube", "instagram", "trends"]);
+const AXIS_TICK = { fontSize: 11, fill: F2.muted };
 
 function VolumeChart({ snapshots }: { snapshots: MonitorData["snapshots"] }) {
   const data = buildChartData(snapshots);
@@ -116,44 +150,57 @@ function VolumeChart({ snapshots }: { snapshots: MonitorData["snapshots"] }) {
   if (data.length < 2) {
     return (
       <div className="flex min-h-16 items-center rounded-xl bg-[#F2EDE3] px-4 py-3 text-sm text-[#5E5A52]">
-        Post-volume chart appears after the second run. Monitors refresh every 6 hours.
+        Engagement chart appears after the second run. Monitors refresh every 6 hours.
       </div>
     );
   }
 
-  // F2 palette, solid then dashed, so five platforms stay distinguishable.
-  const series = VOLUME_PLATFORMS.map((key) => ({
+  // F2 palette, solid then dashed, so six platforms stay distinguishable.
+  const series = CHART_PLATFORMS.map((key) => ({
     key,
     color: SERIES_COLOR[key],
-    dash: key === "youtube" || key === "instagram" ? "4 3" : undefined,
-  })).filter((s) => data.some((d) => (d as Record<string, unknown>)[s.key] !== undefined));
+    dash: DASHED.has(key) ? "4 3" : undefined,
+  })).filter((s) => data.some((d) => d[s.key] !== undefined));
 
   return (
     <div>
-      <ResponsiveContainer width="100%" height={72}>
-        <AreaChart data={data} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
+      <ResponsiveContainer width="100%" height={150}>
+        <LineChart data={data} margin={{ top: 6, right: 8, bottom: 0, left: 0 }}>
           <CartesianGrid stroke={F2.rule} vertical={false} />
-          <XAxis dataKey="name" hide />
-          <YAxis hide />
+          <XAxis
+            dataKey="name"
+            tick={AXIS_TICK}
+            tickLine={false}
+            axisLine={{ stroke: F2.rule }}
+            interval="preserveStartEnd"
+            minTickGap={24}
+          />
+          <YAxis
+            tick={AXIS_TICK}
+            tickLine={false}
+            axisLine={false}
+            width={44}
+            tickFormatter={(v: number) => signed(v)}
+          />
+          <ReferenceLine y={0} stroke={F2.muted} strokeWidth={1} />
           <Tooltip content={<ChartTooltip />} cursor={{ stroke: F2.ink, strokeDasharray: "3 3" }} />
           {series.map((s) => (
-            <Area
+            <Line
               key={s.key}
               type="monotone"
               dataKey={s.key}
               stroke={s.color}
               strokeDasharray={s.dash}
-              fill={s.color}
-              fillOpacity={s.dash ? 0 : 0.12}
               strokeWidth={2}
-              dot={false}
+              dot={{ r: 2.5, fill: s.color, strokeWidth: 0 }}
+              connectNulls
               isAnimationActive={false}
             />
           ))}
-        </AreaChart>
+        </LineChart>
       </ResponsiveContainer>
       <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-[#5E5A52]">
-        <span>Post volume, last {data.length} runs</span>
+        <span>Engagement change since first run shown</span>
         {series.map((s) => (
           <span key={s.key} className="flex items-center gap-1.5">
             <span className="h-2 w-2 rounded-full" style={{ background: s.color }} />
