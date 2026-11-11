@@ -1,6 +1,7 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
+import { DemoBanner } from "@/components/demo";
 
 /**
  * Dashboard layout — server-side session guard (supplements middleware).
@@ -16,6 +17,7 @@ export default async function DashboardLayout({
 
   return (
     <>
+      <DemoBanner />
       {children}
       <footer className="border-t border-border/40 py-4 px-6 text-center">
         <p className="text-xs text-muted-foreground">

@@ -1,3 +1,4 @@
+import { DEMO_EMAIL } from "@/lib/demo-policy";
 import { NextRequest, NextResponse } from "next/server";
 import { rejectUnlessCron } from "@/lib/cron-auth";
 import { prisma } from "@/lib/prisma";
@@ -27,6 +28,7 @@ async function sendDigestToAllUsers(): Promise<number> {
   // Get all users who have at least one active monitor
   const users = await prisma.user.findMany({
     where: {
+      email: { not: DEMO_EMAIL },
       monitors: { some: { status: "active" } },
     },
     select: {

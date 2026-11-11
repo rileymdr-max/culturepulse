@@ -1,3 +1,4 @@
+import { DEMO_EMAIL } from "@/lib/demo-policy";
 import { prisma } from "@/lib/prisma";
 import { enrichSubcultureWithSignals } from "@/lib/subculture-enricher";
 import { computeAccelerationSignal, type SnapshotLike } from "@/lib/acceleration";
@@ -253,7 +254,8 @@ export async function runMonitors(
 
 export async function runAllActiveMonitors(): Promise<MonitorRunSummary> {
   const monitors = await prisma.monitor.findMany({
-    where: { status: "active" },
+    // The demo account holds copies of another account's monitors; never run them.
+    where: { status: "active", user: { email: { not: DEMO_EMAIL } } },
     include: { subculture: true },
     // Least recently run first, so anything skipped on a busy run goes first next time.
     orderBy: { lastRunAt: { sort: "asc", nulls: "first" } },

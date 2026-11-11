@@ -11,6 +11,7 @@ import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getEffectivePlan } from "@/lib/plans";
+import { getOrRefreshDemoUser, isDemoEmail } from "@/lib/demo";
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -57,12 +58,29 @@ export const authOptions: NextAuthOptions = {
         };
       },
     }),
+    // One-click demo: no credentials; signs in as the shared read-only demo user.
+    CredentialsProvider({
+      id: "demo",
+      name: "demo",
+      credentials: {},
+      async authorize() {
+        const user = await getOrRefreshDemoUser();
+        return {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          image: user.image,
+          plan: user.plan,
+        };
+      },
+    }),
   ],
   callbacks: {
     async jwt({ token, user, trigger }) {
       if (user) {
         token.id = user.id;
         token.plan = (user as { plan?: string }).plan ?? "free";
+        token.demo = isDemoEmail(user.email);
       }
       // Refresh plan on session update (e.g., after Stripe webhook updates the DB)
       if (trigger === "update" && token.id) {
@@ -78,6 +96,7 @@ export const authOptions: NextAuthOptions = {
       if (session.user) {
         session.user.id   = token.id as string;
         session.user.plan = getEffectivePlan(session.user.email, (token.plan as string) ?? "free");
+        session.user.isDemo = !!token.demo;
       }
       return session;
     },
