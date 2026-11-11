@@ -139,7 +139,7 @@ function ComparePageInner() {
         <Link href="/dashboard/search" className="group inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground">
           <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-0.5" aria-hidden />Search
         </Link>
-        <h1 className="mt-4 text-3xl font-semibold tracking-tight">
+        <h1 className="mt-4 text-4xl tracking-tight">
           {communities.length >= 2
             ? communities.map((c) => c.community_name).join(" vs ")
             : "Compare communities"}

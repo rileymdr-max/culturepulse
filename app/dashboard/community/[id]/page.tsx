@@ -98,7 +98,7 @@ export default function CommunityDetailPage({ params }: PageProps) {
               <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                 <div className="flex-1 min-w-0">
                   <PlatformBadge platform={community.platform} className="mb-3" />
-                  <h1 className="text-2xl font-bold text-foreground truncate">
+                  <h1 className="text-3xl text-foreground truncate">
                     {community.community_name}
                   </h1>
                   <p className="mt-2 text-sm text-muted-foreground max-w-2xl leading-relaxed">

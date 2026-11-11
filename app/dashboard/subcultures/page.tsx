@@ -210,7 +210,7 @@ export default function SubculturesPage() {
       <main className="mx-auto w-full max-w-screen-xl flex-1 px-4 py-10 sm:px-6">
         <header className="flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
           <div>
-            <h1 className="text-3xl font-semibold tracking-tight">Library</h1>
+            <h1 className="text-4xl tracking-tight">Library</h1>
             <p className="mt-2 max-w-2xl text-muted-foreground">
               Subculture profiles with the keywords, vernacular and moments your monitors listen for.
             </p>

@@ -68,7 +68,7 @@ export function SavedPanel({ open, onClose, onSearchSelect }: SavedPanelProps) {
             {savedSearches.map((s) => (
               <div
                 key={s.id}
-                className="group rounded-lg border border-border p-3 hover:border-blue-800/50 transition-colors"
+                className="group rounded-lg border border-border p-3 hover:border-primary/50 transition-colors"
               >
                 <div className="flex items-start justify-between gap-2">
                   <button
@@ -78,7 +78,7 @@ export function SavedPanel({ open, onClose, onSearchSelect }: SavedPanelProps) {
                       onClose();
                     }}
                   >
-                    <p className="text-sm font-medium text-foreground group-hover:text-indigo-400 transition-colors truncate">
+                    <p className="text-sm font-medium text-foreground group-hover:text-primary transition-colors truncate">
                       {s.label ?? s.query}
                     </p>
                     {s.label && (

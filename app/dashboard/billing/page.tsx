@@ -140,7 +140,7 @@ function BillingPageInner() {
 
       <main className="mx-auto w-full max-w-screen-xl flex-1 px-4 py-10 sm:px-6">
         <header>
-          <h1 className="text-3xl font-semibold tracking-tight">Billing</h1>
+          <h1 className="text-4xl tracking-tight">Billing</h1>
           <p className="mt-2 text-muted-foreground">
             You’re on the <span className="font-medium text-foreground">{plan.name}</span> plan
             {plan.price > 0 && <span className="tabular-nums"> ({price(plan.price)}/mo)</span>}.

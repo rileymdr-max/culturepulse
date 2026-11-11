@@ -1,10 +1,8 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/providers";
 import { SiteAnalytics } from "@/components/analytics";
-
-const inter = Inter({ subsets: ["latin"], display: "swap", variable: "--font-sans" });
+import { FONT_VARS } from "@/components/marketing/brand";
 
 export const metadata: Metadata = {
   title: "CulturePulse — Micro-culture Intelligence",
@@ -18,7 +16,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={inter.variable} suppressHydrationWarning>
+    <html lang="en" className={FONT_VARS} suppressHydrationWarning>
       <body>
         <Providers>{children}</Providers>
         <SiteAnalytics />

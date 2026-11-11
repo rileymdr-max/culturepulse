@@ -34,7 +34,7 @@ export function NavHeader({ onOpenSaved, compareCount = 0, onOpenCompare }: NavH
   ];
 
   return (
-    <header className="sticky top-0 z-30 border-b border-border bg-card/80 backdrop-blur-md">
+    <header className="sticky top-0 z-30 border-b-2 border-foreground bg-background/90 backdrop-blur-md">
       <div className="max-w-screen-xl mx-auto px-4 sm:px-6 flex items-center h-14 gap-4">
         {/* Brand */}
         <Link href="/dashboard" className="flex items-center shrink-0" aria-label="CulturePulse home">
@@ -53,9 +53,9 @@ export function NavHeader({ onOpenSaved, compareCount = 0, onOpenCompare }: NavH
                 key={link.href}
                 href={link.href}
                 className={cn(
-                  "px-3 py-1.5 rounded-md text-sm transition-colors whitespace-nowrap",
+                  "px-3 py-1.5 rounded-full text-sm font-medium transition-colors whitespace-nowrap",
                   active
-                    ? "bg-accent text-accent-foreground font-semibold"
+                    ? "bg-accent text-accent-foreground font-bold ring-[1.5px] ring-inset ring-foreground"
                     : "text-muted-foreground hover:text-foreground hover:bg-accent/60"
                 )}
               >
@@ -93,9 +93,9 @@ export function NavHeader({ onOpenSaved, compareCount = 0, onOpenCompare }: NavH
           <Link href="/dashboard/billing">
             <span className={cn(
               "hidden sm:inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full border cursor-pointer transition-colors hover:opacity-80",
-              currentPlan === "agency" ? "bg-purple-500/15 text-purple-400 border-purple-500/30" :
-              currentPlan === "pro"    ? "bg-amber-500/15 text-amber-400 border-amber-500/30" :
-              currentPlan === "starter"? "bg-indigo-500/15 text-indigo-500 border-indigo-500/30" :
+              currentPlan === "agency" ? "bg-[#BBA8FF] text-foreground border-foreground" :
+              currentPlan === "pro"    ? "bg-[#FFE14D] text-foreground border-foreground" :
+              currentPlan === "starter"? "bg-accent text-accent-foreground border-foreground" :
               "bg-muted text-muted-foreground border-border"
             )}>
               <CreditCard className="h-2.5 w-2.5" />
@@ -108,7 +108,7 @@ export function NavHeader({ onOpenSaved, compareCount = 0, onOpenCompare }: NavH
           <button
             onClick={() => signOut({ callbackUrl: "/login" })}
             title={`Sign out (${session?.user?.email})`}
-            className="group relative h-7 w-7 rounded-full bg-indigo-600 flex items-center justify-center text-white text-xs font-bold shrink-0 hover:bg-indigo-700 transition-colors"
+            className="group relative h-7 w-7 rounded-full bg-primary border-[1.5px] border-foreground flex items-center justify-center text-white text-xs font-bold shrink-0 hover:bg-primary/90 transition-colors"
           >
             {(session?.user?.name ?? session?.user?.email ?? "U").charAt(0).toUpperCase()}
             <span className="absolute -bottom-7 right-0 hidden group-hover:block text-[10px] bg-popover text-popover-foreground border border-border px-1.5 py-0.5 rounded whitespace-nowrap z-50 shadow">

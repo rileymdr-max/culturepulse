@@ -152,7 +152,7 @@ export default function BrandAuditPage() {
       <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-10 sm:px-6">
         {/* Header */}
         <header>
-          <h1 className="text-3xl font-semibold tracking-tight">Audience Audit</h1>
+          <h1 className="text-4xl tracking-tight">Audience Audit</h1>
           <p className="mt-2 max-w-2xl text-muted-foreground">
             Enter a brand’s social handle to see which subcultures make up its audience, and which ones haven’t been mapped yet.
           </p>

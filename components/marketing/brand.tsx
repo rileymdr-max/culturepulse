@@ -11,6 +11,9 @@ const display = Anton({ weight: "400", subsets: ["latin"], display: "swap", vari
 const body = DM_Sans({ subsets: ["latin"], display: "swap", variable: "--font-body" });
 const mono = JetBrains_Mono({ weight: ["400", "500"], subsets: ["latin"], display: "swap", variable: "--font-mono" });
 
+/** Font CSS variables only — applied on <html> so the whole app gets the brand type. */
+export const FONT_VARS = cn(display.variable, body.variable, mono.variable);
+
 /** Root classes: font variables, paper background, ink text. */
 export const BRAND_ROOT = cn(
   display.variable,

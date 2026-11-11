@@ -46,7 +46,7 @@ export default function BriefsPage() {
 
       <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-10 sm:px-6">
         <header>
-          <h1 className="text-3xl font-semibold tracking-tight">Briefs</h1>
+          <h1 className="text-4xl tracking-tight">Briefs</h1>
           <div className="mt-2 text-muted-foreground">
             {isLoading ? (
               <Skeleton className="h-5 w-64" />

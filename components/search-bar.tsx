@@ -10,7 +10,7 @@ const PLATFORMS = [
   { id: "substack", label: "Substack", color: "text-amber-400" },
   { id: "tiktok", label: "TikTok", color: "text-pink-400" },
   { id: "instagram", label: "Instagram", color: "text-purple-400" },
-  { id: "facebook", label: "Facebook", color: "text-indigo-500" },
+  { id: "facebook", label: "Facebook", color: "text-primary" },
 ] as const;
 
 type PlatformId = typeof PLATFORMS[number]["id"];
@@ -76,7 +76,7 @@ export function SearchBar({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search any micro-community, subculture, or niche…"
-            className="w-full h-12 rounded-xl border border-input bg-muted pl-10 pr-10 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
+            className="w-full h-12 rounded-xl border border-input bg-muted pl-10 pr-10 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition"
           />
           {query && (
             <button
@@ -92,7 +92,7 @@ export function SearchBar({
         <button
           type="submit"
           disabled={isLoading || !query.trim()}
-          className="h-12 px-6 rounded-xl bg-indigo-600 text-sm font-semibold text-white hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-background disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center gap-2 shrink-0"
+          className="h-12 px-6 rounded-xl bg-primary text-sm font-semibold text-white hover:bg-primary focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center gap-2 shrink-0"
         >
           {isLoading ? (
             <Loader2 className="h-4 w-4 animate-spin" />
@@ -111,8 +111,8 @@ export function SearchBar({
           className={cn(
             "text-xs rounded-full border px-2.5 py-0.5 transition",
             selected.size === PLATFORMS.length
-              ? "border-blue-700 bg-blue-900/30 text-indigo-500"
-              : "border-border text-muted-foreground hover:border-blue-700 hover:text-indigo-500"
+              ? "border-foreground bg-accent text-primary"
+              : "border-border text-muted-foreground hover:border-foreground hover:text-primary"
           )}
         >
           All

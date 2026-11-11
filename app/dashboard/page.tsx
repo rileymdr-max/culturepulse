@@ -93,7 +93,7 @@ export default function WelcomePage() {
             </>
           ) : (
             <>
-              <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
+              <h1 className="text-4xl tracking-tight sm:text-5xl">
                 {getGreeting(session?.user?.name ?? session?.user?.email)}
               </h1>
               {/* On error the Signal Board panel explains it; don't imply "no monitors" here */}

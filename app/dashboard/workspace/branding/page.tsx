@@ -118,8 +118,8 @@ function BrandingPageInner() {
               <ArrowLeft className="h-4 w-4" /> Workspaces
             </Button>
           </Link>
-          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-            <Palette className="h-6 w-6 text-blue-400" />
+          <h1 className="text-3xl text-foreground flex items-center gap-2">
+            <Palette className="h-6 w-6 text-primary" />
             Branding — {ws.name}
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">

@@ -5,84 +5,84 @@
 @layer base {
   /* ── Light mode (Signal White) ──────────────────────────────────────────── */
   :root {
-    --background: 225 25% 97%;       /* pale blue-gray page surface */
-    --foreground: 222 84% 11%;       /* near-black navy */
+    /* F2 brand: warm paper, ink, deep green (see components/marketing/brand.tsx) */
+    --background: 40 33% 92%;        /* paper #F2EDE3 */
+    --foreground: 60 3% 6%;          /* ink #111110 */
 
-    --muted: 220 20% 93%;
-    --muted-foreground: 215 19% 38%;  /* ≥4.5:1 on background + card */
+    --muted: 40 27% 87%;
+    --muted-foreground: 40 7% 34%;   /* #5E5A52 — 6.1:1 on paper */
 
-    --accent: 238 100% 96%;          /* very light indigo tint — active nav pill bg */
-    --accent-foreground: 239 72% 54%; /* indigo — active nav pill text */
+    --accent: 145 63% 86%;           /* mint #C7F2D9 — active nav pill bg */
+    --accent-foreground: 156 81% 23%; /* green #0B6B45 */
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 222 84% 11%;
+    --popover: 43 100% 99%;
+    --popover-foreground: 60 3% 6%;
 
-    --border: 220 20% 88%;
-    --input: 220 20% 88%;
+    --border: 39 20% 78%;            /* soft rule for dividers */
+    --input: 60 3% 6%;               /* inputs get an ink outline */
 
-    --card: 0 0% 100%;               /* pure white cards */
-    --card-foreground: 222 84% 11%;
+    --card: 43 100% 99%;             /* #FFFDF8 */
+    --card-foreground: 60 3% 6%;
 
-    --primary: 239 72% 54%;          /* indigo #4f46e5 */
+    --primary: 156 81% 23%;          /* green #0B6B45 */
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 220 20% 93%;
-    --secondary-foreground: 222 84% 11%;
+    --secondary: 40 27% 87%;
+    --secondary-foreground: 60 3% 6%;
 
-    --destructive: 0 72% 45%;         /* ≥4.5:1 as text on white */
+    --destructive: 0 72% 42%;
     --destructive-foreground: 0 0% 100%;
 
-    --ring: 239 72% 54%;
+    --ring: 156 81% 23%;
 
-    /* Accent: reserved for live signal moments (breakouts, alerts) — never decoration */
-    --signal: 12 80% 46%;            /* coral */
+    /* Live signal moments (breakouts, alerts) */
+    --signal: 156 81% 23%;
     --signal-foreground: 0 0% 100%;
 
-    /* Signal tiers — the only status colors used for scores */
-    --tier-breakout: 12 80% 46%;
-    --tier-trending: 30 90% 34%;
-    --tier-rising: 239 72% 54%;
+    /* Signal tiers — no blue/orange */
+    --tier-breakout: 156 81% 23%;    /* green */
+    --tier-trending: 46 100% 27%;    /* ochre (yellow, darkened for text) */
+    --tier-rising: 278 58% 39%;      /* plum #742A9E */
 
-    /* Radius scale. Nested rule: inner radius = outer radius − padding */
-    --radius: 0.5rem;                /* 8px — controls, inner panels */
+    --radius: 0.625rem;
   }
 
   /* ── Dark mode ──────────────────────────────────────────────────────────── */
   .dark {
-    --background: 224 71% 4%;
-    --foreground: 213 31% 91%;
+    --background: 60 3% 7%;
+    --foreground: 40 33% 92%;
 
-    --muted: 223 47% 11%;
-    --muted-foreground: 215 20% 65%;
+    --muted: 60 3% 13%;
+    --muted-foreground: 40 10% 66%;
 
-    --accent: 216 34% 17%;
-    --accent-foreground: 210 40% 98%;
+    --accent: 156 45% 16%;
+    --accent-foreground: 145 63% 80%;
 
-    --popover: 224 71% 4%;
-    --popover-foreground: 215 20.2% 65.1%;
+    --popover: 60 3% 10%;
+    --popover-foreground: 40 33% 92%;
 
-    --border: 216 34% 17%;
-    --input: 216 34% 17%;
+    --border: 40 6% 22%;
+    --input: 40 10% 60%;
 
-    --card: 224 71% 4%;
-    --card-foreground: 213 31% 91%;
+    --card: 60 3% 10%;
+    --card-foreground: 40 33% 92%;
 
-    --primary: 239 84% 72%;          /* indigo stays the brand color in dark mode */
-    --primary-foreground: 224 71% 4%;
+    --primary: 152 58% 52%;
+    --primary-foreground: 60 3% 6%;
 
-    --secondary: 222.2 47.4% 11.2%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary: 60 3% 15%;
+    --secondary-foreground: 40 33% 92%;
 
-    --destructive: 0 80% 66%;         /* readable as text on dark */
-    --destructive-foreground: 224 71% 4%;
+    --destructive: 0 80% 66%;
+    --destructive-foreground: 60 3% 6%;
 
-    --ring: 239 84% 72%;
+    --ring: 152 58% 52%;
 
-    --signal: 12 90% 64%;
-    --signal-foreground: 224 71% 4%;
-    --tier-breakout: 12 90% 64%;
-    --tier-trending: 36 92% 58%;
-    --tier-rising: 239 84% 72%;
+    --signal: 152 58% 52%;
+    --signal-foreground: 60 3% 6%;
+    --tier-breakout: 152 58% 52%;
+    --tier-trending: 50 100% 65%;
+    --tier-rising: 253 100% 83%;
   }
 }
 
@@ -96,6 +96,15 @@
   }
   h1, h2, h3 {
     text-wrap: balance;
+  }
+  /* Page titles use the Anton display face (one weight, so no faux bold) */
+  h1 {
+    font-family: var(--font-display), Impact, sans-serif;
+    font-weight: 400;
+    font-synthesis: none;
+    text-transform: uppercase;
+    letter-spacing: 0.01em;
+    line-height: 1;
   }
   p {
     text-wrap: pretty;

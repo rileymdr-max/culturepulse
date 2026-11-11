@@ -208,7 +208,7 @@ export default function WorkspacePage() {
 
       <main className="mx-auto w-full max-w-screen-xl flex-1 px-4 py-10 sm:px-6">
         <header>
-          <h1 className="text-3xl font-semibold tracking-tight">Workspaces</h1>
+          <h1 className="text-4xl tracking-tight">Workspaces</h1>
           <p className="mt-2 max-w-2xl text-muted-foreground">
             Shared spaces for each client or team, with their own members and branding.
           </p>

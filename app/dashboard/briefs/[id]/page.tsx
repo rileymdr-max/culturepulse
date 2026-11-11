@@ -203,7 +203,7 @@ export default function BriefDetailPage() {
       <Shell>
         {backLink}
         <div className="mt-8 rounded-xl border border-dashed border-border px-6 py-16 text-center">
-          <h1 className="text-lg font-semibold">We couldn’t find that brief</h1>
+          <h1 className="text-lg">We couldn’t find that brief</h1>
           <p className="mt-2 text-muted-foreground">It may have been deleted.</p>
         </div>
       </Shell>
@@ -242,7 +242,7 @@ export default function BriefDetailPage() {
           <span className={cn("font-semibold", u.text)}>{u.label}</span>
           <span className="text-muted-foreground"> · {u.detail}</span>
         </p>
-        <h1 className="mt-3 text-3xl font-semibold leading-tight tracking-tight sm:text-4xl">{brief.headline}</h1>
+        <h1 className="mt-3 text-4xl leading-tight tracking-tight sm:text-5xl">{brief.headline}</h1>
         <p className="mt-4 text-sm text-muted-foreground">
           <Link href={`/dashboard/subcultures/${brief.subculture.slug}`} className="font-medium text-foreground underline-offset-4 hover:text-primary hover:underline">
             {brief.subculture.name}

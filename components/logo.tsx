@@ -6,7 +6,7 @@ export function LogoMark({ className }: { className?: string }) {
     <span
       aria-hidden
       className={cn(
-        "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground",
+        "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border-[1.5px] border-foreground bg-primary text-primary-foreground",
         className
       )}
     >
@@ -22,7 +22,9 @@ export function Logo({ className }: { className?: string }) {
   return (
     <span className={cn("inline-flex items-center gap-2", className)}>
       <LogoMark />
-      <span className="text-[15px] font-semibold tracking-tight text-foreground">CulturePulse</span>
+      <span className="font-display text-[20px] uppercase leading-none text-foreground">
+        Culture<span className="text-primary">Pulse</span>
+      </span>
     </span>
   );
 }

@@ -45,7 +45,7 @@ function SpikeContentLoader({
       {!open ? (
         <button
           onClick={handleLoad}
-          className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 transition-colors"
+          className="text-xs text-primary hover:text-foreground flex items-center gap-1 transition-colors"
         >
           <ChevronDown className="h-3 w-3" />
           Load posts driving this spike
@@ -74,7 +74,7 @@ function SpikeContentLoader({
                 href={getContentUrl(platform, communityId, topic)}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-blue-400 hover:underline"
+                className="text-primary hover:underline"
               >
                 Search on platform →
               </a>
@@ -89,7 +89,7 @@ function SpikeContentLoader({
               rel="noopener noreferrer"
               className="block rounded-lg border border-border bg-accent/40 hover:bg-accent px-3 py-2 transition-colors group"
             >
-              <p className="text-xs text-foreground leading-snug line-clamp-2 group-hover:text-blue-300 transition-colors">
+              <p className="text-xs text-foreground leading-snug line-clamp-2 group-hover:text-foreground transition-colors">
                 {item.title}
               </p>
               <div className="flex items-center gap-2 mt-1">
@@ -131,7 +131,7 @@ function SpikeItem({
             "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold shrink-0",
             spike.severity === "high"
               ? "bg-red-500/15 text-red-400 border border-red-500/30"
-              : "bg-orange-500/15 text-orange-400 border border-orange-500/30"
+              : "bg-[#FFE14D] text-foreground border border-foreground"
           )}
         >
           {TYPE_ICONS[spike.type]}
@@ -148,7 +148,7 @@ function SpikeItem({
             href={contentUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="ml-auto inline-flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 transition-colors shrink-0"
+            className="ml-auto inline-flex items-center gap-1 text-xs text-primary hover:text-foreground transition-colors shrink-0"
           >
             View on platform
             <ExternalLink className="h-3 w-3" />
@@ -183,7 +183,7 @@ export function SpikePanel({
       {/* Header */}
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <Zap className="h-4 w-4 text-orange-400" />
+          <Zap className="h-4 w-4 text-tier-trending" />
           <span className="text-sm font-semibold text-foreground">Spike Detection</span>
           {spikes.length > 0 && (
             <span
@@ -191,7 +191,7 @@ export function SpikePanel({
                 "px-1.5 py-0.5 rounded-full text-[10px] font-bold",
                 highCount > 0
                   ? "bg-red-500/20 text-red-400"
-                  : "bg-orange-500/20 text-orange-400"
+                  : "bg-[#FFE14D] text-foreground"
               )}
             >
               {spikes.length} spike{spikes.length !== 1 ? "s" : ""}
