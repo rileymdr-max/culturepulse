@@ -1,6 +1,6 @@
 import { DEMO_EMAIL } from "@/lib/demo-policy";
 import { prisma } from "@/lib/prisma";
-import { enrichSubcultureWithSignals } from "@/lib/subculture-enricher";
+import { enrichSubcultureWithSignals, recheckInstagramEngagement } from "@/lib/subculture-enricher";
 import { computeAccelerationSignal, type SnapshotLike } from "@/lib/acceleration";
 import { sendBreakoutAlert } from "@/lib/email";
 import type { Monitor, Subculture } from "@prisma/client";
@@ -28,7 +28,24 @@ function buildSearchQuery(subculture: Subculture): string {
 
 export async function runMonitor(monitor: MonitorWithSubculture): Promise<void> {
   const query = buildSearchQuery(monitor.subculture);
-  const signals = await enrichSubcultureWithSignals(query);
+  // Instagram engagement comes from re-checking the posts the last run found
+  // (see recheckInstagramEngagement); runs alongside the main scrape.
+  const prevInstagram = monitor.platforms.includes("instagram")
+    ? await prisma.monitorSnapshot.findFirst({
+        where: { monitorId: monitor.id, platform: "instagram" },
+        orderBy: { capturedAt: "desc" },
+        select: { topPosts: true },
+      })
+    : null;
+  const prevPosts = (Array.isArray(prevInstagram?.topPosts) ? prevInstagram.topPosts : [])
+    .map((p) => p as { url?: string; postedAt?: string })
+    .filter((p): p is { url: string; postedAt: string } => Boolean(p?.url && p?.postedAt))
+    .slice(0, 20);
+
+  const [signals, instagramEngagement] = await Promise.all([
+    enrichSubcultureWithSignals(query),
+    recheckInstagramEngagement(prevPosts),
+  ]);
 
   const snapshotRows: Array<{
     monitorId: string;
@@ -38,13 +55,13 @@ export async function runMonitor(monitor: MonitorWithSubculture): Promise<void> 
     topPosts: object;
   }> = [];
   const wants = (p: string) => monitor.platforms.includes(p);
-  const add = (platform: string, postCount: number, engagement: number, topPosts: object[]) =>
+  const add = (platform: string, postCount: number, engagement: number, topPosts: object[], maxPosts = 5) =>
     snapshotRows.push({
       monitorId: monitor.id,
       platform,
       postCount: Math.round(postCount),
       engagement: Math.min(2_147_483_647, Math.round(engagement)), // Int column
-      topPosts: topPosts.slice(0, 5),
+      topPosts: topPosts.slice(0, maxPosts),
     });
 
   if (signals.reddit && wants("reddit")) {
@@ -89,21 +106,22 @@ export async function runMonitor(monitor: MonitorWithSubculture): Promise<void> 
 
   if (signals.instagram && wants("instagram")) {
     const i = signals.instagram;
-    // Engagement column holds posts/day for Instagram (see enrichInstagram).
-    // Skip the row if the rate couldn't be estimated rather than save a 0.
-    if (i.posts_per_day === undefined) {
-      console.warn("[monitor] Instagram returned posts without timestamps; skipping");
-    } else add(
-      "instagram",
-      i.posts_found,
-      i.posts_per_day,
-      i.top_posts.map((p) => ({
-        title: p.caption ?? (p.owner ? `@${p.owner}` : "Instagram post"),
-        url: p.url,
-        score: p.likes,
-        comments: p.comments,
-      }))
-    );
+    // engagement = re-check of LAST run's posts (per post per day ×10), or -1
+    // when there was nothing to re-check yet; -1 rows are left out of scoring.
+    // topPosts keeps every post found (with postedAt) for the next re-check;
+    // the board only shows the first 5.
+    const byUrl = new Map(i.top_posts.map((p) => [p.url, p]));
+    const posts = (i.recent_posts ?? []).map((r) => {
+      const p = byUrl.get(r.url);
+      return {
+        title: p?.caption || (p?.owner ? `@${p.owner}` : "Instagram post"),
+        url: r.url,
+        score: p?.likes ?? 0,
+        comments: p?.comments ?? 0,
+        postedAt: r.posted_at,
+      };
+    });
+    add("instagram", i.posts_found, instagramEngagement ?? -1, posts, 20);
   }
 
   if (signals.trends && wants("trends")) {
@@ -136,7 +154,7 @@ export async function runMonitor(monitor: MonitorWithSubculture): Promise<void> 
   // Compute acceleration from new + existing snapshots to detect breakouts
   const existing: SnapshotLike[] = await prisma.monitorSnapshot.findMany({
     where: { monitorId: monitor.id },
-    select: { platform: true, postCount: true, engagement: true, capturedAt: true },
+    select: { platform: true, postCount: true, engagement: true, capturedAt: true, topPosts: true },
     orderBy: { capturedAt: "desc" },
     take: 60, // ~10 runs across six platforms
   });

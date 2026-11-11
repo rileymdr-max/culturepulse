@@ -329,6 +329,9 @@ interface ApifyInstagramPost {
   ownerUsername?: string;
   hashtags?: string[];
   timestamp?: string;
+  sharesCount?: number | null;
+  videoViewCount?: number | null;
+  videoPlayCount?: number | null;
 }
 
 async function enrichInstagram(query: string): Promise<InstagramSignal | undefined> {
@@ -409,10 +412,51 @@ async function enrichInstagram(query: string): Promise<InstagramSignal | undefin
       top_hashtags: topHashtags,
       total_likes: totalLikes,
       posts_per_day: postsPerDay,
+      recent_posts: posts
+        .filter((p) => p.url && p.timestamp)
+        .map((p) => ({ url: p.url!, posted_at: p.timestamp! })),
       scraped_at: new Date().toISOString(),
     };
   } catch (err) {
     console.warn("[enricher] Instagram scrape failed:", err);
+    return undefined;
+  }
+}
+
+/**
+ * Instagram engagement, measured by re-visiting the posts the previous run
+ * found. A hashtag only lists its newest posts (minutes old, ~0 engagement),
+ * so instead we check those same posts hours later and count everything
+ * Instagram shows publicly: likes + comments + shares + video views/10
+ * (views are far cheaper than other actions). Saves and follows are private.
+ *
+ * Returns average engagement per post per day since it was posted, ×10 so
+ * small tags keep resolution in an Int column. Undefined if nothing came back.
+ */
+export async function recheckInstagramEngagement(
+  posts: Array<{ url: string; postedAt: string }>
+): Promise<number | undefined> {
+  if (!posts.length) return undefined;
+  try {
+    const items = await runActor<ApifyInstagramPost>("apify/instagram-scraper", {
+      resultsType: "posts",
+      directUrls: posts.map((p) => p.url),
+      resultsLimit: posts.length,
+    }, 45);
+    const now = Date.now();
+    const rates = items
+      .filter((p) => p.timestamp)
+      .map((p) => {
+        const n = (v: number | null | undefined) => Math.max(0, v ?? 0);
+        const views = Math.max(n(p.videoViewCount), n(p.videoPlayCount));
+        const engagement = n(p.likesCount) + n(p.commentsCount) + n(p.sharesCount) + views / 10;
+        const ageHours = Math.max(1, (now - Date.parse(p.timestamp!)) / 3_600_000);
+        return (engagement / ageHours) * 24;
+      });
+    if (!rates.length) return undefined;
+    return Math.round((rates.reduce((a, b) => a + b, 0) / rates.length) * 10);
+  } catch (err) {
+    console.warn("[enricher] Instagram re-check failed:", err);
     return undefined;
   }
 }

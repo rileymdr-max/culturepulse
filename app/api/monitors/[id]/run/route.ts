@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireSession, notFound, serverError } from "@/lib/api-helpers";
 import { prisma } from "@/lib/prisma";
 import { runMonitor } from "@/lib/monitor-engine";
-import { computeAccelerationSignal } from "@/lib/acceleration";
+import { computeAccelerationSignal, isComparableSnapshot } from "@/lib/acceleration";
 
 export const maxDuration = 300;
 
@@ -33,7 +33,11 @@ export async function POST(
     });
 
     return NextResponse.json({
-      monitor: { ...updated, signal: computeAccelerationSignal(updated!.snapshots) },
+      monitor: {
+        ...updated,
+        snapshots: updated!.snapshots.filter(isComparableSnapshot),
+        signal: computeAccelerationSignal(updated!.snapshots),
+      },
     });
   } catch (err) {
     console.error("[monitors/[id]/run]", err);

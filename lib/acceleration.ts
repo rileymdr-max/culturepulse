@@ -22,6 +22,8 @@ export interface SnapshotLike {
    * Optional so old callers still work; falls back to postCount.
    */
   engagement?: number;
+  /** Needed to tell current Instagram rows from old ones (isComparableSnapshot). */
+  topPosts?: unknown;
   capturedAt: string | Date;
 }
 
@@ -95,14 +97,18 @@ function breakoutScore(
   return Math.round(Math.min(100, Math.max(0, raw)));
 }
 
-/** Instagram switched from summed likes (on off-topic posts) to posts/day on
- *  2026-11-11. Older Instagram rows use a different unit, so they're ignored
- *  instead of reading as a huge fake spike. */
-const INSTAGRAM_METRIC_SINCE = Date.parse("2026-11-11T16:00:00Z");
-
-/** False for snapshots in an outdated unit (old Instagram likes rows). */
-export function isComparableSnapshot(s: { platform: string; capturedAt: string | Date }): boolean {
-  return s.platform !== "instagram" || new Date(s.capturedAt).getTime() >= INSTAGRAM_METRIC_SINCE;
+/** Instagram rows are comparable only in the current unit: engagement from
+ *  re-checking the previous run's posts (added 2026-11-11). Older rows (summed
+ *  likes on off-topic posts) have no postedAt on their posts, and -1 marks a
+ *  run that had nothing to re-check yet. Both are left out of scores and charts. */
+export function isComparableSnapshot(s: {
+  platform: string;
+  engagement?: number;
+  topPosts?: unknown;
+}): boolean {
+  if (s.platform !== "instagram") return true;
+  const first = Array.isArray(s.topPosts) ? (s.topPosts[0] as { postedAt?: string } | undefined) : undefined;
+  return (s.engagement ?? -1) >= 0 && Boolean(first?.postedAt);
 }
 
 export function computeAccelerationSignal(snapshots: SnapshotLike[]): AccelerationSignal {

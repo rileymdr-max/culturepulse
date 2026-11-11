@@ -120,6 +120,9 @@ export interface InstagramSignal {
   total_likes: number;
   /** Posting rate on the hashtag, estimated from the newest posts' timestamps. */
   posts_per_day?: number;
+  /** Every post found this run (url + when it was posted), saved so the next
+   *  run can re-check how much engagement they earned. */
+  recent_posts?: Array<{ url: string; posted_at: string }>;
   scraped_at: string;
 }
 
