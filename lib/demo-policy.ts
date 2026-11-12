@@ -21,6 +21,7 @@ const DEMO_GET_ALLOWED = [
   /^\/api\/tracked$/,
   /^\/api\/billing$/,
   /^\/api\/workspaces$/,
+  /^\/api\/brand-audit$/,
 ];
 
 export function isDemoApiAllowed(method: string, pathname: string): boolean {

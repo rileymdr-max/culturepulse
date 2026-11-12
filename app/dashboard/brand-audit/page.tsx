@@ -111,16 +111,33 @@ export default function BrandAuditPage() {
   const isPending = auditPending || audiencePending;
   const error = auditError;
 
-  // Restore last result from sessionStorage on mount
+  // Restore last result: sessionStorage first (same session), then server history (returning users / demo)
   useEffect(() => {
-    try {
-      const saved = sessionStorage.getItem(SESSION_KEY);
-      if (saved) {
-        const { audit, audience } = JSON.parse(saved) as { audit?: BrandAuditResult; audience?: AudienceResult };
-        if (audit) setCachedAudit(audit);
-        if (audience) setCachedAudience(audience);
-      }
-    } catch {}
+    let cancelled = false;
+    async function restore() {
+      try {
+        const saved = sessionStorage.getItem(SESSION_KEY);
+        if (saved) {
+          const { audit, audience } = JSON.parse(saved) as { audit?: BrandAuditResult; audience?: AudienceResult };
+          if (audit) setCachedAudit(audit);
+          if (audience) setCachedAudience(audience);
+          return; // session storage wins
+        }
+      } catch {}
+      // No session cache — try server history (covers demo account and returning users)
+      try {
+        const res = await fetch("/api/brand-audit");
+        if (!cancelled && res.ok) {
+          const { handle, result } = await res.json() as { handle: string; result: BrandAuditResult };
+          if (!cancelled && result) {
+            setHandle(handle);
+            setCachedAudit(result);
+          }
+        }
+      } catch {}
+    }
+    restore();
+    return () => { cancelled = true; };
   }, []);
 
   // Persist to sessionStorage whenever fresh results arrive

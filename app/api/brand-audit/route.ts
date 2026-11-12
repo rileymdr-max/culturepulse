@@ -42,6 +42,21 @@ const bodySchema = z.object({
   excludedPlatforms: z.array(platformEnum).optional().default([]),
 });
 
+/** GET /api/brand-audit — returns the user's most recent saved audit result, or 204. */
+export async function GET(_req: NextRequest) {
+  const { session, error: authError } = await requireSession();
+  if (authError) return authError;
+
+  const log = await prisma.auditLog.findFirst({
+    where: { userId: session.user.id },
+    orderBy: { createdAt: "desc" },
+    select: { handle: true, platform: true, result: true, createdAt: true },
+  });
+
+  if (!log) return new NextResponse(null, { status: 204 });
+  return NextResponse.json({ handle: log.handle, platform: log.platform, result: log.result, createdAt: log.createdAt });
+}
+
 export async function POST(req: NextRequest) {
   const { session, error: authError } = await requireSession();
   if (authError) return authError;

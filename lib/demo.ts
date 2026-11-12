@@ -62,6 +62,7 @@ async function syncDemoData(demoId: string): Promise<void> {
       briefs: true,
       savedSearches: true,
       trackedCommunities: { include: { snapshots: true } },
+      auditLogs: { orderBy: { createdAt: "desc" }, take: 5 },
     },
   });
 
@@ -78,6 +79,7 @@ async function syncDemoData(demoId: string): Promise<void> {
       await tx.monitor.deleteMany({ where: { userId: demoId } });
       await tx.savedSearch.deleteMany({ where: { userId: demoId } });
       await tx.trackedCommunity.deleteMany({ where: { userId: demoId } });
+      await tx.auditLog.deleteMany({ where: { userId: demoId } });
 
       if (!source) {
         console.warn(`[demo] source account ${sourceEmail()} not found; demo will be empty`);
@@ -139,6 +141,18 @@ async function syncDemoData(demoId: string): Promise<void> {
             platforms: s.platforms,
             label: s.label,
             createdAt: s.createdAt,
+          })),
+        });
+      }
+
+      if (source.auditLogs.length) {
+        await tx.auditLog.createMany({
+          data: source.auditLogs.map((a) => ({
+            userId: demoId,
+            handle: a.handle,
+            platform: a.platform,
+            result: a.result as Prisma.InputJsonValue,
+            createdAt: a.createdAt,
           })),
         });
       }
