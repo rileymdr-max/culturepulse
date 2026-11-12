@@ -16,7 +16,7 @@ const SIGNUP_HREF = "/register";
 const DEMO_HREF = "https://calendly.com/rileymdr/30min";
 const BTN_OUTLINE =
   "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full border-2 border-current px-7 py-[14px] text-[17px] font-bold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4";
-const PLATFORMS = ["Reddit", "TikTok", "Instagram", "X", "Facebook", "Substack"];
+const PLATFORMS = ["Reddit", "TikTok", "Instagram", "X", "YouTube", "Pinterest", "Google Trends"];
 
 export default async function HomePage() {
   const session = await getServerSession(authOptions);
@@ -364,7 +364,7 @@ const DISPATCH = [
   {
     n: "ii.",
     name: "Dark academia",
-    note: "Substack essays feeding BookTok reading lists.",
+    note: "YouTube video essays feeding BookTok reading lists.",
     vocab: "“annotated copy” · “tweed season”",
     score: 61,
     tier: "Trending",

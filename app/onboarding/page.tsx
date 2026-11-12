@@ -1,19 +1,17 @@
 "use client";
 
-// ─── Swap this URL when the demo video is ready ───────────────────────────────
-const VIDEO_URL: string | null = null; // e.g. "https://www.loom.com/embed/abc123"
-
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Play, Zap } from "lucide-react";
+import { ArrowRight, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BRAND_ROOT, BTN_GO, CARD, D, M, STICKER, Wordmark } from "@/components/marketing/brand";
 import { FormNotice } from "@/components/marketing/auth-shell";
+import { DemoVideoButton } from "@/components/marketing/demo-video-button";
 import type { BrandAuditResult, MatchedSubculture, DiscoveredSubculture } from "@/lib/types/brand-audit";
 
 // ─── Loading messages that rotate while the audit runs ───────────────────────
 const LOADING_MESSAGES = [
-  "Scanning Twitter & X for brand mentions…",
+  "Scanning X for brand mentions…",
   "Pulling TikTok community signals…",
   "Mapping Reddit subcultures…",
   "Checking Instagram hashtag clusters…",
@@ -27,12 +25,12 @@ const LOADING_MESSAGES = [
 const KICKER = cn(M, "text-xs font-medium uppercase tracking-[0.1em] text-[#0B6B45]");
 
 // ─── Step indicator ───────────────────────────────────────────────────────────
-function Steps({ current }: { current: 1 | 2 | 3 }) {
+function Steps({ current }: { current: 1 | 2 }) {
   return (
-    <div className="flex items-center gap-3">
-      <span className={cn(M, "hidden text-xs text-[#66625A] sm:inline")}>Step {current} of 3</span>
+    <div className="hidden items-center gap-3 sm:flex">
+      <span className={cn(M, "hidden text-xs text-[#66625A] sm:inline")}>Step {current} of 2</span>
       <div className="flex items-center gap-1.5" aria-hidden>
-        {[1, 2, 3].map((n) => (
+        {[1, 2].map((n) => (
           <div
             key={n}
             className={cn(
@@ -46,50 +44,7 @@ function Steps({ current }: { current: 1 | 2 | 3 }) {
   );
 }
 
-// ─── Step 1: Video ────────────────────────────────────────────────────────────
-function StepWatch({ onNext }: { onNext: () => void }) {
-  return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col items-center gap-8">
-      <div className="space-y-4 text-center">
-        <p className={KICKER}>Welcome to CulturePulse</p>
-        <h1 className={cn(D, "text-5xl leading-[0.92] sm:text-6xl lg:text-7xl")}>
-          Find the <span className="text-[#0B6B45]">subcultures</span> your audience actually lives in
-        </h1>
-        <p className="mx-auto max-w-xl text-lg text-[#3B3832]">
-          A 90-second walkthrough of how it works, then we&rsquo;ll run a live audit on your brand.
-        </p>
-      </div>
-
-      <div className={cn(CARD, "relative aspect-video w-full max-w-2xl overflow-hidden")}>
-        {VIDEO_URL ? (
-          <iframe src={VIDEO_URL} className="h-full w-full" allow="autoplay; fullscreen" allowFullScreen />
-        ) : (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-[#C7F2D9]">
-            <div className="flex h-16 w-16 items-center justify-center rounded-full border-2 border-[#111110] bg-[#FFFDF8] shadow-[3px_3px_0_#111110]">
-              <Play className="ml-1 h-7 w-7 text-[#0B6B45]" aria-hidden />
-            </div>
-            <div className="text-center">
-              <p className={cn(D, "text-2xl")}>Demo video coming soon</p>
-              <p className="mt-1 text-[15px] text-[#2E3A33]">We&rsquo;re putting the finishing touches on it.</p>
-            </div>
-          </div>
-        )}
-      </div>
-
-      <div className="flex w-full flex-col items-center gap-4">
-        <button onClick={onNext} className={BTN_GO}>
-          See what it finds about your brand
-          <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" aria-hidden />
-        </button>
-        <button onClick={onNext} className="text-sm font-medium text-[#66625A] hover:text-[#111110]">
-          Skip the video
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// ─── Step 2: Run audit ────────────────────────────────────────────────────────
+// ─── Step 1: Run audit ────────────────────────────────────────────────────────
 function StepAudit({
   onResult,
 }: {
@@ -139,11 +94,11 @@ function StepAudit({
       {!loading ? (
         <>
           <div className="space-y-4 text-center">
-            <p className={KICKER}>Your first audit</p>
-            <h2 className={cn(D, "text-5xl leading-[0.92] sm:text-6xl")}>What&rsquo;s your brand&rsquo;s handle?</h2>
+            <p className={KICKER}>Welcome to CulturePulse</p>
+            <h1 className={cn(D, "text-5xl leading-[0.92] sm:text-6xl")}>What&rsquo;s your brand&rsquo;s handle?</h1>
             <p className="text-[17px] text-[#3B3832]">
-              We&rsquo;ll scan Twitter, TikTok, Reddit, Instagram, YouTube and Pinterest to surface the subcultures
-              your audience actually belongs to.
+              Your first audit is on us. We&rsquo;ll scan X, TikTok, Reddit, Instagram, YouTube and Pinterest to
+              surface the subcultures your audience actually belongs to.
             </p>
           </div>
 
@@ -175,6 +130,7 @@ function StepAudit({
           <p className={cn(M, "text-center text-xs text-[#66625A]")}>
             Takes 30–60 seconds · Results stay in your dashboard
           </p>
+          <DemoVideoButton variant="link">Watch the 54-second demo first</DemoVideoButton>
         </>
       ) : (
         <div className={cn(CARD, "flex w-full flex-col items-center gap-6 px-6 py-10")} aria-live="polite">
@@ -205,7 +161,7 @@ function StepAudit({
   );
 }
 
-// ─── Step 3: Results ──────────────────────────────────────────────────────────
+// ─── Step 2: Results ──────────────────────────────────────────────────────────
 const STRENGTH: Record<string, string> = {
   strong: "bg-[#0B6B45] text-white",
   moderate: "bg-[#C7F2D9] text-[#0B4A30]",
@@ -317,13 +273,17 @@ function StepResults({
 // ─── Main onboarding shell ────────────────────────────────────────────────────
 export default function OnboardingPage() {
   const router = useRouter();
-  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [step, setStep] = useState<1 | 2>(1);
   const [auditHandle, setAuditHandle] = useState("");
   const [auditResult, setAuditResult] = useState<BrandAuditResult | null>(null);
 
   async function handleEnterDashboard() {
-    // Mark onboarding complete — fire and forget, don't block navigation
-    fetch("/api/onboarding", { method: "POST" }).catch(() => {});
+    // Mark onboarding complete. Wait briefly so a later visit to "/" doesn't bounce back here,
+    // but never block navigation on it for long.
+    await Promise.race([
+      fetch("/api/onboarding", { method: "POST" }).catch(() => {}),
+      new Promise((r) => setTimeout(r, 1500)),
+    ]);
     router.push("/dashboard");
   }
 
@@ -332,23 +292,31 @@ export default function OnboardingPage() {
       <header className="sticky top-0 z-30 border-b-2 border-[#111110] bg-[#F2EDE3]/90 backdrop-blur-md">
         <div className="mx-auto flex h-[72px] max-w-[1360px] items-center justify-between px-4 sm:px-6 lg:px-11">
           <Wordmark />
-          <Steps current={step} />
+          <div className="flex items-center gap-5 sm:gap-7">
+            <Steps current={step} />
+            <button
+              type="button"
+              onClick={handleEnterDashboard}
+              className="text-sm font-bold text-[#111110] underline decoration-2 underline-offset-4 hover:text-[#0B6B45]"
+            >
+              Skip to dashboard
+            </button>
+          </div>
         </div>
       </header>
 
       <main className="flex flex-1 items-start justify-center px-4 py-10 sm:px-6 sm:py-12">
         <div className="w-full">
-          {step === 1 && <StepWatch onNext={() => setStep(2)} />}
-          {step === 2 && (
+          {step === 1 && (
             <StepAudit
               onResult={(h, r) => {
                 setAuditHandle(h);
                 setAuditResult(r);
-                setStep(3);
+                setStep(2);
               }}
             />
           )}
-          {step === 3 && auditResult && (
+          {step === 2 && auditResult && (
             <StepResults handle={auditHandle} result={auditResult} onEnterDashboard={handleEnterDashboard} />
           )}
         </div>

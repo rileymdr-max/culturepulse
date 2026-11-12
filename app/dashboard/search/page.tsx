@@ -645,7 +645,7 @@ function DiscoverPageInner() {
         <div>
           <h1 className="text-3xl text-foreground mb-1">Discover Subcultures</h1>
           <p className="text-sm text-muted-foreground">
-            Describe any audience or niche — we scrape Reddit, TikTok, Twitter, YouTube, and Google Trends in real time, then build a full intelligence profile grounded in live data.
+            Describe any audience or niche — we scrape Reddit, TikTok, X, YouTube, Instagram and Google Trends in real time, then build a full intelligence profile grounded in live data.
           </p>
         </div>
 

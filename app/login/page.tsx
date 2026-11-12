@@ -13,7 +13,8 @@ import { PENDING_APPROVAL_ERROR } from "@/lib/approval";
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get("callbackUrl") ?? "/dashboard";
+  // "/" sends first-time users to onboarding and everyone else to the dashboard.
+  const callbackUrl = searchParams.get("callbackUrl") ?? "/";
   const justRegistered = searchParams.get("registered") === "true";
   const justRequested = searchParams.get("pending") === "true";
 

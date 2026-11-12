@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import React, { useRef } from "react";
 import { Play, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CARD } from "@/components/marketing/brand";
@@ -13,7 +13,16 @@ const CAPTIONS_SRC = "/videos/culturepulse-demo.en.vtt";
  * Hero button that opens the product demo in a pop-up player and starts it with sound.
  * Uses a native <dialog> for focus trapping, Esc to close and an inert page behind it.
  */
-export function DemoVideoButton({ className }: { className?: string }) {
+export function DemoVideoButton({
+  className,
+  variant = "button",
+  children,
+}: {
+  className?: string;
+  /** "button" is the yellow hero pill; "link" is an inline text link with a small play icon. */
+  variant?: "button" | "link";
+  children?: React.ReactNode;
+}) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -34,6 +43,22 @@ export function DemoVideoButton({ className }: { className?: string }) {
 
   return (
     <>
+      {variant === "link" ? (
+        <button
+          type="button"
+          onClick={open}
+          aria-haspopup="dialog"
+          className={cn(
+            "inline-flex items-center gap-2 text-[15px] font-bold text-[#111110] underline decoration-2 underline-offset-4 hover:text-[#0B6B45] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#0B6B45]",
+            className
+          )}
+        >
+          <span className="inline-flex h-6 w-6 items-center justify-center rounded-full border-2 border-[#111110] bg-[#FFE14D]" aria-hidden>
+            <Play className="ml-px h-2.5 w-2.5 fill-current" />
+          </span>
+          {children ?? "Watch the 54-second demo"}
+        </button>
+      ) : (
       <button
         type="button"
         onClick={open}
@@ -46,8 +71,9 @@ export function DemoVideoButton({ className }: { className?: string }) {
         <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-[#111110] text-[#FFE14D]" aria-hidden>
           <Play className="ml-px h-3 w-3 fill-current" />
         </span>
-        See it in action
+        {children ?? "See it in action"}
       </button>
+      )}
 
       <dialog
         ref={dialogRef}
