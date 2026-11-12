@@ -125,15 +125,27 @@ export async function POST(req: NextRequest) {
 
     const result = await runBrandAudit(handles, platform, excludedPlatforms);
 
-    // Fire-and-forget: save history + auto-add discovered subcultures as drafts
-    prisma.auditLog.create({
-      data: {
-        userId: session.user.id,
-        handle: handles.default,
-        platform,
-        result: result as object,
-      },
-    }).catch((e) => console.error("[api/brand-audit] Failed to save audit log:", e));
+    // Fire-and-forget: upsert by (userId, handle) so each brand has one saved result
+    ;(async () => {
+      try {
+        const existing = await prisma.auditLog.findFirst({
+          where: { userId: session.user.id, handle: handles.default },
+          select: { id: true },
+        });
+        if (existing) {
+          await prisma.auditLog.update({
+            where: { id: existing.id },
+            data: { platform, result: result as object, createdAt: new Date() },
+          });
+        } else {
+          await prisma.auditLog.create({
+            data: { userId: session.user.id, handle: handles.default, platform, result: result as object },
+          });
+        }
+      } catch (e) {
+        console.error("[api/brand-audit] Failed to save audit log:", e);
+      }
+    })();
 
     if (result.discovered_subcultures?.length) {
       autoAddDiscoveredSubcultures(result.discovered_subcultures).catch(() => {});

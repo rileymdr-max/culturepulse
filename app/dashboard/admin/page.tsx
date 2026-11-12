@@ -526,59 +526,8 @@ function AuditsTab() {
               </button>
 
               {expanded === log.id && (
-                <div className="px-4 pb-4 space-y-4 border-t border-border bg-muted/20">
-                  <p className="text-xs text-muted-foreground pt-3 leading-relaxed">{log.result.audience_summary}</p>
-
-                  {/* Matched subcultures */}
-                  {log.result.matched_subcultures?.length > 0 && (
-                    <div>
-                      <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-2 flex items-center gap-1.5">
-                        <Layers className="h-3 w-3" /> Library matches
-                      </p>
-                      <div className="flex flex-wrap gap-1.5">
-                        {log.result.matched_subcultures.map((s) => (
-                          <span key={s.slug} className="px-2 py-0.5 rounded-full bg-primary/8 text-primary border border-primary/15 text-[11px] font-medium">
-                            {s.name} · {s.match_pct}%
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Discovered subcultures */}
-                  {log.result.discovered_subcultures?.length > 0 && (
-                    <div>
-                      <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-2 flex items-center gap-1.5">
-                        <Sparkles className="h-3 w-3 text-tier-trending" /> New discoveries
-                      </p>
-                      <div className="flex flex-wrap gap-1.5">
-                        {log.result.discovered_subcultures.map((s) => (
-                          <span key={s.provisional_slug} className="px-2 py-0.5 rounded-full bg-[#FFE14D]/40 text-foreground border border-foreground/20 text-[11px] font-medium">
-                            {s.name} · ~{s.estimated_audience_pct}%
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Dominant themes */}
-                  {log.result.dominant_themes?.length > 0 && (
-                    <div className="flex flex-wrap gap-1">
-                      {log.result.dominant_themes.map((t) => (
-                        <span key={t} className="px-2 py-0.5 rounded-full bg-muted text-muted-foreground text-[10px]">{t}</span>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Full profile link */}
-                  <div className="pt-1">
-                    <a
-                      href={`/dashboard/brand-audit?id=${log.id}`}
-                      className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
-                    >
-                      View full profile <ChevronRight className="h-3 w-3" />
-                    </a>
-                  </div>
+                <div className="border-t border-border bg-muted/20">
+                  <AuditResultInline result={log.result} logId={log.id} />
                 </div>
               )}
             </div>
@@ -861,6 +810,68 @@ function DemoRow({ visible, busy, onToggle, primary, secondary, meta, urgency }:
           </span>
         )}
         {meta && <span className="text-xs text-muted-foreground">{meta}</span>}
+      </div>
+    </div>
+  );
+}
+
+// ─── AuditResultInline ────────────────────────────────────────────────────────
+
+function AuditResultInline({ result, logId }: { result: BrandAuditResult; logId: string }) {
+  const stats = [
+    { label: "Audience size", value: result.audience_size?.toLocaleString() ?? "—" },
+    { label: "Lib. matches",  value: String(result.matched_subcultures?.length ?? 0) },
+    { label: "New discoveries", value: String(result.discovered_subcultures?.length ?? 0) },
+    { label: "Top platform",  value: result.primary_platforms?.[0] ?? "—" },
+  ];
+
+  return (
+    <div className="px-4 pb-4 pt-3 space-y-3">
+      {/* Stats row */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        {stats.map(({ label, value }) => (
+          <div key={label} className="rounded-lg bg-muted/50 px-3 py-2">
+            <p className="text-[10px] text-muted-foreground uppercase tracking-wide">{label}</p>
+            <p className="text-sm font-semibold text-foreground mt-0.5">{value}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Audience summary */}
+      {result.audience_summary && (
+        <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">{result.audience_summary}</p>
+      )}
+
+      {/* Matched subcultures */}
+      {result.matched_subcultures?.length > 0 && (
+        <div className="flex flex-wrap gap-1">
+          {result.matched_subcultures.map((s) => (
+            <span key={s.slug} className="px-2 py-0.5 rounded-full bg-primary/8 text-primary border border-primary/15 text-[10px] font-medium">
+              {s.name} · {s.match_pct}%
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* Discoveries */}
+      {result.discovered_subcultures?.length > 0 && (
+        <div className="flex flex-wrap gap-1">
+          {result.discovered_subcultures.map((s) => (
+            <span key={s.provisional_slug} className="px-2 py-0.5 rounded-full bg-[#FFE14D]/40 text-foreground border border-foreground/20 text-[10px] font-medium">
+              ✦ {s.name} · ~{s.estimated_audience_pct}%
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* Full profile link */}
+      <div className="pt-1">
+        <a
+          href={`/dashboard/brand-audit?id=${logId}`}
+          className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+        >
+          View full profile <ChevronRight className="h-3 w-3" />
+        </a>
       </div>
     </div>
   );
