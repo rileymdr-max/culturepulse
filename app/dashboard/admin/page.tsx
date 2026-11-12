@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import {
   Layers, Radio, CheckCircle2, Archive, Clock, Search,
   ChevronDown, ChevronRight, Users, BarChart2, Sparkles, Eye, EyeOff,
+  MonitorPlay, FileText, ScanFace, RefreshCw, Check,
 } from "lucide-react";
 import { NavHeader } from "@/components/nav-header";
 import { Button } from "@/components/ui/button";
@@ -46,13 +47,13 @@ interface AuditLogEntry {
 export default function AdminPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
-  const [tab, setTab] = useState<"signups" | "library" | "audits">("library");
+  const [tab, setTab] = useState<"signups" | "library" | "audits" | "demo">("library");
   const [pendingCount, setPendingCount] = useState(0);
 
   // Deep link from the "new sign-up" email: /dashboard/admin?tab=signups
   useEffect(() => {
     const t = new URLSearchParams(window.location.search).get("tab");
-    if (t === "signups" || t === "library" || t === "audits") setTab(t);
+    if (t === "signups" || t === "library" || t === "audits" || t === "demo") setTab(t);
   }, []);
 
   useEffect(() => {
@@ -93,6 +94,7 @@ export default function AdminPage() {
             { key: "signups", label: pendingCount ? `Sign-ups (${pendingCount})` : "Sign-ups", icon: Users },
             { key: "library", label: "Subculture Library", icon: Layers },
             { key: "audits",  label: "Audit History",      icon: BarChart2 },
+            { key: "demo",    label: "Demo",                icon: ScanFace },
           ] as const).map(({ key, label, icon: Icon }) => (
             <button
               key={key}
@@ -113,6 +115,7 @@ export default function AdminPage() {
         <SignupsTab visible={tab === "signups"} onPendingCount={setPendingCount} />
         {tab === "library" && <LibraryTab />}
         {tab === "audits"  && <AuditsTab />}
+        {tab === "demo"    && <DemoTab />}
       </main>
     </div>
   );
@@ -587,6 +590,278 @@ function AuditsTab() {
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── Demo tab ────────────────────────────────────────────────────────────────
+
+interface DemoMonitor {
+  id: string;
+  demoVisible: boolean;
+  status: string;
+  platforms: string[];
+  lastRunAt: string | null;
+  createdAt: string;
+  subculture: { name: string; category: string; slug: string };
+}
+
+interface DemoBrief {
+  id: string;
+  demoVisible: boolean;
+  headline: string;
+  urgency: string;
+  createdAt: string;
+  subculture: { name: string; slug: string };
+}
+
+interface DemoAudit {
+  id: string;
+  demoVisible: boolean;
+  handle: string;
+  platform: string;
+  createdAt: string;
+}
+
+function DemoTab() {
+  const [monitors, setMonitors] = useState<DemoMonitor[]>([]);
+  const [briefs, setBriefs] = useState<DemoBrief[]>([]);
+  const [audits, setAudits] = useState<DemoAudit[]>([]);
+  const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<{ monitors: number; briefs: number; audits: number } | null>(null);
+  const [updating, setUpdating] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/admin/demo")
+      .then((r) => r.json())
+      .then((d) => {
+        setMonitors(d.monitors ?? []);
+        setBriefs(d.briefs ?? []);
+        setAudits(d.audits ?? []);
+        setLastSyncAt(d.lastSyncAt ?? null);
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
+  async function toggle(type: "monitor" | "brief" | "audit", id: string, current: boolean) {
+    setUpdating(id);
+    try {
+      const res = await fetch("/api/admin/demo", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type, id, demoVisible: !current }),
+      });
+      if (!res.ok) return;
+      if (type === "monitor") setMonitors((prev) => prev.map((m) => m.id === id ? { ...m, demoVisible: !current } : m));
+      if (type === "brief")   setBriefs((prev) => prev.map((b) => b.id === id ? { ...b, demoVisible: !current } : b));
+      if (type === "audit")   setAudits((prev) => prev.map((a) => a.id === id ? { ...a, demoVisible: !current } : a));
+    } finally {
+      setUpdating(null);
+    }
+  }
+
+  async function runSync() {
+    setSyncing(true);
+    setSyncResult(null);
+    try {
+      const res = await fetch("/api/admin/demo/sync", { method: "POST" });
+      if (res.ok) {
+        const d = await res.json();
+        setSyncResult(d.synced);
+        if (d.lastSyncAt) setLastSyncAt(d.lastSyncAt);
+      }
+    } finally {
+      setSyncing(false);
+    }
+  }
+
+  const demoCount = {
+    monitors: monitors.filter((m) => m.demoVisible).length,
+    briefs: briefs.filter((b) => b.demoVisible).length,
+    audits: audits.filter((a) => a.demoVisible).length,
+  };
+
+  return (
+    <div className="space-y-8">
+      {/* Header / sync button */}
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h2 className="text-sm font-semibold text-foreground">Demo account content</h2>
+          <p className="mt-1 text-xs text-muted-foreground max-w-lg">
+            Toggle which of your monitors, briefs, and audit runs appear when visitors use the live demo.
+            Click "Update demo now" to push your selections — the demo only updates when you do this.
+          </p>
+          {lastSyncAt && (
+            <p className="mt-1 text-xs text-muted-foreground">
+              Last synced: {new Date(lastSyncAt).toLocaleString()}
+            </p>
+          )}
+        </div>
+        <div className="flex flex-col items-end gap-2">
+          <Button onClick={runSync} disabled={syncing} className="shrink-0">
+            {syncing
+              ? <><RefreshCw className="h-3.5 w-3.5 mr-1.5 animate-spin" />Syncing…</>
+              : <><RefreshCw className="h-3.5 w-3.5 mr-1.5" />Update demo now</>
+            }
+          </Button>
+          {syncResult && (
+            <p className="text-xs text-muted-foreground flex items-center gap-1">
+              <Check className="h-3 w-3 text-primary" />
+              Pushed {syncResult.monitors} monitors · {syncResult.briefs} briefs · {syncResult.audits} audits
+            </p>
+          )}
+        </div>
+      </div>
+
+      {/* Summary chips */}
+      {!loading && (
+        <div className="flex flex-wrap gap-2">
+          {[
+            { label: "Monitors in demo", count: demoCount.monitors, total: monitors.length },
+            { label: "Briefs in demo", count: demoCount.briefs, total: briefs.length },
+            { label: "Audits in demo", count: demoCount.audits, total: audits.length },
+          ].map(({ label, count, total }) => (
+            <div key={label} className="rounded-lg border border-border bg-card px-3 py-2 text-sm">
+              <span className="font-semibold text-foreground">{count}</span>
+              <span className="text-muted-foreground"> / {total} {label.toLowerCase()}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {loading ? (
+        <div className="space-y-2">{[...Array(4)].map((_, i) => <Skeleton key={i} className="h-12 rounded-lg" />)}</div>
+      ) : (
+        <>
+          {/* Monitors */}
+          <DemoSection
+            title="Monitors"
+            icon={<MonitorPlay className="h-3.5 w-3.5" />}
+            empty="No monitors yet — set up monitors on the Signal Board."
+          >
+            {monitors.map((m) => (
+              <DemoRow
+                key={m.id}
+                visible={m.demoVisible}
+                busy={updating === m.id}
+                onToggle={() => toggle("monitor", m.id, m.demoVisible)}
+                primary={m.subculture.name}
+                secondary={`${m.subculture.category} · ${m.platforms.join(", ")}`}
+                meta={m.lastRunAt ? `Last run ${new Date(m.lastRunAt).toLocaleDateString()}` : "Never run"}
+              />
+            ))}
+          </DemoSection>
+
+          {/* Briefs */}
+          <DemoSection
+            title="Content Briefs"
+            icon={<FileText className="h-3.5 w-3.5" />}
+            empty="No briefs yet — generate briefs from subculture profiles."
+          >
+            {briefs.map((b) => (
+              <DemoRow
+                key={b.id}
+                visible={b.demoVisible}
+                busy={updating === b.id}
+                onToggle={() => toggle("brief", b.id, b.demoVisible)}
+                primary={b.headline}
+                secondary={b.subculture.name}
+                meta={new Date(b.createdAt).toLocaleDateString()}
+                urgency={b.urgency}
+              />
+            ))}
+          </DemoSection>
+
+          {/* Audits */}
+          <DemoSection
+            title="Brand Audit Runs"
+            icon={<BarChart2 className="h-3.5 w-3.5" />}
+            empty="No audit runs yet — run audits from the Audience Audit page."
+          >
+            {audits.map((a) => (
+              <DemoRow
+                key={a.id}
+                visible={a.demoVisible}
+                busy={updating === a.id}
+                onToggle={() => toggle("audit", a.id, a.demoVisible)}
+                primary={`@${a.handle}`}
+                secondary={a.platform}
+                meta={new Date(a.createdAt).toLocaleDateString()}
+              />
+            ))}
+          </DemoSection>
+        </>
+      )}
+    </div>
+  );
+}
+
+function DemoSection({ title, icon, children, empty }: {
+  title: string;
+  icon: React.ReactNode;
+  children: React.ReactNode;
+  empty: string;
+}) {
+  const hasChildren = Array.isArray(children) ? children.length > 0 : !!children;
+  return (
+    <section className="space-y-2">
+      <h3 className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+        {icon}{title}
+      </h3>
+      {hasChildren ? (
+        <div className="rounded-xl border border-border overflow-hidden divide-y divide-border">
+          {children}
+        </div>
+      ) : (
+        <p className="text-sm text-muted-foreground pl-1">{empty}</p>
+      )}
+    </section>
+  );
+}
+
+const URGENCY_LABEL: Record<string, string> = {
+  "act-now": "Act now",
+  "this-week": "This week",
+  "monitor": "Monitor",
+};
+
+function DemoRow({ visible, busy, onToggle, primary, secondary, meta, urgency }: {
+  visible: boolean;
+  busy: boolean;
+  onToggle: () => void;
+  primary: string;
+  secondary: string;
+  meta?: string;
+  urgency?: string;
+}) {
+  return (
+    <div className={cn("flex items-center gap-3 px-4 py-3 bg-card transition-colors", visible ? "" : "opacity-60")}>
+      <button
+        disabled={busy}
+        onClick={onToggle}
+        title={visible ? "In demo — click to remove" : "Not in demo — click to include"}
+        className={cn(
+          "shrink-0 inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs transition-colors",
+          visible ? "text-primary hover:bg-primary/10" : "text-muted-foreground hover:bg-muted"
+        )}
+      >
+        {visible ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
+        {visible ? "On" : "Off"}
+      </button>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-foreground truncate">{primary}</p>
+        <p className="text-xs text-muted-foreground truncate">{secondary}</p>
+      </div>
+      <div className="shrink-0 text-right">
+        {urgency && (
+          <span className="text-[10px] font-medium text-muted-foreground bg-muted rounded px-1.5 py-0.5 mr-2">
+            {URGENCY_LABEL[urgency] ?? urgency}
+          </span>
+        )}
+        {meta && <span className="text-xs text-muted-foreground">{meta}</span>}
+      </div>
     </div>
   );
 }

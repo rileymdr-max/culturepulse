@@ -2,9 +2,10 @@
  * One-click demo account.
  *
  * Visitors click "Explore the live demo" on the homepage and are signed in as a
- * shared, read-only demo user. On sign-in, the demo user's data is refreshed
- * from a source account (DEMO_SOURCE_EMAIL, default: the admin account) so the
- * demo always shows real monitors, signal history and briefs.
+ * shared, read-only demo user. The demo user's data is refreshed manually by the
+ * admin via Admin → Demo → "Update demo now" (or on first creation).
+ *
+ * Only items flagged demoVisible=true on the source account are copied.
  *
  * The demo is read-only: middleware.ts blocks every API call that writes data
  * or spends Claude / Apify credit (see lib/demo-policy.ts).
@@ -20,9 +21,6 @@ export const DEMO_NAME = "Demo";
 const DEMO_PLAN = "pro";
 const ADMIN_EMAIL = "rileymdr@gmail.com";
 
-/** Re-copy the source account's data at most this often. */
-const SYNC_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
-
 export function isDemoEmail(email: string | null | undefined): boolean {
   return email === DEMO_EMAIL;
 }
@@ -31,9 +29,9 @@ function sourceEmail(): string {
   return process.env.DEMO_SOURCE_EMAIL?.trim() || ADMIN_EMAIL;
 }
 
-// ─── Demo user + data sync ────────────────────────────────────────────────────
+// ─── Demo user ────────────────────────────────────────────────────────────────
 
-/** Returns the demo user, creating it and refreshing its data when stale. */
+/** Returns the demo user, creating it (and running an initial sync) if needed. */
 export async function getOrRefreshDemoUser() {
   let demo = await prisma.user.findUnique({ where: { email: DEMO_EMAIL } });
   if (!demo) {
@@ -41,53 +39,61 @@ export async function getOrRefreshDemoUser() {
       data: { email: DEMO_EMAIL, name: DEMO_NAME, plan: DEMO_PLAN, onboardedAt: new Date(), approvedAt: new Date() },
     });
     await syncDemoData(demo.id).catch((err) => console.error("[demo] initial sync failed", err));
-    return demo;
   }
-
-  if (Date.now() - demo.updatedAt.getTime() > SYNC_INTERVAL_MS) {
-    await syncDemoData(demo.id).catch((err) => console.error("[demo] sync failed", err));
-  }
+  // No auto-refresh — admin manually triggers updates via Admin → Demo
   return demo;
 }
 
+// ─── Sync ─────────────────────────────────────────────────────────────────────
+
 /**
- * Replaces the demo user's monitors, snapshots, briefs, saved searches and
- * tracked communities with a copy of the source account's.
+ * Copies the source account's demoVisible items to the demo user.
+ * Called on first creation and manually via POST /api/admin/demo/sync.
  */
-async function syncDemoData(demoId: string): Promise<void> {
-  const source = await prisma.user.findUnique({
+export async function syncDemoData(demoId: string): Promise<{
+  monitors: number;
+  briefs: number;
+  audits: number;
+}> {
+  const src = await prisma.user.findUnique({
     where: { email: sourceEmail() },
     include: {
-      monitors: { include: { snapshots: true } },
-      briefs: true,
+      monitors: {
+        where: { demoVisible: true },
+        include: { snapshots: true },
+      },
+      briefs: { where: { demoVisible: true } },
       savedSearches: true,
       trackedCommunities: { include: { snapshots: true } },
-      auditLogs: { orderBy: { createdAt: "desc" }, take: 5 },
+      auditLogs: {
+        where: { demoVisible: true },
+        orderBy: { createdAt: "desc" },
+      },
     },
   });
 
   await prisma.$transaction(
     async (tx) => {
-      // Claim the sync first (bumps updatedAt) so concurrent sign-ins skip it.
+      // Bump updatedAt so callers can display "last synced" time
       await tx.user.update({
         where: { id: demoId },
         data: { name: DEMO_NAME, plan: DEMO_PLAN, onboardedAt: new Date() },
       });
 
-      // Cascades remove monitor + community snapshots.
+      // Clear everything first (cascades handle snapshots)
       await tx.contentBrief.deleteMany({ where: { userId: demoId } });
       await tx.monitor.deleteMany({ where: { userId: demoId } });
       await tx.savedSearch.deleteMany({ where: { userId: demoId } });
       await tx.trackedCommunity.deleteMany({ where: { userId: demoId } });
       await tx.auditLog.deleteMany({ where: { userId: demoId } });
 
-      if (!source) {
+      if (!src) {
         console.warn(`[demo] source account ${sourceEmail()} not found; demo will be empty`);
         return;
       }
 
       const monitorIdMap = new Map<string, string>();
-      for (const m of source.monitors) {
+      for (const m of src.monitors) {
         const copy = await tx.monitor.create({
           data: {
             userId: demoId,
@@ -114,9 +120,9 @@ async function syncDemoData(demoId: string): Promise<void> {
         }
       }
 
-      if (source.briefs.length) {
+      if (src.briefs.length) {
         await tx.contentBrief.createMany({
-          data: source.briefs.map((b) => ({
+          data: src.briefs.map((b) => ({
             userId: demoId,
             subcultureId: b.subcultureId,
             monitorId: b.monitorId ? monitorIdMap.get(b.monitorId) ?? null : null,
@@ -133,9 +139,9 @@ async function syncDemoData(demoId: string): Promise<void> {
         });
       }
 
-      if (source.savedSearches.length) {
+      if (src.savedSearches.length) {
         await tx.savedSearch.createMany({
-          data: source.savedSearches.map((s) => ({
+          data: src.savedSearches.map((s) => ({
             userId: demoId,
             query: s.query,
             platforms: s.platforms,
@@ -145,9 +151,9 @@ async function syncDemoData(demoId: string): Promise<void> {
         });
       }
 
-      if (source.auditLogs.length) {
+      if (src.auditLogs.length) {
         await tx.auditLog.createMany({
-          data: source.auditLogs.map((a) => ({
+          data: src.auditLogs.map((a) => ({
             userId: demoId,
             handle: a.handle,
             platform: a.platform,
@@ -157,7 +163,7 @@ async function syncDemoData(demoId: string): Promise<void> {
         });
       }
 
-      for (const t of source.trackedCommunities) {
+      for (const t of src.trackedCommunities) {
         await tx.trackedCommunity.create({
           data: {
             userId: demoId,
@@ -179,4 +185,10 @@ async function syncDemoData(demoId: string): Promise<void> {
     },
     { timeout: 30_000 }
   );
+
+  return {
+    monitors: src?.monitors.length ?? 0,
+    briefs: src?.briefs.length ?? 0,
+    audits: src?.auditLogs.length ?? 0,
+  };
 }

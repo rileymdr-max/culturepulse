@@ -206,6 +206,8 @@ model Monitor {
   platforms    String[]  // any of MONITOR_PLATFORMS in lib/acceleration.ts
   lastRunAt             DateTime?
   lastBreakoutAlertAt   DateTime?
+  // Demo curation — admin toggles which monitors appear in the demo sync
+  demoVisible  Boolean   @default(false)
   createdAt             DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
@@ -226,6 +228,9 @@ model ContentBrief {
   userId       String
   subcultureId String
   monitorId    String?
+
+  // Demo curation — admin toggles which briefs appear in the demo sync
+  demoVisible  Boolean @default(false)
 
   headline            String
   urgency             String    // "act-now" | "this-week" | "monitor"
@@ -313,6 +318,8 @@ model AuditLog {
   handle    String
   platform  String
   result    Json     // full BrandAuditResult
+  // Demo curation — admin toggles which audit runs appear in the demo sync
+  demoVisible Boolean @default(false)
   createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
