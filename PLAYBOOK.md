@@ -381,6 +381,7 @@ Newest first. One line per change that affects anything in this playbook.
 
 | Date | Change |
 |---|---|
+| 2026-11-11 | MAINTENANCE-NOTES.md and the token/password rotation scripts now backed up on GitHub. |
 | 2026-11-11 | Playbook created. |
 | 2026-11-11 | Onboarding reworked to audit-first; homepage demo video + hero pop-up. |
 | 2026-11-11 | Pricing tightened; Agency renamed Studio. Sign-up approval + read-only demo account. |
