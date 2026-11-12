@@ -2,7 +2,7 @@
 
 How the site is built, where its data comes from, how the scores work, what it runs on, and how to change it.
 
-_Last updated: November 12, 2026_
+_Last updated: November 12, 2026 (evening)_
 
 > **This is a living document.** Every change to the site should update the matching section here, and add a line to the [Change log](#9-change-log) at the bottom. Claude is instructed to do this automatically (see `CLAUDE.md`). No passwords or keys go in this file.
 
@@ -102,7 +102,7 @@ Browser page (app/dashboard/...)
 
 ### Key database tables
 
-`User` (with `plan`, `approvedAt`), `Subculture` (profiles), `Monitor` (a user watching a subculture on chosen platforms), `MonitorSnapshot` (one row per platform per run: post count, engagement, top posts), `Brief`, `SavedSearch`, `TrackedCommunity`, workspace/organisation tables.
+`User` (with `plan`, `approvedAt`), `Subculture` (profiles; `status` = draft/approved/archived, `demoVisible` = whether demo sessions can see it), `Monitor` (a user watching a subculture on chosen platforms), `MonitorSnapshot` (one row per platform per run: post count, engagement, top posts), `Brief`, `AuditLog` (one row per brand audit run, stored JSON result), `SavedSearch`, `TrackedCommunity`, workspace/organisation tables.
 
 ### Mock data
 
@@ -381,6 +381,7 @@ Newest first. One line per change that affects anything in this playbook.
 
 | Date | Change |
 |---|---|
+| 2026-11-12 | Brand Audit history panel: "Previous runs" dropdown lets you reload any past audit without re-running. Auto-add: discovered subcultures from audits are silently saved as library drafts for admin review. Demo curation: `demoVisible` field on Subculture; admin can toggle per-subculture in Library tab; demo sessions see only approved + demoVisible subcultures. |
 | 2026-11-12 | All emails (breakout alert, weekly digest, sign-up and approval) now use the F2 brand. Email links point to the live site address instead of the old Vercel address. |
 | 2026-11-11 | MAINTENANCE-NOTES.md and the token/password rotation scripts now backed up on GitHub. |
 | 2026-11-11 | Playbook created. |
