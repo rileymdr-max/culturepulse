@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { AlertCircle, ArrowRight, ChevronDown, Plus, Check, Loader2, FileText, Search, X } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { AlertCircle, ArrowRight, ChevronDown, Plus, Check, Loader2, FileText, Search, X, History, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { NavHeader } from "@/components/nav-header";
 import { Button } from "@/components/ui/button";
@@ -95,6 +95,13 @@ function AuditAllowance() {
 
 // Page ───────────────────────────────────────────────────────────────────────
 
+interface HistoryEntry {
+  id: string;
+  handle: string;
+  platform: string;
+  createdAt: string;
+}
+
 export default function BrandAuditPage() {
   const [handle, setHandle] = useState("");
   const [platform, setPlatform] = useState<string>("all");
@@ -104,6 +111,10 @@ export default function BrandAuditPage() {
   const [cachedAudit, setCachedAudit] = useState<BrandAuditResult | null>(null);
   const [cachedAudience, setCachedAudience] = useState<AudienceResult | null>(null);
   const [submittedHandle, setSubmittedHandle] = useState("");
+  const [auditHistory, setAuditHistory] = useState<HistoryEntry[]>([]);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const historyRef = useRef<HTMLDivElement>(null);
 
   const { mutate: runAudit, data: auditData, isPending: auditPending, error: auditError, isSuccess: auditDone } = useBrandAudit();
   const { mutate: runAudience, data: audienceData, isPending: audiencePending, isSuccess: audienceDone } = useAudience();
@@ -140,7 +151,46 @@ export default function BrandAuditPage() {
     return () => { cancelled = true; };
   }, []);
 
-  // Persist to sessionStorage whenever fresh results arrive
+  // Load history list (metadata only — no full results until a run is clicked)
+  useEffect(() => {
+    fetch("/api/brand-audit?history=1")
+      .then((r) => r.ok ? r.json() : null)
+      .then((d) => { if (d?.logs) setAuditHistory(d.logs); })
+      .catch(() => {});
+  }, []);
+
+  // Close history dropdown on outside click
+  useEffect(() => {
+    if (!historyOpen) return;
+    function handleClick(e: MouseEvent) {
+      if (historyRef.current && !historyRef.current.contains(e.target as Node)) {
+        setHistoryOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [historyOpen]);
+
+  async function loadHistoryRun(id: string, h: string) {
+    setHistoryOpen(false);
+    setHistoryLoading(true);
+    try {
+      const res = await fetch(`/api/brand-audit?id=${id}`);
+      if (res.ok) {
+        const { handle: runHandle, result } = await res.json() as { handle: string; result: BrandAuditResult };
+        setHandle(runHandle || h);
+        setCachedAudit(result);
+        setCachedAudience(null);
+        try {
+          sessionStorage.setItem(SESSION_KEY, JSON.stringify({ audit: result }));
+        } catch {}
+      }
+    } finally {
+      setHistoryLoading(false);
+    }
+  }
+
+  // Persist to sessionStorage and refresh history list whenever fresh results arrive
   useEffect(() => {
     if (!auditData && !audienceData) return;
     try {
@@ -153,6 +203,13 @@ export default function BrandAuditPage() {
       if (auditData) setCachedAudit(auditData);
       if (audienceData) setCachedAudience(audienceData);
     } catch {}
+    // Refresh history metadata after a new run lands
+    if (auditData) {
+      fetch("/api/brand-audit?history=1")
+        .then((r) => r.ok ? r.json() : null)
+        .then((d) => { if (d?.logs) setAuditHistory(d.logs); })
+        .catch(() => {});
+    }
   }, [auditData, audienceData]);
 
   function handleClearResults() {
@@ -347,11 +404,52 @@ export default function BrandAuditPage() {
           </div>
         </form>
 
+        {/* History strip */}
+        {auditHistory.length > 0 && (
+          <div ref={historyRef} className="relative mt-4">
+            <button
+              onClick={() => setHistoryOpen((v) => !v)}
+              className="flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <History className="h-3.5 w-3.5" />
+              Previous runs
+              <ChevronRight className={cn("h-3.5 w-3.5 transition-transform duration-200", historyOpen && "rotate-90")} />
+            </button>
+            {historyOpen && (
+              <div className="absolute left-0 top-full z-10 mt-1.5 w-72 rounded-xl border border-border bg-card shadow-lg animate-in fade-in slide-in-from-top-1 duration-150">
+                <ul className="divide-y divide-border py-1">
+                  {auditHistory.map((entry) => (
+                    <li key={entry.id}>
+                      <button
+                        onClick={() => loadHistoryRun(entry.id, entry.handle)}
+                        className="flex w-full items-center justify-between gap-3 px-4 py-2.5 text-left transition-colors hover:bg-accent/50"
+                      >
+                        <span className="font-medium text-sm text-foreground">@{entry.handle}</span>
+                        <span className="text-xs text-muted-foreground tabular-nums shrink-0">
+                          {new Date(entry.createdAt).toLocaleDateString([], { month: "short", day: "numeric" })}
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Error */}
         {error && (
           <div role="alert" className="mt-8 flex items-center gap-2 rounded-lg bg-destructive/10 px-4 py-3 text-sm text-destructive">
             <AlertCircle className="h-4 w-4 shrink-0" />
             {error.message}
+          </div>
+        )}
+
+        {/* History loading */}
+        {historyLoading && (
+          <div className="mt-8 flex items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Loading past audit…
           </div>
         )}
 

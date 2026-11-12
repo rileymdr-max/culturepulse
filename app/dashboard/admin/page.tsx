@@ -5,7 +5,7 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import {
   Layers, Radio, CheckCircle2, Archive, Clock, Search,
-  ChevronDown, ChevronRight, Users, BarChart2, Sparkles,
+  ChevronDown, ChevronRight, Users, BarChart2, Sparkles, Eye, EyeOff,
 } from "lucide-react";
 import { NavHeader } from "@/components/nav-header";
 import { Button } from "@/components/ui/button";
@@ -24,6 +24,7 @@ interface AdminSubculture {
   description: string;
   category: string;
   status: "draft" | "approved" | "archived";
+  demoVisible: boolean;
   generatedByAi: boolean;
   enrichedByApify: boolean;
   createdAt: string;
@@ -150,6 +151,23 @@ function LibraryTab() {
     }
   }
 
+  async function toggleDemoVisible(id: string, current: boolean) {
+    setUpdating(id);
+    try {
+      const res = await fetch(`/api/admin/library?id=${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ demoVisible: !current }),
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setSubcultures((prev) => prev.map((s) => s.id === id ? { ...s, demoVisible: updated.demoVisible } : s));
+      }
+    } finally {
+      setUpdating(null);
+    }
+  }
+
   const filtered = subcultures.filter((s) => {
     if (filter !== "all" && s.status !== filter) return false;
     if (query) {
@@ -207,6 +225,7 @@ function LibraryTab() {
                 <th className="px-4 py-2.5 text-left font-medium">Name</th>
                 <th className="px-4 py-2.5 text-left font-medium hidden sm:table-cell">Category</th>
                 <th className="px-4 py-2.5 text-left font-medium">Status</th>
+                <th className="px-4 py-2.5 text-left font-medium hidden md:table-cell">Demo</th>
                 <th className="px-4 py-2.5 text-left font-medium hidden md:table-cell">Usage</th>
                 <th className="px-4 py-2.5 text-left font-medium hidden lg:table-cell">Added</th>
                 <th className="px-4 py-2.5 text-right font-medium">Actions</th>
@@ -229,6 +248,22 @@ function LibraryTab() {
                   </td>
                   <td className="px-4 py-3">
                     <StatusBadge status={s.status} />
+                  </td>
+                  <td className="px-4 py-3 hidden md:table-cell">
+                    <button
+                      title={s.demoVisible ? "Visible in demo — click to hide" : "Hidden from demo — click to show"}
+                      disabled={updating === s.id}
+                      onClick={() => toggleDemoVisible(s.id, s.demoVisible)}
+                      className={cn(
+                        "inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs transition-colors",
+                        s.demoVisible
+                          ? "text-primary hover:bg-primary/10"
+                          : "text-muted-foreground hover:bg-muted"
+                      )}
+                    >
+                      {s.demoVisible ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
+                      {s.demoVisible ? "On" : "Off"}
+                    </button>
                   </td>
                   <td className="px-4 py-3 hidden md:table-cell text-xs text-muted-foreground">
                     {s._count.monitors} monitors · {s._count.briefs} briefs
@@ -279,7 +314,7 @@ function LibraryTab() {
               ))}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-4 py-10 text-center text-sm text-muted-foreground">
+                  <td colSpan={7} className="px-4 py-10 text-center text-sm text-muted-foreground">
                     No subcultures match your filter.
                   </td>
                 </tr>

@@ -16,6 +16,7 @@ export async function GET() {
       description: true,
       category: true,
       status: true,
+      demoVisible: true,
       generatedByAi: true,
       enrichedByApify: true,
       createdAt: true,
@@ -27,9 +28,10 @@ export async function GET() {
   return NextResponse.json({ subcultures, total: subcultures.length });
 }
 
-const patchSchema = z.object({
-  status: z.enum(["draft", "approved", "archived"]),
-});
+const patchSchema = z.union([
+  z.object({ status: z.enum(["draft", "approved", "archived"]) }),
+  z.object({ demoVisible: z.boolean() }),
+]);
 
 export async function PATCH(req: NextRequest) {
   const { error } = await requireAdmin();
@@ -42,10 +44,14 @@ export async function PATCH(req: NextRequest) {
   const body = patchSchema.safeParse(await req.json().catch(() => ({})));
   if (!body.success) return NextResponse.json({ error: "Invalid body" }, { status: 400 });
 
+  const data = "demoVisible" in body.data
+    ? { demoVisible: body.data.demoVisible }
+    : { status: (body.data as { status: string }).status };
+
   const updated = await prisma.subculture.update({
     where: { id },
-    data: { status: body.data.status },
-    select: { id: true, slug: true, name: true, status: true },
+    data,
+    select: { id: true, slug: true, name: true, status: true, demoVisible: true },
   });
 
   return NextResponse.json(updated);

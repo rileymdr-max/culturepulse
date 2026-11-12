@@ -177,6 +177,9 @@ model Subculture {
   // Live signal data (real scraped — per platform, with source labels)
   signalData      Json?
 
+  // Demo visibility — admin can hide specific approved subcultures from demo sessions
+  demoVisible     Boolean  @default(true)
+
   // Provenance
   generatedByAi   Boolean  @default(false)
   enrichedByApify Boolean  @default(false)

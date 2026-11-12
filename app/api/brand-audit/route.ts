@@ -20,6 +20,7 @@ import { canRunBrandAudit, getPlan } from "@/lib/plans";
 import { countBrandAudits, getUserPlan } from "@/lib/plan-usage";
 import { runBrandAudit } from "@/lib/brand-audit";
 import { prisma } from "@/lib/prisma";
+import type { DiscoveredSubculture } from "@/lib/types/brand-audit";
 
 // Allow up to 120s — Apify scraping (45s) + Claude analysis (30s) + buffer
 export const maxDuration = 120;
@@ -42,19 +43,47 @@ const bodySchema = z.object({
   excludedPlatforms: z.array(platformEnum).optional().default([]),
 });
 
-/** GET /api/brand-audit — returns the user's most recent saved audit result, or 204. */
-export async function GET(_req: NextRequest) {
+/**
+ * GET /api/brand-audit
+ *   - no params     → most recent result (for page restore on mount)
+ *   - ?history=1    → last 10 runs (metadata only: id, handle, platform, createdAt)
+ *   - ?id=<logId>   → full result for a specific past run
+ */
+export async function GET(req: NextRequest) {
   const { session, error: authError } = await requireSession();
   if (authError) return authError;
+
+  const { searchParams } = new URL(req.url);
+  const history = searchParams.get("history");
+  const id = searchParams.get("id");
+
+  if (history === "1") {
+    const logs = await prisma.auditLog.findMany({
+      where: { userId: session.user.id },
+      orderBy: { createdAt: "desc" },
+      take: 10,
+      select: { id: true, handle: true, platform: true, createdAt: true },
+    });
+    return NextResponse.json({ logs });
+  }
+
+  if (id) {
+    const log = await prisma.auditLog.findFirst({
+      where: { id, userId: session.user.id },
+      select: { id: true, handle: true, platform: true, result: true, createdAt: true },
+    });
+    if (!log) return new NextResponse(null, { status: 404 });
+    return NextResponse.json({ id: log.id, handle: log.handle, platform: log.platform, result: log.result, createdAt: log.createdAt });
+  }
 
   const log = await prisma.auditLog.findFirst({
     where: { userId: session.user.id },
     orderBy: { createdAt: "desc" },
-    select: { handle: true, platform: true, result: true, createdAt: true },
+    select: { id: true, handle: true, platform: true, result: true, createdAt: true },
   });
 
   if (!log) return new NextResponse(null, { status: 204 });
-  return NextResponse.json({ handle: log.handle, platform: log.platform, result: log.result, createdAt: log.createdAt });
+  return NextResponse.json({ id: log.id, handle: log.handle, platform: log.platform, result: log.result, createdAt: log.createdAt });
 }
 
 export async function POST(req: NextRequest) {
@@ -93,7 +122,7 @@ export async function POST(req: NextRequest) {
 
     const result = await runBrandAudit(handles, platform, excludedPlatforms);
 
-    // Fire-and-forget: save audit to history (don't block the response)
+    // Fire-and-forget: save history + auto-add discovered subcultures as drafts
     prisma.auditLog.create({
       data: {
         userId: session.user.id,
@@ -103,9 +132,65 @@ export async function POST(req: NextRequest) {
       },
     }).catch((e) => console.error("[api/brand-audit] Failed to save audit log:", e));
 
+    if (result.discovered_subcultures?.length) {
+      autoAddDiscoveredSubcultures(result.discovered_subcultures).catch(() => {});
+    }
+
     return NextResponse.json(result);
   } catch (err) {
     console.error("[api/brand-audit] Unhandled error:", err);
     return serverError("Brand audit failed. Please try again.");
+  }
+}
+
+// ─── Auto-add discovered subcultures to library as drafts ─────────────────────
+
+async function autoAddDiscoveredSubcultures(discovered: DiscoveredSubculture[]) {
+  for (const sub of discovered) {
+    // Skip if a subculture with this name already exists
+    const existing = await prisma.subculture.findFirst({
+      where: { name: { equals: sub.name, mode: "insensitive" } },
+      select: { id: true },
+    });
+    if (existing) continue;
+
+    // Build a unique slug from the provisional slug
+    const baseSlug = (sub.provisional_slug || sub.name)
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "");
+
+    let slug = baseSlug;
+    for (let attempt = 1; attempt <= 10; attempt++) {
+      const taken = await prisma.subculture.findUnique({ where: { slug }, select: { id: true } });
+      if (!taken) break;
+      slug = `${baseSlug}-${attempt}`;
+    }
+
+    try {
+      await prisma.subculture.create({
+        data: {
+          slug,
+          name: sub.name,
+          description: sub.description,
+          category: sub.suggested_category || "Other",
+          status: "draft",
+          keywords: sub.key_signals ?? [],
+          vernacular: [],
+          categoricalBehaviors: [],
+          moments: [],
+          mediaSources: [],
+          icons: [],
+          platforms: [],
+          psychographics: { hero: "", villain: "", core_values: [], motivations: [] },
+          adjacentSubcultures: [],
+          brandFitSignals: { fit_industries: [], red_flags: [] },
+          generatedByAi: true,
+        },
+      });
+      console.log(`[api/brand-audit] Auto-added draft subculture: ${sub.name}`);
+    } catch {
+      // Silently skip on duplicate slug race conditions
+    }
   }
 }
