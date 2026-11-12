@@ -2,7 +2,7 @@
 
 How the site is built, where its data comes from, how the scores work, what it runs on, and how to change it.
 
-_Last updated: November 11, 2026_
+_Last updated: November 12, 2026_
 
 > **This is a living document.** Every change to the site should update the matching section here, and add a line to the [Change log](#9-change-log) at the bottom. Claude is instructed to do this automatically (see `CLAUDE.md`). No passwords or keys go in this file.
 
@@ -381,6 +381,7 @@ Newest first. One line per change that affects anything in this playbook.
 
 | Date | Change |
 |---|---|
+| 2026-11-12 | All emails (breakout alert, weekly digest, sign-up and approval) now use the F2 brand. Email links point to the live site address instead of the old Vercel address. |
 | 2026-11-11 | MAINTENANCE-NOTES.md and the token/password rotation scripts now backed up on GitHub. |
 | 2026-11-11 | Playbook created. |
 | 2026-11-11 | Onboarding reworked to audit-first; homepage demo video + hero pop-up. |
