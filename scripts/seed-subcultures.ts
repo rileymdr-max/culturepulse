@@ -10,19 +10,25 @@
 // Load .env.prod.local before importing anything that needs env vars
 import { readFileSync } from "fs";
 import { resolve } from "path";
-try {
-  const envPath = resolve(process.cwd(), ".env.prod.local");
-  const lines = readFileSync(envPath, "utf-8").split("\n");
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#")) continue;
-    const eqIdx = trimmed.indexOf("=");
-    if (eqIdx === -1) continue;
-    const key = trimmed.slice(0, eqIdx).trim();
-    const val = trimmed.slice(eqIdx + 1).trim().replace(/^["']|["']$/g, "");
-    if (key && !process.env[key]) process.env[key] = val;
-  }
-} catch { /* env file not found — rely on existing env */ }
+function loadEnvFile(filename: string) {
+  try {
+    const lines = readFileSync(resolve(process.cwd(), filename), "utf-8").split("\n");
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("#")) continue;
+      const eqIdx = trimmed.indexOf("=");
+      if (eqIdx === -1) continue;
+      const key = trimmed.slice(0, eqIdx).trim();
+      const val = trimmed.slice(eqIdx + 1).trim().replace(/^["']|["']$/g, "");
+      if (key && !process.env[key]) process.env[key] = val;
+    }
+  } catch { /* file not found — skip */ }
+}
+// Load prod DB credentials from .env.prod.local, but the Anthropic key there may be
+// stale — force it to reload from .env (which the app uses for local dev).
+loadEnvFile(".env.prod.local");
+delete process.env.ANTHROPIC_API_KEY;
+loadEnvFile(".env");
 
 import { PrismaClient } from "@prisma/client";
 import Anthropic from "@anthropic-ai/sdk";
@@ -66,6 +72,49 @@ const SUBCULTURES: { name: string; category: string; seed?: string }[] = [
   // Niche / Cross-category
   { name: "BookTok Community", category: "Entertainment", seed: "BookTok, romantasy, literary fiction, book hauls, reading challenges" },
   { name: "Vintage & Thrift Culture", category: "Fashion", seed: "thrifting, vintage Levi's, deadstock, depop, sustainable fashion" },
+
+  // ── Batch 2: Agency-relevant additions to reach ~50 ──────────────────────────
+
+  // Fashion / Lifestyle
+  { name: "Gorpcore", category: "Fashion", seed: "Arc'teryx, Salomon trail runners as fashion, hiking-gear-as-streetwear, techwear-meets-outdoor, Gore-Tex lifestyle" },
+  { name: "Y2K & Nostalgia Fashion", category: "Fashion", seed: "low-rise jeans, butterfly clips, Bratz aesthetic, Juicy Couture revival, early-2000s nostalgia, Y2K TikTok" },
+  { name: "Minimalism & Intentional Living", category: "Lifestyle", seed: "Buy Nothing movement, r/minimalism, capsule wardrobe, owning less, anti-consumerism, Swedish death cleaning" },
+  { name: "Sober Curious Movement", category: "Lifestyle", seed: "dry January, mindful drinking, mocktails, non-alcoholic spirits, Sober October, r/stopdrinking, Club Soda" },
+  { name: "Homesteading & Self-Sufficiency", category: "Lifestyle", seed: "backyard chickens, canning, food preservation, r/homesteading, modern homestead, urban farming, off-grid adjacent" },
+  { name: "Luxury Travel & Points Hacking", category: "Lifestyle", seed: "travel hacking, award booking, Amex Centurion, Chase Sapphire, Points Guy, Marriott Bonvoy, business class redemptions" },
+
+  // Wellness / Health
+  { name: "Pilates & Reformer Culture", category: "Beauty & Wellness", seed: "reformer Pilates, ClassPass, Pilates Princess, Equinox, barre, controlled movement, body sculpting aesthetic" },
+
+  // Sports / Outdoors
+  { name: "Golf Disruptors", category: "Sports", seed: "Malbon Golf, Bad Birdie, TGL, streetwear-meets-golf, Tiger Woods new era, golf content creators, hypebeast golfers" },
+  { name: "Cycling & Bikepacking", category: "Sports", seed: "Rapha, Pas Normal Studios, gravel riding, Strava segments, club culture, bikepacking routes, r/cycling" },
+  { name: "Surf Culture", category: "Outdoors", seed: "Vissla, Vans surf, Carver skate, dawn patrol, coastal lifestyle, surf travel, r/surfing, WSL" },
+  { name: "Pickleball Community", category: "Sports", seed: "fastest growing sport, dinking, kitchen, PPA Tour, Selkirk paddles, Ben Johns, recreational pickleball culture" },
+
+  // Gaming / Tech
+  { name: "Tabletop Gaming & TTRPG", category: "Gaming", seed: "D&D, Critical Role, Dimension 20, Pathfinder, one shots, homebrew, r/DnD, miniature painting" },
+  { name: "AI Builders & LLM Enthusiasts", category: "Tech", seed: "Hugging Face, LangChain, fine-tuning, r/MachineLearning, build-in-public AI, vibe coding, local LLMs, Claude, ChatGPT power users" },
+  { name: "Retro Gaming Community", category: "Gaming", seed: "vintage consoles, CRT gaming, ROM hacks, r/retrogaming, GameBoy modding, Neo Geo, pixel art appreciation" },
+  { name: "Mobile & Casual Gaming", category: "Gaming", seed: "Roblox adults, Candy Crush demographics, idle games, Wordle, NYT Games, gacha mechanics, mobile MOBA" },
+
+  // Music
+  { name: "Latin Music & Urbano Culture", category: "Music", seed: "reggaeton, Bad Bunny, Peso Pluma, Latin trap, corridos tumbados, Feid, Latin Grammy, Pitchfork Latin" },
+  { name: "Metal & Heavy Music Community", category: "Music", seed: "metalcore revival, deathcore, prog metal, Knocked Loose, Metal Hammer, r/metal, festival circuit, moshpit culture" },
+
+  // Food & Drink
+  { name: "Natural Wine Community", category: "Food & Drink", seed: "biodynamic wine, low-intervention, pét-nat, skin contact orange wine, Resy natural wine bars, somm culture alternative" },
+  { name: "Hot Sauce & Spicy Food Culture", category: "Food & Drink", seed: "Hot Ones, Heatonist, pepper collecting, Scoville obsession, homemade hot sauce, r/spicy, ghost pepper challenges" },
+
+  // Entertainment
+  { name: "Anime & Manga Fandom", category: "Entertainment", seed: "Jujutsu Kaisen, shonen, seinen, manga collecting, Crunchyroll, Funimation, con culture, figure collecting, Akihabara" },
+  { name: "True Crime Community", category: "Entertainment", seed: "My Favorite Murder, Crime Junkie, Dateline, r/truecrime, cold case sleuthing, podcast Murderinos, Netflix docs" },
+  { name: "Letterboxd & Film Culture", category: "Entertainment", seed: "Letterboxd lists, Criterion Collection, 4K physical media, A24 films, film Twitter, arthouse, genre film appreciation" },
+  { name: "Reality TV Fandom", category: "Entertainment", seed: "Love Island, Bachelor Nation, Bravo universe, Vanderpump Rules, Real Housewives, Watch What Happens Live, live-tweeting" },
+
+  // Automotive
+  { name: "EV & Clean Transport Community", category: "Automotive", seed: "Tesla owners club, Rivian, Lucid, charging anxiety, r/electricvehicles, range anxiety solved, EV road trips" },
+  { name: "Overlanding & Off-Road Culture", category: "Automotive", seed: "4Runner builds, rooftop tents, Overland Expo, overlanding rigs, recovery gear, dispersed camping, r/overlanding" },
 ];
 
 // ─── Generator ────────────────────────────────────────────────────────────────
