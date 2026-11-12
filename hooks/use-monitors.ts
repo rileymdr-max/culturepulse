@@ -104,7 +104,21 @@ export function useRunMonitor() {
   return useMutation({
     mutationFn: (id: string) =>
       fetchJson<{ monitor: MonitorData }>(`/api/monitors/${id}/run`, { method: "POST" }),
-    onSuccess: () => {
+    onSuccess: (result) => {
+      // Immediately write the fresh monitor (with updated signal) into every
+      // cached monitors list so sort tabs work right away, before the
+      // background refetch arrives.
+      qc.setQueriesData<{ monitors: MonitorData[] }>(
+        { queryKey: ["monitors"] },
+        (old) => {
+          if (!old) return old;
+          return {
+            monitors: old.monitors.map((m) =>
+              m.id === result.monitor.id ? result.monitor : m
+            ),
+          };
+        }
+      );
       qc.invalidateQueries({ queryKey: ["monitors"] });
     },
   });
