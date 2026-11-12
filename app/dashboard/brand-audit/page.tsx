@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import { AlertCircle, ArrowRight, ChevronDown, Plus, Check, Loader2, FileText, Search, X, History, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { NavHeader } from "@/components/nav-header";
@@ -103,6 +104,7 @@ interface HistoryEntry {
 }
 
 export default function BrandAuditPage() {
+  const searchParams = useSearchParams();
   const [handle, setHandle] = useState("");
   const [platform, setPlatform] = useState<string>("all");
   const [showOverrides, setShowOverrides] = useState(false);
@@ -122,10 +124,22 @@ export default function BrandAuditPage() {
   const isPending = auditPending || audiencePending;
   const error = auditError;
 
-  // Restore last result: sessionStorage first (same session), then server history (returning users / demo)
+  // Restore last result: URL ?id= param first (admin deep-links), then sessionStorage, then server history
+  const urlId = searchParams.get("id");
   useEffect(() => {
     let cancelled = false;
     async function restore() {
+      // URL ?id= wins — used by admin "View full profile" links
+      if (urlId) {
+        try {
+          const res = await fetch(`/api/brand-audit?id=${urlId}`);
+          if (!cancelled && res.ok) {
+            const { handle: h, result } = await res.json() as { handle: string; result: BrandAuditResult };
+            if (!cancelled && result) { setHandle(h); setCachedAudit(result); }
+          }
+        } catch {}
+        return;
+      }
       try {
         const saved = sessionStorage.getItem(SESSION_KEY);
         if (saved) {
@@ -139,17 +153,15 @@ export default function BrandAuditPage() {
       try {
         const res = await fetch("/api/brand-audit");
         if (!cancelled && res.ok) {
-          const { handle, result } = await res.json() as { handle: string; result: BrandAuditResult };
-          if (!cancelled && result) {
-            setHandle(handle);
-            setCachedAudit(result);
-          }
+          const { handle: h, result } = await res.json() as { handle: string; result: BrandAuditResult };
+          if (!cancelled && result) { setHandle(h); setCachedAudit(result); }
         }
       } catch {}
     }
     restore();
     return () => { cancelled = true; };
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlId]);
 
   // Load history list (metadata only — no full results until a run is clicked)
   useEffect(() => {

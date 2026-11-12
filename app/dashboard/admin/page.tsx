@@ -566,6 +566,16 @@ function AuditsTab() {
                       ))}
                     </div>
                   )}
+
+                  {/* Full profile link */}
+                  <div className="pt-1">
+                    <a
+                      href={`/dashboard/brand-audit?id=${log.id}`}
+                      className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      View full profile <ChevronRight className="h-3 w-3" />
+                    </a>
+                  </div>
                 </div>
               )}
             </div>

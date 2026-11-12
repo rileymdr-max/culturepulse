@@ -17,6 +17,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireSession, enforceRateLimit, badRequest, serverError, paymentRequired } from "@/lib/api-helpers";
 import { canRunBrandAudit, getPlan } from "@/lib/plans";
+import { isAdmin } from "@/lib/admin";
 import { countBrandAudits, getUserPlan } from "@/lib/plan-usage";
 import { runBrandAudit } from "@/lib/brand-audit";
 import { prisma } from "@/lib/prisma";
@@ -68,8 +69,10 @@ export async function GET(req: NextRequest) {
   }
 
   if (id) {
+    // Admin can fetch any user's log; regular users only their own
+    const admin = isAdmin(session.user.email);
     const log = await prisma.auditLog.findFirst({
-      where: { id, userId: session.user.id },
+      where: admin ? { id } : { id, userId: session.user.id },
       select: { id: true, handle: true, platform: true, result: true, createdAt: true },
     });
     if (!log) return new NextResponse(null, { status: 404 });
