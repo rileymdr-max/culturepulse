@@ -8,6 +8,7 @@ import { isAdmin } from "@/lib/admin";
 import { PLANS, PLAN_ORDER } from "@/lib/plans";
 import { PendingLink } from "@/components/pending-link";
 import { DemoButton } from "@/components/demo";
+import { DemoVideoButton } from "@/components/marketing/demo-video-button";
 import { cn } from "@/lib/utils";
 import { BRAND_ROOT, D, M, CARD, BTN_GO, BTN_INK, STICKER, Wordmark } from "@/components/marketing/brand";
 
@@ -49,15 +50,16 @@ export default async function HomePage() {
               CulturePulse reads the micro-communities where taste is made, scores which ones are about to break out,
               and writes the brief your team needs to show up first.
             </p>
-            <div className="mt-8 flex flex-wrap items-center gap-4">
-              <PendingLink href={SIGNUP_HREF} arrow className={BTN_GO}>
+            <div className="mt-8 flex flex-wrap items-center gap-3 lg:gap-x-2.5">
+              <PendingLink href={SIGNUP_HREF} arrow className={cn(BTN_GO, "lg:px-5 lg:text-base")}>
                 Find your first breakout
               </PendingLink>
+              <DemoVideoButton className="lg:px-5 lg:text-base" />
               <a
                 href={DEMO_HREF}
                 target="_blank"
                 rel="noopener noreferrer"
-                className={cn(BTN_OUTLINE, "text-[#111110] hover:bg-[#111110] hover:text-[#F2EDE3] focus-visible:outline-[#0B6B45]")}
+                className={cn(BTN_OUTLINE, "text-[#111110] hover:bg-[#111110] hover:text-[#F2EDE3] focus-visible:outline-[#0B6B45] lg:px-5 lg:text-base")}
               >
                 Book a demo
               </a>
@@ -65,7 +67,7 @@ export default async function HomePage() {
             <p className="mt-4 text-sm text-[#66625A]">
               Free plan · No credit card ·{" "}
               <DemoButton className="inline-flex items-center gap-1.5 font-bold text-[#0B6B45] underline decoration-2 underline-offset-2 hover:text-[#111110]">
-                Or explore the live demo, no sign-up
+                Or explore the platform, no sign-up
               </DemoButton>
             </p>
             <p className={cn(M, "mt-10 text-xs uppercase tracking-[0.08em] text-[#66625A]")}>
