@@ -7,7 +7,6 @@ import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BTN_GO, INPUT, LABEL } from "@/components/marketing/brand";
 import { AuthShell, FormNotice } from "@/components/marketing/auth-shell";
-import { DemoButton } from "@/components/demo";
 import { PENDING_APPROVAL_ERROR } from "@/lib/approval";
 
 function LoginForm() {
@@ -57,8 +56,7 @@ function LoginForm() {
       )}
       {justRequested && !error && (
         <FormNotice tone="success">
-          Thanks for signing up! Your account is waiting for approval. We&rsquo;ll email you as soon as it&rsquo;s
-          ready. In the meantime, explore the live demo below.
+          Thanks for signing up! Your account is waiting for approval. We&rsquo;ll email you as soon as it&rsquo;s ready.
         </FormNotice>
       )}
       {error && <FormNotice tone="error">{error}</FormNotice>}
@@ -100,12 +98,6 @@ function LoginForm() {
           {loading ? "Signing in…" : "Sign in"}
         </button>
       </form>
-      <p className="mt-5 text-center text-sm text-[#5E5A52]">
-        Just looking?{" "}
-        <DemoButton className="inline-flex items-center gap-1.5 font-bold text-[#0B6B45] underline decoration-2 underline-offset-2 hover:text-[#111110]">
-          Explore the live demo
-        </DemoButton>
-      </p>
     </>
   );
 }

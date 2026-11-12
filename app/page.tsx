@@ -7,7 +7,6 @@ import { prisma } from "@/lib/prisma";
 import { isAdmin } from "@/lib/admin";
 import { PLANS, PLAN_ORDER } from "@/lib/plans";
 import { PendingLink } from "@/components/pending-link";
-import { DemoButton } from "@/components/demo";
 import { DemoVideoButton } from "@/components/marketing/demo-video-button";
 import { cn } from "@/lib/utils";
 import { BRAND_ROOT, D, M, CARD, BTN_GO, BTN_INK, STICKER, Wordmark } from "@/components/marketing/brand";
@@ -65,10 +64,7 @@ export default async function HomePage() {
               </a>
             </div>
             <p className="mt-4 text-sm text-[#66625A]">
-              Free plan · No credit card ·{" "}
-              <DemoButton className="inline-flex items-center gap-1.5 font-bold text-[#0B6B45] underline decoration-2 underline-offset-2 hover:text-[#111110]">
-                Or explore the platform, no sign-up
-              </DemoButton>
+              Free plan · No credit card required
             </p>
             <p className={cn(M, "mt-10 text-xs uppercase tracking-[0.08em] text-[#66625A]")}>
               Listening across {PLATFORMS.join(" · ")}

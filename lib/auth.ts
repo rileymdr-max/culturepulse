@@ -66,12 +66,14 @@ export const authOptions: NextAuthOptions = {
         };
       },
     }),
-    // One-click demo: no credentials; signs in as the shared read-only demo user.
+    // One-click demo: disabled unless DEMO_ENABLED=true in env.
+    // Set that env var in Vercel when you want to share a live demo with a prospect.
     CredentialsProvider({
       id: "demo",
       name: "demo",
       credentials: {},
       async authorize() {
+        if (process.env.DEMO_ENABLED !== "true") return null;
         const user = await getOrRefreshDemoUser();
         return {
           id: user.id,
