@@ -14,6 +14,11 @@ _Last updated: November 11, 2026_
 - **To turn it back on:** in `lib/monitor-schedule.ts`, change `MONITOR_AUTO_RUN = false` to `true`, then commit and push. That's the only change; the schedule in `vercel.json` is still there. Or ask Claude to "turn monitor auto-runs back on".
 - **At launch, expect about $35–40/month in Apify credit** for 5 monitors running 4 times a day (more as monitors are added).
 
+### Before launch: switch Stripe from Sandbox to live
+- **Right now (since Nov 13, 2026):** Vercel Production uses Stripe **Sandbox** (test mode). Checkout only takes test cards (e.g. 4242 4242 4242 4242) and no real money moves.
+- **What's set up in the Sandbox:** products Starter, Pro, Studio (monthly and yearly prices) and Brand Culture Snapshot ($499 one time); the coupon `snapshot-credit` ($499 off, once); and the webhook "culturepulse-billing" to `https://www.culture-pulse.com/api/billing/webhook` (4 events).
+- **To go live:** in Stripe, switch to live mode and create the same products, prices, coupon and webhook (Stripe can copy products across). Then in Vercel, replace all 8 `STRIPE_PRICE_*` / `STRIPE_COUPON_SNAPSHOT_CREDIT` values with the live IDs, plus the 3 keys (`STRIPE_SECRET_KEY` starts `sk_live_`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` starts `pk_live_`, and the live webhook's `STRIPE_WEBHOOK_SECRET`). Redeploy afterwards. Or ask Claude to "move Stripe to live".
+
 ### Feb 7, 2027: the GitHub token expires
 
 - **What you'll see:** `git push` stops working, with an "Authentication failed" error.
