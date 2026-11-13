@@ -45,7 +45,7 @@ It's organised in five layers:
 | Screen | Path | What it does |
 |---|---|---|
 | Home / Discover | `/dashboard` | Type a subculture or idea → live scrape + AI profile ("Discover search") |
-| Subculture library | `/dashboard/subcultures` | Saved subculture profiles (pre-built + custom). Without full-library access, locked profiles show a teaser and can be unlocked with a "pick" |
+| Subculture library | `/dashboard/subcultures` | Saved subculture profiles (pre-built + custom). Without full-library access, locked profiles show a teaser and can be unlocked with a "pick". Each profile (`/dashboard/subcultures/[slug]`) opens as a visual page: bold lead line, at-a-glance tiles (main platforms, moments, icons, terms), live-signal panel when monitored, jump links, and numbered card sections for language, moments, icons (sentiment-coloured), platforms (logos), psychographics, brand fit and media sources |
 | Signal Board (Monitors) | `/dashboard/monitors` | Watched subcultures with Breakout Scores; "Run all now" |
 | Briefs | `/dashboard/briefs` | AI content briefs. The list shows urgency filter tiles (All / 🔥 Act now / This week / Monitor) and a card per brief with its urgency, first line of "The moment", subculture, velocity and platform logos. Each brief opens as a visual page: urgency sticker, at-a-glance tiles (window, velocity, angle and platform counts), jump links, and colour-coded cards with real platform logos (Simple Icons, `components/platform-logo.tsx`) for the moment, angles (with a yellow "Example" box), platforms and brand fit. Layout lives in `components/brief-view.tsx`; "Copy as text" still gives the plain version |
 | Brand Audit | `/dashboard/brand-audit` | Enter a brand's social handles → its "subculture DNA" + new discoveries. "Your brands" lists saved brands (removing one frees a brand slot); "Download PDF" prints the report |
@@ -405,6 +405,7 @@ Newest first. One line per change that affects anything in this playbook.
 | Date | Change |
 |---|---|
 | 2026-11-13 | Compare hidden: removed from the top nav and from the Pro plan's feature list, since nothing in the app could start a comparison. To come back later as a subculture comparison on the Library page. |
+| 2026-11-13 | Subculture profile pages redesigned in the same card style as briefs: same content, now with icons, platform logos, colour-coded sections and quick stats. |
 | 2026-11-13 | Briefs list redesigned: urgency filter tiles and brief cards with a teaser line and platform logos. |
 | 2026-11-13 | Brief pages redesigned: same text, now laid out as cards with icons, colour-coded sections and quick stats so they read lighter. |
 | 2026-11-13 | Pricing v2: no free plan; one-time $499 Brand Culture Snapshot as the paid way in; plans now count brand slots, library picks, custom subcultures and seats; Pro $899; new Enterprise tier (sales call, set by hand in Admin); annual billing with 2 months free. Brand Audits now count per brand per month (re-runs of the same brand are free, once a day). |

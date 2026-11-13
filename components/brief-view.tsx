@@ -16,7 +16,7 @@ import type { BriefDetail, ContentAngle, PlatformStrategyItem, BriefBrandFit } f
 const signed = (n: number) => `${n > 0 ? "+" : n < 0 ? "−" : ""}${Math.abs(n)}%`;
 
 /** Ink-outlined card used for every block on the page. */
-const BOX = "rounded-2xl border-2 border-foreground shadow-[3px_3px_0_hsl(var(--foreground))]";
+export const BOX = "rounded-2xl border-2 border-foreground shadow-[3px_3px_0_hsl(var(--foreground))]";
 
 /** Split off the first sentence so it can lead in bold; the rest stays as-is. Never drops text. */
 export function splitLead(text: string): [string, string] {
@@ -60,7 +60,7 @@ export function UrgencyPill({ urgency, size = "md" }: { urgency: string; size?: 
 
 // Layout pieces ──────────────────────────────────────────────────────────────
 
-function Section({ id, n, title, meta, children }: { id: string; n: number; title: string; meta?: string; children: React.ReactNode }) {
+export function Section({ id, n, title, meta, children }: { id: string; n: number; title: string; meta?: string; children: React.ReactNode }) {
   return (
     <section id={id} className="scroll-mt-24">
       <div className="flex items-end justify-between gap-4 border-b-2 border-foreground pb-3">
@@ -75,7 +75,7 @@ function Section({ id, n, title, meta, children }: { id: string; n: number; titl
   );
 }
 
-function StatTile({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value: React.ReactNode }) {
+export function StatTile({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value: React.ReactNode }) {
   return (
     <div className={cn(BOX, "bg-card px-4 py-3")}>
       <p className={cn(EYEBROW, "flex items-center gap-1.5")}>
@@ -164,7 +164,7 @@ function PlatformStrategy({ items }: { items: PlatformStrategyItem[] }) {
   );
 }
 
-function FitList({ items, icon: Icon, iconClass }: { items: string[]; icon: React.ElementType; iconClass: string }) {
+export function FitList({ items, icon: Icon, iconClass }: { items: string[]; icon: React.ElementType; iconClass: string }) {
   return (
     <ul className="mt-4 space-y-2.5">
       {items.map((t) => (
