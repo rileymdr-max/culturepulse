@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { requireSession, badRequest, notFound, serverError } from "@/lib/api-helpers";
+import { requireSession, badRequest, notFound, serverError, paymentRequired } from "@/lib/api-helpers";
+import { getPlan } from "@/lib/plans";
+import { getWorkspaceOwnerPlan } from "@/lib/plan-usage";
 import { prisma } from "@/lib/prisma";
 
 const brandingSchema = z.object({
@@ -29,6 +31,11 @@ export async function PATCH(
       where: { workspaceId: params.id, userId: session.user.id, role: { in: ["owner", "admin"] } },
     });
     if (!membership) return notFound("Workspace not found.");
+
+    const owner = await getWorkspaceOwnerPlan(params.id);
+    if (!owner || !getPlan(owner.plan).limits.whiteLabel) {
+      return paymentRequired("White-label branding is included on Studio and Enterprise.");
+    }
 
     const updated = await prisma.workspace.update({
       where: { id: params.id },

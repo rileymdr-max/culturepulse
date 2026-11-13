@@ -15,7 +15,8 @@ import { cn } from "@/lib/utils";
 import type { SubcultureProfile, SubcultureSignalData } from "@/lib/types/subculture";
 import { useCreateBrief } from "@/hooks/use-briefs";
 import { useCurrentPlan } from "@/hooks/use-billing";
-import { canCreateCustomSubculture } from "@/lib/plans";
+import { getPlan } from "@/lib/plans";
+import { PlanGate } from "@/components/plan-gate";
 
 const RECENT_KEY = "speedbag:recent-discoveries";
 const SESSION_KEY = "culturepulse-search";
@@ -296,7 +297,7 @@ function ProfileCard({
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [savedSlug, setSavedSlug] = useState<string | null>(null);
   const { mutate: createBrief, isPending: isGeneratingBrief, data: briefResult, isError: isBriefError, reset: resetBrief } = useCreateBrief();
-  const canSave = canCreateCustomSubculture(useCurrentPlan());
+  const canSave = getPlan(useCurrentPlan()).limits.customSubcultures !== 0;
 
   async function handleAddToLibrary() {
     setSaveState("saving");
@@ -566,6 +567,7 @@ type DiscoverResult = {
 };
 
 function DiscoverPageInner() {
+  const canDiscover = getPlan(useCurrentPlan()).limits.discovery;
   const [prompt, setPrompt] = useState("");
   const [state, setState] = useState<DiscoverState>("idle");
   const [result, setResult] = useState<DiscoverResult | null>(null);
@@ -601,7 +603,7 @@ function DiscoverPageInner() {
 
   async function handleDiscover(inputPrompt?: string) {
     const q = (inputPrompt ?? prompt).trim();
-    if (!q) return;
+    if (!q || !canDiscover) return;
 
     setState("loading");
     setResult(null);
@@ -649,8 +651,14 @@ function DiscoverPageInner() {
           </p>
         </div>
 
+        {!canDiscover && (
+          <PlanGate requiredPlan="starter" feature="Discover search">
+            {null}
+          </PlanGate>
+        )}
+
         {/* Input */}
-        <div className="space-y-3">
+        <div className={cn("space-y-3", !canDiscover && "hidden")}>
           <div className="relative">
             <textarea
               value={prompt}

@@ -3,8 +3,8 @@
 import { Lock, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { useCheckout, useCurrentPlan, type PlanId } from "@/hooks/use-billing";
-import { PLANS, hasPlanAccess } from "@/lib/plans";
+import { useCheckout, useCurrentPlan, type CheckoutItem, type PlanId } from "@/hooks/use-billing";
+import { PLANS, SALES_URL, hasPlanAccess } from "@/lib/plans";
 
 interface PlanGateProps {
   requiredPlan: PlanId;
@@ -66,13 +66,21 @@ function UpgradeCard({
           Available on {plan.name} and above, from ${plan.price.toLocaleString("en-US")}/mo.
         </p>
       </div>
-      <Button
-        className="gap-2"
-        disabled={isPending}
-        onClick={() => checkout(requiredPlan as Exclude<PlanId, "free">)}
-      >
-        {isPending ? "Opening checkout…" : `Upgrade to ${plan.name}`} <ArrowRight className="h-4 w-4" />
-      </Button>
+      {plan.salesLed ? (
+        <a href={SALES_URL} target="_blank" rel="noopener noreferrer">
+          <Button className="gap-2">
+            Talk to us <ArrowRight className="h-4 w-4" />
+          </Button>
+        </a>
+      ) : (
+        <Button
+          className="gap-2"
+          disabled={isPending}
+          onClick={() => checkout({ item: requiredPlan as CheckoutItem })}
+        >
+          {isPending ? "Opening checkout…" : `Upgrade to ${plan.name}`} <ArrowRight className="h-4 w-4" />
+        </Button>
+      )}
     </div>
   );
 }

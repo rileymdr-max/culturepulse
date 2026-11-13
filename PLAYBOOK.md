@@ -2,7 +2,7 @@
 
 How the site is built, where its data comes from, how the scores work, what it runs on, and how to change it.
 
-_Last updated: November 12, 2026 (night)_
+_Last updated: November 13, 2026_
 
 > **This is a living document.** Every change to the site should update the matching section here, and add a line to the [Change log](#9-change-log) at the bottom. Claude is instructed to do this automatically (see `CLAUDE.md`). No passwords or keys go in this file.
 
@@ -45,15 +45,15 @@ It's organised in five layers:
 | Screen | Path | What it does |
 |---|---|---|
 | Home / Discover | `/dashboard` | Type a subculture or idea → live scrape + AI profile ("Discover search") |
-| Subculture library | `/dashboard/subcultures` | Saved subculture profiles (pre-built + custom) |
+| Subculture library | `/dashboard/subcultures` | Saved subculture profiles (pre-built + custom). Without full-library access, locked profiles show a teaser and can be unlocked with a "pick" |
 | Signal Board (Monitors) | `/dashboard/monitors` | Watched subcultures with Breakout Scores; "Run all now" |
 | Briefs | `/dashboard/briefs` | AI content briefs |
-| Brand Audit | `/dashboard/brand-audit` | Enter a brand's social handles → its "subculture DNA" + new discoveries |
+| Brand Audit | `/dashboard/brand-audit` | Enter a brand's social handles → its "subculture DNA" + new discoveries. "Your brands" lists saved brands (removing one frees a brand slot); "Download PDF" prints the report |
 | Audience | `/dashboard/audience` | Audience overlap by handle (shares the Brand Audit allowance) |
 | Compare | `/dashboard/compare` | Side-by-side communities with a similarity score (currently no way in, see MAINTENANCE-NOTES) |
-| Billing / Workspace / Admin | `/dashboard/billing`, `/workspace`, `/admin` | Plan, team, branding, sign-up approvals |
+| Billing / Workspace / Admin | `/dashboard/billing`, `/workspace`, `/admin` | Plan, usage, Snapshot purchase; team and branding; sign-up approvals and setting plans by hand |
 
-Public pages: homepage `/`, `/login`, `/register`, `/onboarding` (2 steps: brand-handle audit → results), `/join/[token]` (workspace invites).
+Public pages: homepage `/`, `/login`, `/register`, `/onboarding` (2 steps: brand-handle audit → results; accounts with no plan and no Snapshot first choose between buying a Snapshot and seeing plans), `/join/[token]` (workspace invites).
 
 ---
 
@@ -243,20 +243,38 @@ Average of the latest 4 weeks vs. the first 4 weeks of the year: >15% higher = r
 
 ## 6. Plans, limits and accounts
 
-Code: `lib/plans.ts`, usage counting in `lib/plan-usage.ts` (calendar month, UTC).
+Code: `lib/plans.ts` (plans, Snapshot, sales link), `lib/plan-usage.ts` (counting and checks). Monthly limits reset on the 1st of each month (UTC). Brand Audits and custom subcultures are counted in the `UsageEvent` table. Audits count **per brand**: re-running a brand already audited this month doesn't use up another audit.
 
-| | Free | Starter | Pro | Studio |
+**There is no free plan.** An account without a subscription ("No plan", stored as `free`) can only browse library teasers. The paid way in is the one-time **Brand Culture Snapshot**.
+
+| | Starter | Pro | Studio | Enterprise |
 |---|---|---|---|---|
-| Price / month | $0 | $299 | $799 | $2,500 |
-| Active monitors | 1 | 3 | 10 | 50 |
-| Briefs / month | 0 | 5 | 30 | Unlimited |
-| Brand Audits | 1 trial | 1 trial | 5 / month | Unlimited |
-| Full acceleration breakdown | Blurred | ✓ | ✓ | ✓ |
-| Weekly digest | – | ✓ | ✓ | ✓ |
-| Breakout alerts, Compare, custom subcultures | – | – | ✓ | ✓ |
-| Workspaces | – | – | – | 5 |
+| Price / month | $299 | $899 | $2,500 | From $6,000, annual contract (sales call) |
+| Annual billing | $2,990/yr | $8,990/yr | $25,000/yr | In contract |
+| Brand slots | 1 | 3 | 10 | Unlimited |
+| Brands audited / month | 1 | 5 | 25 | Unlimited |
+| Library | 10 profiles you pick | Full | Full | Full + custom research |
+| Custom subcultures / month | – | 3 | 15 | Unlimited |
+| Active monitors | 3 | 10 | 50 | Unlimited |
+| Briefs / month | 5 | 30 | Unlimited | Unlimited |
+| Seats (incl. owner) | 1 | 3 | 10 | Unlimited |
+| Workspaces | – | 1 | 10 | Unlimited |
+| Discover search, weekly digest, full acceleration scores | ✓ | ✓ | ✓ | ✓ |
+| Breakout alerts, Compare | – | ✓ | ✓ | ✓ |
+| White-label branding | – | – | ✓ | ✓ |
 
-Studio's internal id is still `agency` (database + `STRIPE_PRICE_AGENCY`). Don't rename the id. API access and custom domain are advertised as "coming soon".
+**How the limits work:**
+- **Brand slot:** each brand with a saved audit holds one. Re-auditing a brand you already have doesn't need a new slot. Removing a brand under "Your brands" on the Brand Audit page frees its slot.
+- **Brands audited / month:** the number of *different* brands audited this month. Re-runs of a brand already counted are free, but each brand can be re-run at most once every 24 hours (`BRAND_RERUN_HOURS` in `lib/plan-usage.ts`), because every run costs Apify and Claude.
+- **Library picks:** Starter picks 10 full profiles. A pick can be swapped out 30 days after it was added. Monitors and briefs only work on profiles the account can open.
+- **Seats:** the owner plus everyone in, or invited to, workspaces they own. Each person counts once.
+- **Enterprise:** has no checkout. "Talk to us" opens the Calendly link (`SALES_URL`). After the contract is signed, set the account's plan by hand in Admin → Sign-ups (plan dropdown). The change shows up for them within about 30 seconds, with no need to sign out. Accounts paying through Stripe change plans in Stripe instead.
+- Studio's internal id is still `agency` (database + `STRIPE_PRICE_AGENCY`). Don't rename the id. Enterprise "API access" and "SSO" are advertised as "coming soon".
+- The admin account always gets Enterprise.
+
+**Brand Culture Snapshot ($499, one-time):** one Brand Audit credit, a PDF of the report (browser "Save as PDF"), and 3 library picks. If the buyer starts a plan within 30 days, Stripe takes $499 off the first payment, using the coupon in `STRIPE_COUPON_SNAPSHOT_CREDIT`. When the plan's own audits run out, Snapshot credits are used instead.
+
+**Not built yet (planned):** paid add-ons (extra brand slot $99, or $79 on Studio; 5 extra audits $149; extra custom subculture $99).
 
 **Accounts:**
 - **Sign-up approval:** new users can't sign in until approved in Admin → Sign-ups. Workspace invitees and the admin are auto-approved.
@@ -278,7 +296,7 @@ What the project runs on. **Check the actual plan and billing in each dashboard*
 | **Apify** | All social scraping (§3) | Pay-as-you-go credit. ~$35–40/month expected once auto-runs are on (5 monitors × 4/day), more with more monitors/users | console.apify.com | `APIFY_API_TOKEN` |
 | **Anthropic** | Claude for profiles, audits, briefs (§4) | Pay per use | console.anthropic.com | `ANTHROPIC_API_KEY` |
 | **Resend** | Email (alerts, digest, approvals) | Sending domain `culture-pulse.com` verified | resend.com | `RESEND_API_KEY`, `RESEND_FROM` |
-| **Stripe** | Subscriptions / payments | Checkout + portal + webhook built | dashboard.stripe.com | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_STARTER/PRO/AGENCY`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` |
+| **Stripe** | Subscriptions / payments | Checkout + portal + webhook built | dashboard.stripe.com | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_STARTER/PRO/AGENCY` (monthly), `STRIPE_PRICE_STARTER_ANNUAL/PRO_ANNUAL/AGENCY_ANNUAL`, `STRIPE_PRICE_SNAPSHOT` (one-time $499), `STRIPE_COUPON_SNAPSHOT_CREDIT` ($499 off, once), `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` |
 | **GitHub** | Code storage (`rileymdr-max/culturepulse`) | Push token **expires Feb 7, 2027** (see MAINTENANCE-NOTES) | github.com | — |
 | **Squarespace** | Domain registration + DNS for `culture-pulse.com` | Annual domain renewal | squarespace.com → Domains | — |
 | **Claude (Anthropic) subscription** | Claude Code / desktop app used to build the site | Your Claude plan | claude.ai | — |
@@ -365,6 +383,8 @@ Vercel deploys automatically. Watch it at vercel.com → culturepulse → Deploy
 
 - [ ] Set `MONITOR_AUTO_RUN = true` in `lib/monitor-schedule.ts`
 - [ ] Stripe in live mode with real price ids
+- [ ] In Stripe, create: monthly prices Starter $299 / Pro $899 / Studio $2,500; annual prices $2,990 / $8,990 / $25,000; a one-time $499 "Brand Culture Snapshot" price; a $499-off "once" coupon. Put their ids in the Vercel settings listed in §7
+- [ ] Update the existing Pro price in Stripe from $799 to $899 (new price id)
 - [ ] Fix or hide Compare (no way in)
 - [ ] Look into the `Apify error 400` in the monitor job logs
 - [ ] Top up / set a budget alert on Apify and Anthropic
@@ -384,6 +404,7 @@ Newest first. One line per change that affects anything in this playbook.
 
 | Date | Change |
 |---|---|
+| 2026-11-13 | Pricing v2: no free plan; one-time $499 Brand Culture Snapshot as the paid way in; plans now count brand slots, library picks, custom subcultures and seats; Pro $899; new Enterprise tier (sales call, set by hand in Admin); annual billing with 2 months free. Brand Audits now count per brand per month (re-runs of the same brand are free, once a day). |
 | 2026-11-12 | Admin-controlled demo curation: `demoVisible` flags added to Monitor, ContentBrief, AuditLog. Admin → Demo tab lets you toggle per-item and push to demo on demand ("Update demo now"). Auto-hourly sync removed. |
 | 2026-11-12 | Admin "View full profile" deep-link on audit history rows. Brand-audit page loads any saved run from URL `?id=`. Admin can view any user's audit log. |
 | 2026-11-12 | Brand Audit history panel: "Previous runs" dropdown lets you reload any past audit without re-running. Auto-add: discovered subcultures from audits are silently saved as library drafts for admin review. Demo curation: `demoVisible` field on Subculture; admin can toggle per-subculture in Library tab; demo sessions see only approved + demoVisible subcultures. |

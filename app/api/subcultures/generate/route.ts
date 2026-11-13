@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireSession, badRequest, serverError, paymentRequired } from "@/lib/api-helpers";
-import { canCreateCustomSubculture } from "@/lib/plans";
-import { getUserPlan } from "@/lib/plan-usage";
+import { getPlan, withinLimit } from "@/lib/plans";
+import { countUsageThisMonth, getUserPlan, recordUsage } from "@/lib/plan-usage";
 import { generateSubcultureProfile } from "@/lib/subculture-generator";
 import { enrichSubcultureWithSignals } from "@/lib/subculture-enricher";
 import { prisma, withDbRetry } from "@/lib/prisma";
@@ -38,13 +38,23 @@ export async function POST(req: NextRequest) {
 
   const { name, seed, save, profile: prebuiltProfile, signal_data: prebuiltSignals } = parsed.data;
 
-  // ── Plan: previews (save: false) power Search on every plan; saving a new
-  // subculture to the library is the Pro "custom subculture" feature.
+  // ── Plan: live previews (Discover search) need a paid plan; saving a new
+  // subculture to the library counts against the monthly custom allowance.
+  const plan = await getUserPlan(session.user.id, session.user.email);
+  if (!plan) return serverError("User not found.");
+  const { limits, name: planName } = getPlan(plan);
+  if (!limits.discovery) {
+    return paymentRequired("Discover search is included on every plan, from Starter at $299/mo.");
+  }
   if (save) {
-    const plan = await getUserPlan(session.user.id, session.user.email);
-    if (!plan) return serverError("User not found.");
-    if (!canCreateCustomSubculture(plan)) {
+    if (limits.customSubcultures === 0) {
       return paymentRequired("Adding subcultures to your library is available on Pro and above.");
+    }
+    const used = await countUsageThisMonth(session.user.id, "custom_subculture");
+    if (!withinLimit(limits.customSubcultures, used)) {
+      return paymentRequired(
+        `You've added all ${limits.customSubcultures} custom subcultures on your ${planName} plan this month.`
+      );
     }
   }
 
@@ -103,6 +113,7 @@ export async function POST(req: NextRequest) {
     }));
 
     console.log(`[subcultures/generate] Created "${subculture.name}" (${subculture.id})`);
+    await recordUsage(session.user.id, "custom_subculture");
 
     return NextResponse.json({ subculture, saved: true }, { status: 201 });
   } catch (err) {

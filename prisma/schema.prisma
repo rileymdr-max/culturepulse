@@ -66,11 +66,17 @@ model User {
   monitorRunStartedAt DateTime?
 
   // Billing
-  plan                 String   @default("free") // free | starter | pro | agency
+  plan                 String   @default("free") // free (no plan) | starter | pro | agency (Studio) | enterprise
   stripeCustomerId     String?  @unique
   stripeSubscriptionId String?  @unique
   subscriptionStatus   String?  // active | trialing | past_due | canceled | incomplete
   currentPeriodEnd     DateTime?
+
+  // One-time Brand Culture Snapshot purchases (see SNAPSHOT in lib/plans.ts)
+  snapshotCredits      Int       @default(0) // unused Snapshot audits
+  bonusLibraryPicks    Int       @default(0) // extra full library profiles from Snapshots
+  snapshotPurchasedAt  DateTime?
+  snapshotCreditUsedAt DateTime? // when the $499 was credited to a subscription
 
   accounts            Account[]
   sessions            Session[]
@@ -81,6 +87,8 @@ model User {
   ownedWorkspaces     Workspace[]
   workspaceMemberships WorkspaceMember[]
   auditLogs           AuditLog[]
+  libraryPicks        LibraryPick[]
+  usageEvents         UsageEvent[]
 }
 
 // ─── Saved Searches ──────────────────────────────────────────────────────────
@@ -190,6 +198,7 @@ model Subculture {
 
   monitors  Monitor[]
   briefs    ContentBrief[]
+  picks     LibraryPick[]
 
   @@index([category])
   @@index([status])
@@ -342,4 +351,34 @@ model MonitorSnapshot {
 
   @@index([monitorId])
   @@index([capturedAt])
+}
+
+// ─── Plan usage ───────────────────────────────────────────────────────────────
+// Library profiles a Starter / Snapshot user has unlocked (Pro and above see
+// the whole library and don't need picks).
+model LibraryPick {
+  id           String   @id @default(cuid())
+  userId       String
+  subcultureId String
+  createdAt    DateTime @default(now())
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subculture Subculture @relation(fields: [subcultureId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, subcultureId])
+  @@index([userId])
+}
+
+// One row per metered action, for monthly limits. kind: brand_audit | custom_subculture.
+// subject = the brand handle for audits (brands, not runs, count toward the allowance).
+model UsageEvent {
+  id        String   @id @default(cuid())
+  userId    String
+  kind      String
+  subject   String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, kind, createdAt])
 }

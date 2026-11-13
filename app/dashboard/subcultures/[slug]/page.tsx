@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { MONITOR_REFRESH_COPY } from "@/lib/monitor-schedule";
-import { ArrowLeft, ArrowRight, AlertCircle, Bell, Check, Loader2, FileText, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { ArrowLeft, ArrowRight, AlertCircle, Bell, Check, Loader2, FileText, TrendingUp, TrendingDown, Minus, Lock, Plus } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { NavHeader } from "@/components/nav-header";
@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { signalTier, TIER_STYLE } from "@/lib/signal-tier";
-import { useSubculture } from "@/hooks/use-subcultures";
+import { useSubculture, usePickSubculture, type LibraryAccessInfo, type SubcultureFull, type SubcultureSummary } from "@/hooks/use-subcultures";
 import { useMonitors, useCreateMonitor, type MonitorData } from "@/hooks/use-monitors";
 import { useCreateBrief, useBriefs } from "@/hooks/use-briefs";
 
@@ -168,10 +168,49 @@ const backLink = (
   </Link>
 );
 
+/** Teaser for a profile outside the viewer's plan, with a pick or upgrade action. */
+function LockedProfile({ s, access }: { s: SubcultureSummary; access: LibraryAccessInfo }) {
+  const { mutate: pick, isPending, error } = usePickSubculture();
+  const picksLeft = Math.max(0, access.pickLimit - access.picked);
+
+  return (
+    <Shell>
+      {backLink}
+      <header className="mt-8 max-w-3xl">
+        <p className="text-sm text-muted-foreground">{s.category}</p>
+        <h1 className="mt-1 text-4xl tracking-tight sm:text-5xl">{s.name}</h1>
+        <p className="mt-3 leading-relaxed text-muted-foreground">{s.description}</p>
+      </header>
+
+      <section className="mt-10 flex max-w-xl flex-col items-start gap-3 rounded-xl border border-dashed border-border p-6">
+        <Lock className="h-5 w-5 text-muted-foreground" aria-hidden />
+        <h2 className="font-semibold">The full profile is locked</h2>
+        <p className="text-sm text-muted-foreground">
+          Keywords, vernacular, moments, icons, psychographics, brand fit and live signal data.
+        </p>
+        {error && <p className="text-sm text-destructive">{error.message}</p>}
+        {picksLeft > 0 ? (
+          <Button disabled={isPending} onClick={() => pick({ subcultureId: s.id })}>
+            {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+            Unlock with a pick ({picksLeft} left)
+          </Button>
+        ) : (
+          <Link href="/dashboard/billing">
+            <Button>
+              {access.pickLimit === 0 ? "See plans" : "Get the full library on Pro"} <ArrowRight className="h-4 w-4" />
+            </Button>
+          </Link>
+        )}
+      </section>
+    </Shell>
+  );
+}
+
 export default function SubcultureDetailPage() {
   const { slug } = useParams<{ slug: string }>();
   const { data, isLoading, error } = useSubculture(slug);
-  const s = data?.subculture;
+  // Locked profiles (teaser fields only) return early below, before any full field is read.
+  const s = data?.subculture as SubcultureFull | undefined;
 
   const { data: monitorsData } = useMonitors(s?.id);
   const existingMonitor = monitorsData?.monitors?.[0];
@@ -208,6 +247,8 @@ export default function SubcultureDetailPage() {
       </Shell>
     );
   }
+
+  if (data?.locked) return <LockedProfile s={s} access={data.access} />;
 
   const generate = () => createBrief({ subcultureId: s.id, monitorId: existingMonitor?.id });
 

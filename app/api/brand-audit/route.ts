@@ -16,9 +16,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireSession, enforceRateLimit, badRequest, serverError, paymentRequired } from "@/lib/api-helpers";
-import { canRunBrandAudit, getPlan } from "@/lib/plans";
 import { isAdmin } from "@/lib/admin";
-import { countBrandAudits, getUserPlan } from "@/lib/plan-usage";
+import { chargeBrandAudit, checkBrandAudit, getUserPlan, normalizeHandle } from "@/lib/plan-usage";
 import { runBrandAudit } from "@/lib/brand-audit";
 import { prisma } from "@/lib/prisma";
 import type { DiscoveredSubculture } from "@/lib/types/brand-audit";
@@ -113,23 +112,19 @@ export async function POST(req: NextRequest) {
   try {
     const plan = await getUserPlan(session.user.id, session.user.email);
     if (!plan) return serverError("User not found.");
-    const used = await countBrandAudits(session.user.id, plan);
-    if (!canRunBrandAudit(plan, used)) {
-      const { limits, name } = getPlan(plan);
-      return paymentRequired(
-        limits.brandAuditPeriod === "lifetime"
-          ? "You've used your trial Brand Audit. Brand Audits are included on Pro and above."
-          : `You've used all ${limits.brandAudits} Brand Audits on your ${name} plan this month. Upgrade to Studio for unlimited audits.`
-      );
-    }
+    const permit = await checkBrandAudit(session.user.id, plan, handles.default);
+    if (!permit.ok) return paymentRequired(permit.message);
 
     const result = await runBrandAudit(handles, platform, excludedPlatforms);
+
+    // Charge only for audits that completed.
+    await chargeBrandAudit(session.user.id, permit.source, handles.default);
 
     // Fire-and-forget: upsert by (userId, handle) so each brand has one saved result
     ;(async () => {
       try {
         const existing = await prisma.auditLog.findFirst({
-          where: { userId: session.user.id, handle: handles.default },
+          where: { userId: session.user.id, handle: { equals: normalizeHandle(handles.default), mode: "insensitive" } },
           select: { id: true },
         });
         if (existing) {
@@ -139,7 +134,7 @@ export async function POST(req: NextRequest) {
           });
         } else {
           await prisma.auditLog.create({
-            data: { userId: session.user.id, handle: handles.default, platform, result: result as object },
+            data: { userId: session.user.id, handle: normalizeHandle(handles.default), platform, result: result as object },
           });
         }
       } catch (e) {
@@ -155,6 +150,28 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     console.error("[api/brand-audit] Unhandled error:", err);
     return serverError("Brand audit failed. Please try again.");
+  }
+}
+
+/**
+ * DELETE /api/brand-audit?handle=<handle>
+ * Removes a brand's saved audit, which frees its brand slot.
+ */
+export async function DELETE(req: NextRequest) {
+  const { session, error: authError } = await requireSession();
+  if (authError) return authError;
+
+  const handle = new URL(req.url).searchParams.get("handle");
+  if (!handle) return badRequest("handle is required.");
+
+  try {
+    await prisma.auditLog.deleteMany({
+      where: { userId: session.user.id, handle: { equals: normalizeHandle(handle), mode: "insensitive" } },
+    });
+    return new NextResponse(null, { status: 204 });
+  } catch (err) {
+    console.error("[api/brand-audit DELETE]", err);
+    return serverError();
   }
 }
 

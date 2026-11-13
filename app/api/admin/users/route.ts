@@ -9,7 +9,7 @@ import { requireAdmin } from "@/lib/admin";
 import { prisma } from "@/lib/prisma";
 import { DEMO_EMAIL } from "@/lib/demo-policy";
 
-const SELECT = { id: true, name: true, email: true, createdAt: true, approvedAt: true } as const;
+const SELECT = { id: true, name: true, email: true, createdAt: true, approvedAt: true, plan: true, stripeSubscriptionId: true } as const;
 
 export async function GET() {
   const { error } = await requireAdmin();

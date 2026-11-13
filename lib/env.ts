@@ -72,6 +72,11 @@ const envSchema = z.object({
   STRIPE_PRICE_STARTER:   emptyStringToUndefined,
   STRIPE_PRICE_PRO:       emptyStringToUndefined,
   STRIPE_PRICE_AGENCY:    emptyStringToUndefined,
+  STRIPE_PRICE_STARTER_ANNUAL: emptyStringToUndefined,
+  STRIPE_PRICE_PRO_ANNUAL:     emptyStringToUndefined,
+  STRIPE_PRICE_AGENCY_ANNUAL:  emptyStringToUndefined,
+  STRIPE_PRICE_SNAPSHOT:       emptyStringToUndefined,
+  STRIPE_COUPON_SNAPSHOT_CREDIT: emptyStringToUndefined,
   NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: emptyStringToUndefined,
 
   // Force mock data regardless of API key presence

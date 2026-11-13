@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { requireSession, badRequest, notFound, serverError } from "@/lib/api-helpers";
+import { requireSession, badRequest, notFound, serverError, paymentRequired } from "@/lib/api-helpers";
+import { getPlan, withinLimit } from "@/lib/plans";
+import { countSeatsUsed, getWorkspaceOwnerPlan } from "@/lib/plan-usage";
 import { prisma } from "@/lib/prisma";
 
 const inviteSchema = z.object({
@@ -40,6 +42,21 @@ export async function POST(
         where: { workspaceId: params.id, userId: existingUser.id },
       });
       if (alreadyMember) return badRequest("This user is already a member of this workspace.");
+    }
+
+    // Seats: everyone across the owner's workspaces counts once.
+    const owner = await getWorkspaceOwnerPlan(params.id);
+    if (!owner) return notFound("Workspace not found.");
+    const { limits, name } = getPlan(owner.plan);
+    const alreadyCounted =
+      !!(await prisma.workspaceMember.findFirst({
+        where: { workspace: { ownerId: owner.ownerId }, user: { email: parsed.data.email } },
+      })) ||
+      !!(await prisma.workspaceInvite.findFirst({
+        where: { workspace: { ownerId: owner.ownerId }, email: parsed.data.email, acceptedAt: null, expiresAt: { gt: new Date() } },
+      }));
+    if (!alreadyCounted && !withinLimit(limits.seats, await countSeatsUsed(owner.ownerId))) {
+      return paymentRequired(`The ${name} plan includes ${limits.seats} seats, and they're all in use.`);
     }
 
     // Upsert invite (re-use token if pending invite for same email)

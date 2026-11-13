@@ -14,6 +14,16 @@ export interface SubcultureSummary {
   enrichedByApify: boolean;
   createdAt: string;
   updatedAt: string;
+  /** True when the viewer's plan only shows a teaser of this profile. */
+  locked?: boolean;
+}
+
+/** The viewer's library allowance (see lib/plan-usage.ts). */
+export interface LibraryAccessInfo {
+  full: boolean;
+  /** -1 = whole library. */
+  pickLimit: number;
+  picked: number;
 }
 
 export interface SubcultureFull extends SubcultureSummary {
@@ -31,7 +41,7 @@ export interface SubcultureFull extends SubcultureSummary {
 
 export function useSubcultures(category?: string) {
   const params = category ? `?category=${encodeURIComponent(category)}` : "";
-  return useQuery<{ subcultures: SubcultureSummary[]; total: number }>({
+  return useQuery<{ subcultures: SubcultureSummary[]; total: number; access: LibraryAccessInfo }>({
     queryKey: ["subcultures", category],
     queryFn: async () => {
       const res = await fetch(`/api/subcultures${params}`);
@@ -42,7 +52,10 @@ export function useSubcultures(category?: string) {
 }
 
 export function useSubculture(slug: string) {
-  return useQuery<{ subculture: SubcultureFull }>({
+  return useQuery<
+    | { subculture: SubcultureFull; locked: false }
+    | { subculture: SubcultureSummary; locked: true; access: LibraryAccessInfo }
+  >({
     queryKey: ["subculture", slug],
     queryFn: async () => {
       const res = await fetch(`/api/subcultures/${slug}`);
@@ -74,6 +87,29 @@ export function useGenerateSubculture() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["subcultures"] });
+    },
+  });
+}
+
+/** Unlocks a full library profile with one of the plan's picks. */
+export function usePickSubculture() {
+  const queryClient = useQueryClient();
+  return useMutation<void, Error, { subcultureId: string }>({
+    mutationFn: async ({ subcultureId }) => {
+      const res = await fetch("/api/library/picks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ subcultureId }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error ?? "Couldn't add this profile");
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["subcultures"] });
+      queryClient.invalidateQueries({ queryKey: ["subculture"] });
+      queryClient.invalidateQueries({ queryKey: ["billing"] });
     },
   });
 }

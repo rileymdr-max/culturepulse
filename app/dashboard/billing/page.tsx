@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, Suspense } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Check, AlertCircle, ArrowRight, Loader2, ExternalLink, X } from "lucide-react";
 import { NavHeader } from "@/components/nav-header";
@@ -8,14 +9,31 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useMonitors } from "@/hooks/use-monitors";
 import { useWorkspaces } from "@/hooks/use-workspace";
-import { useCheckout, useBillingInfo, useBillingPortal, useCurrentPlan } from "@/hooks/use-billing";
-import { PLANS, PLAN_ORDER, hasPlanAccess, type PlanId } from "@/lib/plans";
+import {
+  useCheckout,
+  useBillingInfo,
+  useBillingPortal,
+  useCurrentPlan,
+  type CheckoutItem,
+} from "@/hooks/use-billing";
+import { PLANS, PLAN_ORDER, SNAPSHOT } from "@/lib/plans";
+import { PricingTable, CTA_FEATURED, CTA_PLAIN } from "@/components/marketing/pricing-table";
 
 const price = (n: number) => `$${n.toLocaleString("en-US")}`;
 
 // Usage meter ────────────────────────────────────────────────────────────────
 
-function UsageMeter({ label, used, limit }: { label: string; used: number; limit: number /* -1 = unlimited */ }) {
+function UsageMeter({
+  label,
+  used,
+  limit,
+  fullLabel,
+}: {
+  label: string;
+  used: number;
+  limit: number; // -1 = unlimited
+  fullLabel?: string;
+}) {
   const unlimited = limit === -1;
   const unavailable = !unlimited && limit === 0;
   const pct = unlimited || unavailable ? 0 : Math.min(100, Math.round((used / limit) * 100));
@@ -27,7 +45,7 @@ function UsageMeter({ label, used, limit }: { label: string; used: number; limit
       <div className="flex items-baseline justify-between gap-4">
         <span className="text-sm">{label}</span>
         <span className={cn("text-sm tabular-nums", over ? "font-medium text-destructive" : nearLimit ? "font-medium text-tier-trending" : "text-muted-foreground")}>
-          {unavailable ? "Not on your plan" : unlimited ? `${used} · Unlimited` : `${used} of ${limit}`}
+          {unavailable ? "Not on your plan" : unlimited ? (fullLabel ?? `${used} · Unlimited`) : `${used} of ${limit}`}
         </span>
       </div>
       {!unlimited && !unavailable && (
@@ -39,70 +57,6 @@ function UsageMeter({ label, used, limit }: { label: string; used: number; limit
         </div>
       )}
       {over && <p className="mt-1.5 text-xs text-destructive">You’ve reached this plan’s limit.</p>}
-    </div>
-  );
-}
-
-// Plan card ──────────────────────────────────────────────────────────────────
-
-function PlanCard({ planId, currentPlanId, onManage, managing }: {
-  planId: PlanId;
-  currentPlanId: PlanId;
-  onManage: () => void;
-  managing: boolean;
-}) {
-  const plan = PLANS[planId];
-  const { mutate: checkout, isPending } = useCheckout();
-  const isCurrent = planId === currentPlanId;
-  const isDowngrade = PLAN_ORDER.indexOf(planId) < PLAN_ORDER.indexOf(currentPlanId);
-
-  return (
-    <div className={cn("flex flex-col rounded-xl border bg-card p-6", isCurrent ? "border-primary ring-1 ring-primary" : "border-border")}>
-      <div className="flex items-baseline justify-between gap-2">
-        <h3 className="font-semibold">{plan.name}</h3>
-        {isCurrent && <span className="text-xs font-medium text-primary">Your plan</span>}
-      </div>
-      <p className="mt-3 flex items-baseline gap-1">
-        <span className="text-3xl font-semibold tracking-tight tabular-nums">{plan.price > 0 ? price(plan.price) : "$0"}</span>
-        {plan.price > 0 && <span className="text-sm text-muted-foreground">/mo</span>}
-      </p>
-      <ul className="mt-6 flex-1 space-y-2.5 text-sm">
-        {plan.features.map((f) => (
-          <li key={f} className="flex gap-2.5">
-            <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />
-            {f}
-          </li>
-        ))}
-        {plan.comingSoon?.map((f) => (
-          <li key={f} className="flex gap-2.5 text-muted-foreground">
-            <span className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
-            {f} <span className="text-xs">(coming soon)</span>
-          </li>
-        ))}
-      </ul>
-
-      <div className="mt-8">
-        {isCurrent ? (
-          <p className="flex h-9 items-center justify-center text-sm text-muted-foreground">You’re on this plan</p>
-        ) : planId === "free" ? null : isDowngrade ? (
-          <Button variant="ghost" className="w-full text-muted-foreground" disabled={managing} onClick={onManage}>
-            Switch in billing portal
-          </Button>
-        ) : plan.stripePriceId ? (
-          <Button
-            className="w-full"
-            variant={planId === "pro" ? "default" : "outline"}
-            disabled={isPending}
-            onClick={() => checkout(planId as Exclude<PlanId, "free">)}
-          >
-            {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-            {isPending ? "Opening checkout…" : `Upgrade to ${plan.name}`}
-            {!isPending && <ArrowRight className="h-4 w-4" />}
-          </Button>
-        ) : (
-          <p className="flex h-9 items-center justify-center text-sm text-muted-foreground">Available on request</p>
-        )}
-      </div>
     </div>
   );
 }
@@ -128,17 +82,21 @@ function BillingPageInner() {
 
   const currentPlan = useCurrentPlan();
   const plan = PLANS[currentPlan];
+  const { limits } = plan;
 
   const { data: monitorsData } = useMonitors();
   const { data: billingData } = useBillingInfo();
   const { data: wsData } = useWorkspaces();
   const { mutate: openPortal, isPending: openingPortal } = useBillingPortal();
+  const { mutate: checkout, isPending: checkingOut, variables: checkoutVars } = useCheckout();
 
+  const usage = billingData?.usage;
+  const snapshotCredits = billingData?.snapshot?.credits ?? 0;
   const monitorCount = monitorsData?.monitors?.length ?? 0;
-  const briefCount = billingData?.usage?.briefsThisMonth ?? 0;
-  const auditCount = billingData?.usage?.brandAudits ?? 0;
   const wsCount = wsData?.workspaces?.length ?? 0;
-  const paid = currentPlan !== "free";
+  // Existing subscribers change plans in Stripe's portal, which handles proration.
+  const subscribed = !!billingData?.billing?.stripeCustomerId && currentPlan !== "free" && !plan.salesLed;
+  const busy = (item: CheckoutItem) => checkingOut && checkoutVars?.item === item;
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -148,8 +106,14 @@ function BillingPageInner() {
         <header>
           <h1 className="text-4xl tracking-tight">Billing</h1>
           <p className="mt-2 text-muted-foreground">
-            You’re on the <span className="font-medium text-foreground">{plan.name}</span> plan
-            {plan.price > 0 && <span className="tabular-nums"> ({price(plan.price)}/mo)</span>}.
+            {currentPlan === "free" ? (
+              <>You don’t have a plan yet. Pick one below, or start with a one-time {SNAPSHOT.name}.</>
+            ) : (
+              <>
+                You’re on the <span className="font-medium text-foreground">{plan.name}</span> plan
+                {!plan.salesLed && <span className="tabular-nums"> ({price(plan.price)}/mo)</span>}.
+              </>
+            )}
           </p>
         </header>
 
@@ -172,43 +136,89 @@ function BillingPageInner() {
         )}
 
         {/* Usage */}
-        <section className="mt-10 grid gap-8 rounded-2xl border-[1.5px] border-foreground bg-card shadow-[3px_3px_0_hsl(var(--foreground))] p-6 lg:grid-cols-[1fr_2fr]">
+        <section className="mt-10 grid gap-8 rounded-2xl border-[1.5px] border-foreground bg-card p-6 shadow-[3px_3px_0_hsl(var(--foreground))] lg:grid-cols-[1fr_2fr]">
           <div>
             <h2 className="text-lg font-semibold tracking-tight">Usage</h2>
-            <p className="mt-1 text-sm text-muted-foreground">What your {plan.name} plan includes, and how much you’ve used.</p>
-            {paid && (
+            <p className="mt-1 text-sm text-muted-foreground">
+              What your plan includes and how much you’ve used. Monthly limits reset on the 1st (UTC).
+            </p>
+            {snapshotCredits > 0 && (
+              <p className="mt-3 text-sm">
+                <span className="font-medium">
+                  {snapshotCredits} Snapshot audit{snapshotCredits === 1 ? "" : "s"}
+                </span>{" "}
+                ready to run in{" "}
+                <Link href="/dashboard/brand-audit" className="underline underline-offset-4">
+                  Brand Audit
+                </Link>
+                .
+              </p>
+            )}
+            {subscribed && (
               <Button variant="outline" size="sm" className="mt-4" disabled={openingPortal} onClick={() => openPortal()}>
                 {openingPortal ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ExternalLink className="h-3.5 w-3.5" />}
-                {openingPortal ? "Opening…" : "Invoices & payment method"}
+                {openingPortal ? "Opening…" : "Invoices, payment & plan changes"}
               </Button>
             )}
           </div>
-          <div className="space-y-5">
-            <UsageMeter label="Active monitors" used={monitorCount} limit={plan.limits.monitors} />
-            <UsageMeter label="Content briefs this month" used={briefCount} limit={plan.limits.briefs} />
+          <div className="grid gap-5 sm:grid-cols-2">
+            <UsageMeter label="Brands" used={usage?.brands.length ?? 0} limit={limits.brandSlots} />
+            <UsageMeter label="Brands audited this month" used={usage?.brandAuditsThisMonth ?? 0} limit={limits.brandAudits} />
             <UsageMeter
-              label={plan.limits.brandAuditPeriod === "lifetime" ? "Trial Brand Audit" : "Brand Audits this month"}
-              used={auditCount}
-              limit={plan.limits.brandAudits}
+              label="Library profiles"
+              used={usage?.libraryPicked ?? 0}
+              limit={usage?.libraryPickLimit ?? limits.libraryPicks}
+              fullLabel="Full library"
             />
-            {hasPlanAccess(currentPlan, "agency") && (
-              <UsageMeter label="Workspaces" used={wsCount} limit={plan.limits.workspaces} />
-            )}
-            {!hasPlanAccess(currentPlan, "pro") && (
-              <p className="text-sm text-muted-foreground">Brand Audits, Compare and creating your own subculture profiles are included on Pro and above.</p>
-            )}
+            <UsageMeter label="Custom subcultures this month" used={usage?.customSubculturesThisMonth ?? 0} limit={limits.customSubcultures} />
+            <UsageMeter label="Active monitors" used={monitorCount} limit={limits.monitors} />
+            <UsageMeter label="Content briefs this month" used={usage?.briefsThisMonth ?? 0} limit={limits.briefs} />
+            <UsageMeter label="Seats" used={usage?.seatsUsed ?? 1} limit={limits.seats} />
+            <UsageMeter label="Workspaces" used={wsCount} limit={limits.workspaces} />
           </div>
         </section>
 
         {/* Plans */}
         <section className="mt-12">
           <h2 className="text-xl font-semibold tracking-tight">Plans</h2>
-          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {PLAN_ORDER.map((id) => (
-              <PlanCard key={id} planId={id} currentPlanId={currentPlan} onManage={() => openPortal()} managing={openingPortal} />
-            ))}
+          <div className="mt-4">
+            <PricingTable
+              currentPlan={currentPlan}
+              renderCta={(id, interval, featured) => {
+                const cls = featured ? CTA_FEATURED : CTA_PLAIN;
+                if (id === currentPlan) {
+                  return <p className={cn(cls, "pointer-events-none opacity-70")}>Your plan</p>;
+                }
+                if (subscribed) {
+                  const lower = PLAN_ORDER.indexOf(id) < PLAN_ORDER.indexOf(currentPlan);
+                  return (
+                    <button type="button" className={cls} disabled={openingPortal} onClick={() => openPortal()}>
+                      {lower ? "Switch in billing portal" : `Upgrade to ${PLANS[id].name}`}
+                    </button>
+                  );
+                }
+                const item = id as CheckoutItem;
+                return (
+                  <button type="button" className={cls} disabled={checkingOut} onClick={() => checkout({ item, interval })}>
+                    {busy(item) && <Loader2 className="h-4 w-4 animate-spin" />}
+                    {busy(item) ? "Opening checkout…" : `Choose ${PLANS[id].name}`}
+                    {!busy(item) && <ArrowRight className="h-4 w-4" />}
+                  </button>
+                );
+              }}
+              snapshotCta={
+                <button
+                  type="button"
+                  className={CTA_FEATURED}
+                  disabled={checkingOut}
+                  onClick={() => checkout({ item: "snapshot" })}
+                >
+                  {busy("snapshot") && <Loader2 className="h-4 w-4 animate-spin" />}
+                  {busy("snapshot") ? "Opening checkout…" : `Buy for $${SNAPSHOT.price}`}
+                </button>
+              }
+            />
           </div>
-          <p className="mt-4 text-sm text-muted-foreground">Prices in USD, billed monthly. Cancel anytime.</p>
         </section>
       </main>
     </div>

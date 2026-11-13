@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireSession, badRequest, serverError, paymentRequired } from "@/lib/api-helpers";
-import { canCreateMonitor } from "@/lib/plans";
+import { canCreateMonitor, getPlan } from "@/lib/plans";
+import { canOpenSubculture, getLibraryAccess } from "@/lib/plan-usage";
 import { getEffectivePlan } from "@/lib/admin";
 import { prisma, withDbRetry } from "@/lib/prisma";
 import { computeAccelerationSignal, isComparableSnapshot, MONITOR_PLATFORMS } from "@/lib/acceleration";
@@ -68,10 +69,17 @@ export async function POST(req: NextRequest) {
     if (!user) return serverError("User not found.");
 
     const currentCount = await prisma.monitor.count({ where: { userId: session.user.id } });
-    if (!canCreateMonitor(getEffectivePlan(session.user.email, user.plan), currentCount)) {
+    const plan = getEffectivePlan(session.user.email, user.plan);
+    if (!canCreateMonitor(plan, currentCount)) {
+      const { name, limits } = getPlan(plan);
       return paymentRequired(
-        `You've reached the monitor limit for your ${user.plan} plan. Upgrade to add more monitors.`
+        limits.monitors === 0
+          ? "Monitors are included on every plan, from Starter at $299/mo."
+          : `You've reached the ${limits.monitors}-monitor limit on your ${name} plan. Upgrade to add more monitors.`
       );
+    }
+    if (!canOpenSubculture(await getLibraryAccess(session.user.id, plan), subcultureId)) {
+      return paymentRequired("Add this subculture to your library picks before monitoring it.");
     }
 
     const subculture = await prisma.subculture.findUnique({ where: { id: subcultureId } });

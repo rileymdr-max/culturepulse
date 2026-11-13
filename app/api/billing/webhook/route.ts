@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { getStripe, STRIPE_WEBHOOK_SECRET } from "@/lib/stripe";
 import { prisma } from "@/lib/prisma";
-import type { PlanId } from "@/lib/plans";
+import { SNAPSHOT, type PlanId } from "@/lib/plans";
 
 // Stripe requires the raw body to verify the signature.
 export async function POST(req: NextRequest) {
@@ -26,9 +26,16 @@ export async function POST(req: NextRequest) {
     switch (event.type) {
       case "checkout.session.completed": {
         const session = event.data.object as Stripe.Checkout.Session;
-        if (session.mode === "subscription" && session.metadata?.userId) {
+        const userId = session.metadata?.userId;
+        if (session.mode === "payment" && userId && session.metadata?.kind === "snapshot" && session.payment_status === "paid") {
+          await grantSnapshot(userId);
+        }
+        if (session.mode === "subscription" && userId) {
           const sub = await getStripe().subscriptions.retrieve(session.subscription as string);
-          await activateSubscription(session.metadata.userId, session.metadata.planId as PlanId, sub);
+          await activateSubscription(userId, session.metadata!.planId as PlanId, sub);
+          if (session.metadata?.snapshotCredit === "1") {
+            await prisma.user.update({ where: { id: userId }, data: { snapshotCreditUsedAt: new Date() } });
+          }
         }
         break;
       }
@@ -101,6 +108,18 @@ async function updateSubscriptionStatus(userId: string, planId: PlanId | undefin
       ...(planId ? { plan: planId } : {}),
       subscriptionStatus: sub.status,
       currentPeriodEnd: new Date((sub.items.data[0]?.current_period_end ?? 0) * 1000),
+    },
+  });
+}
+
+/** One-time Brand Culture Snapshot: one audit credit plus library picks. */
+async function grantSnapshot(userId: string) {
+  await prisma.user.update({
+    where: { id: userId },
+    data: {
+      snapshotCredits: { increment: 1 },
+      bonusLibraryPicks: { increment: SNAPSHOT.libraryPicks },
+      snapshotPurchasedAt: new Date(),
     },
   });
 }
