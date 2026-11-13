@@ -50,7 +50,7 @@ It's organised in five layers:
 | Briefs | `/dashboard/briefs` | AI content briefs. The list shows urgency filter tiles (All / 🔥 Act now / This week / Monitor) and a card per brief with its urgency, first line of "The moment", subculture, velocity and platform logos. Each brief opens as a visual page: urgency sticker, at-a-glance tiles (window, velocity, angle and platform counts), jump links, and colour-coded cards with real platform logos (Simple Icons, `components/platform-logo.tsx`) for the moment, angles (with a yellow "Example" box), platforms and brand fit. Layout lives in `components/brief-view.tsx`; "Copy as text" still gives the plain version |
 | Brand Audit | `/dashboard/brand-audit` | Enter a brand's social handles → its "subculture DNA" + new discoveries. "Your brands" lists saved brands (removing one frees a brand slot); "Download PDF" prints the report |
 | Audience | `/dashboard/audience` | Audience overlap by handle (shares the Brand Audit allowance) |
-| Compare | `/dashboard/compare` | Side-by-side communities with a similarity score (currently no way in, see MAINTENANCE-NOTES) |
+| Compare | `/dashboard/compare` | **Hidden for now.** Removed from the nav and the Pro plan list; the page still exists but nothing links to it. Plan: rebuild it to compare subcultures from the Library (see MAINTENANCE-NOTES) |
 | Billing / Workspace / Admin | `/dashboard/billing`, `/workspace`, `/admin` | Plan, usage, Snapshot purchase; team and branding; sign-up approvals and setting plans by hand |
 
 Public pages: homepage `/`, `/login`, `/register`, `/onboarding` (2 steps: brand-handle audit → results; accounts with no plan and no Snapshot first choose between buying a Snapshot and seeing plans), `/join/[token]` (workspace invites).
@@ -260,7 +260,7 @@ Code: `lib/plans.ts` (plans, Snapshot, sales link), `lib/plan-usage.ts` (countin
 | Seats (incl. owner) | 1 | 3 | 10 | Unlimited |
 | Workspaces | – | 1 | 10 | Unlimited |
 | Discover search, weekly digest, full acceleration scores | ✓ | ✓ | ✓ | ✓ |
-| Breakout alerts, Compare | – | ✓ | ✓ | ✓ |
+| Breakout alerts (Compare when it returns) | – | ✓ | ✓ | ✓ |
 | White-label branding | – | – | ✓ | ✓ |
 
 **How the limits work:**
@@ -385,7 +385,7 @@ Vercel deploys automatically. Watch it at vercel.com → culturepulse → Deploy
 - [ ] Stripe in live mode with real price ids
 - [ ] In Stripe, create: monthly prices Starter $299 / Pro $899 / Studio $2,500; annual prices $2,990 / $8,990 / $25,000; a one-time $499 "Brand Culture Snapshot" price; a $499-off "once" coupon. Put their ids in the Vercel settings listed in §7
 - [ ] Update the existing Pro price in Stripe from $799 to $899 (new price id)
-- [ ] Fix or hide Compare (no way in)
+- [x] Hide Compare (done 2026-11-13; rebuild for subcultures later)
 - [ ] Look into the `Apify error 400` in the monitor job logs
 - [ ] Top up / set a budget alert on Apify and Anthropic
 
@@ -404,6 +404,7 @@ Newest first. One line per change that affects anything in this playbook.
 
 | Date | Change |
 |---|---|
+| 2026-11-13 | Compare hidden: removed from the top nav and from the Pro plan's feature list, since nothing in the app could start a comparison. To come back later as a subculture comparison on the Library page. |
 | 2026-11-13 | Briefs list redesigned: urgency filter tiles and brief cards with a teaser line and platform logos. |
 | 2026-11-13 | Brief pages redesigned: same text, now laid out as cards with icons, colour-coded sections and quick stats so they read lighter. |
 | 2026-11-13 | Pricing v2: no free plan; one-time $499 Brand Culture Snapshot as the paid way in; plans now count brand slots, library picks, custom subcultures and seats; Pro $899; new Enterprise tier (sales call, set by hand in Admin); annual billing with 2 months free. Brand Audits now count per brand per month (re-runs of the same brand are free, once a day). |

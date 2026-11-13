@@ -70,9 +70,11 @@ _Last updated: November 11, 2026_
 - The Signal Board's "Run all now" uses its own signed-in route and runs only your own monitors.
 - These routes also no longer run during builds. Before Nov 10, every production deploy sent a weekly-digest email (6 extra sends Nov 9–10).
 
-### Open issue: Compare has no way in
-- Nothing in the app can start a comparison since Search was rebuilt as AI discovery (the old "compare tray" lived on the old Search page).
-- The Compare link in the nav and on the welcome screen leads to an empty page. Fix by adding "Compare" to the new Search results, or hide the link.
+### Parked: Compare (hidden 2026-11-13)
+- Compare was removed from the top nav and from the Pro plan's feature list. The page (`/dashboard/compare`), its API and the old card/tray code are still in the project, just not linked.
+- Why: it compares single platform communities (a subreddit, a hashtag), but the app now works in subcultures, and nothing could start a comparison.
+- Plan to bring it back: rebuild it to compare 2–4 **subcultures**: tick boxes and a tray on the Library page, plus a "Compare with…" button on each subculture page. Use stored subculture data (language, psychographics, platforms, signals), so no extra Apify cost.
+- When it returns: re-add the nav link in `components/nav-header.tsx` and "Compare" to the Pro features in `lib/plans.ts`.
 
 ### Open issue: Apify errors in the monitor job
 - Production build logs show `Apify error 400` from the monitor snapshot job (the enricher code).

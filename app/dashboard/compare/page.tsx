@@ -137,7 +137,7 @@ function ComparePageInner() {
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
-      <NavHeader compareCount={communityIds.length} />
+      <NavHeader />
 
       <main className="mx-auto w-full max-w-screen-2xl flex-1 px-4 py-10 sm:px-6">
         <Link href="/dashboard/search" className="group inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground">
