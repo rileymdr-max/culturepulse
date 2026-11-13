@@ -134,7 +134,7 @@ export const PLANS: Record<PlanId, Plan> = {
       "10 active monitors",
       "30 content briefs / month",
       "3 seats",
-      "Breakout alerts + Compare",
+      "Breakout alerts",
     ],
   },
   agency: {

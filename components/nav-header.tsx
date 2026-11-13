@@ -1,6 +1,6 @@
 "use client";
 
-import { Bookmark, GitCompare, CreditCard } from "lucide-react";
+import { Bookmark, CreditCard } from "lucide-react";
 import { Logo, LogoMark } from "@/components/logo";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -13,11 +13,9 @@ import { useQuery } from "@tanstack/react-query";
 
 interface NavHeaderProps {
   onOpenSaved?: () => void;
-  compareCount?: number;
-  onOpenCompare?: () => void;
 }
 
-export function NavHeader({ onOpenSaved, compareCount = 0, onOpenCompare }: NavHeaderProps) {
+export function NavHeader({ onOpenSaved }: NavHeaderProps) {
   const { data: session, status } = useSession();
   const pathname = usePathname();
   const currentPlan = useCurrentPlan();
@@ -42,7 +40,6 @@ export function NavHeader({ onOpenSaved, compareCount = 0, onOpenCompare }: NavH
     { href: "/dashboard/subcultures", label: "Library" },
     { href: "/dashboard/monitors", label: "Signals" },
     { href: "/dashboard/briefs", label: "Briefs" },
-    { href: "/dashboard/compare", label: "Compare" },
     { href: "/dashboard/brand-audit", label: "Audience Audit" },
     { href: "/dashboard/workspace", label: "Workspace", agencyOnly: true },
     { href: "/dashboard/admin", label: "Admin", adminOnly: true },
@@ -90,19 +87,6 @@ export function NavHeader({ onOpenSaved, compareCount = 0, onOpenCompare }: NavH
 
         {/* Right actions */}
         <div className="flex items-center gap-2 shrink-0">
-          {/* Compare basket indicator */}
-          {compareCount > 0 && (
-            <Link href="/dashboard/compare">
-              <Button variant="outline" size="sm" className="gap-1.5 relative">
-                <GitCompare className="h-4 w-4" />
-                <span className="hidden sm:inline">Compare</span>
-                <span className="absolute -top-1.5 -right-1.5 h-4 w-4 rounded-full bg-primary text-primary-foreground text-[10px] font-bold tabular-nums flex items-center justify-center">
-                  {compareCount}
-                </span>
-              </Button>
-            </Link>
-          )}
-
           {/* Saved panel toggle */}
           {onOpenSaved && (
             <Button variant="ghost" size="icon" onClick={onOpenSaved} title="Saved searches">
