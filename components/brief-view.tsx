@@ -19,7 +19,7 @@ const signed = (n: number) => `${n > 0 ? "+" : n < 0 ? "−" : ""}${Math.abs(n)}
 const BOX = "rounded-2xl border-2 border-foreground shadow-[3px_3px_0_hsl(var(--foreground))]";
 
 /** Split off the first sentence so it can lead in bold; the rest stays as-is. Never drops text. */
-function splitLead(text: string): [string, string] {
+export function splitLead(text: string): [string, string] {
   const m = text.match(/^([\s\S]+?[.!?])\s+([\s\S]+)$/);
   if (!m || m[1].length < 20) return [text, ""];
   return [m[1], m[2]];
@@ -43,6 +43,20 @@ const URGENCY_STICKER: Record<string, string> = {
 
 /** In a two-column grid, stretch a lone last card across both columns. */
 const lastOdd = (i: number, n: number) => n % 2 === 1 && n > 1 && i === n - 1;
+
+/** Urgency sticker shared by the brief page and the briefs list. */
+export function UrgencyPill({ urgency, size = "md" }: { urgency: string; size?: "sm" | "md" }) {
+  return (
+    <span className={cn(
+      "inline-flex shrink-0 items-center gap-1.5 rounded-full border-2 border-foreground font-bold shadow-[2px_2px_0_hsl(var(--foreground))]",
+      size === "sm" ? "px-2.5 py-0.5 text-xs" : "px-3 py-1 text-sm",
+      URGENCY_STICKER[urgency] ?? URGENCY_STICKER.monitor,
+    )}>
+      {urgency === "act-now" && <span aria-hidden>🔥</span>}
+      {urgencyOf(urgency).label}
+    </span>
+  );
+}
 
 // Layout pieces ──────────────────────────────────────────────────────────────
 
@@ -207,13 +221,7 @@ export function BriefView({ brief }: { brief: BriefDetail }) {
       {/* Header */}
       <header className="mt-8">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-          <span className={cn(
-            "inline-flex items-center gap-1.5 rounded-full border-2 border-foreground px-3 py-1 text-sm font-bold shadow-[2px_2px_0_hsl(var(--foreground))]",
-            URGENCY_STICKER[brief.urgency] ?? URGENCY_STICKER.monitor,
-          )}>
-            {brief.urgency === "act-now" && <span aria-hidden>🔥</span>}
-            {u.label}
-          </span>
+          <UrgencyPill urgency={brief.urgency} />
           <span className={cn(EYEBROW)}>Content brief · {date}</span>
         </div>
         <h1 className="mt-4 text-4xl leading-[1.05] tracking-tight sm:text-6xl">{brief.headline}</h1>

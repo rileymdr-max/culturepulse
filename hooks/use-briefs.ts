@@ -11,6 +11,9 @@ export interface BriefSummary {
   urgency: "act-now" | "this-week" | "monitor";
   createdAt: string;
   velocityAtGeneration: number | null;
+  /** Sent by the list endpoint too; used for card teasers and platform logos. */
+  momentSummary?: string;
+  platformStrategy?: PlatformStrategyItem[];
   subculture: {
     id: string;
     name: string;
