@@ -1,6 +1,6 @@
 import {
   siReddit, siTiktok, siInstagram, siYoutube, siX, siSubstack, siFacebook, siDiscord,
-  siTwitch, siThreads, siPinterest, siSnapchat, siLinkedin, siBluesky, siSpotify, siTumblr,
+  siTwitch, siThreads, siGoogle, siPinterest, siSnapchat, siLinkedin, siBluesky, siSpotify, siTumblr,
   type SimpleIcon,
 } from "simple-icons";
 import { Globe } from "lucide-react";
@@ -27,6 +27,7 @@ const MATCHERS: [RegExp, SimpleIcon][] = [
   [/bluesky/i, siBluesky],
   [/spotify|podcast/i, siSpotify],
   [/tumblr/i, siTumblr],
+  [/google/i, siGoogle],
 ];
 
 /** Brand colours too light to read on a white card fall back to ink. */
