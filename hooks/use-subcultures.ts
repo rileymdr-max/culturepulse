@@ -16,6 +16,8 @@ export interface SubcultureSummary {
   updatedAt: string;
   /** True when the viewer's plan only shows a teaser of this profile. */
   locked?: boolean;
+  /** Library list only: main platforms (primary first, max 4); empty when locked. */
+  platformNames?: string[];
 }
 
 /** The viewer's library allowance (see lib/plan-usage.ts). */

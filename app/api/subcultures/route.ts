@@ -32,6 +32,7 @@ export async function GET(req: NextRequest) {
         enrichedByApify: true,
         createdAt: true,
         updatedAt: true,
+        platforms: true,
       },
     }));
 
@@ -39,7 +40,10 @@ export async function GET(req: NextRequest) {
     // for the profiles they've picked.
     const plan = (await getUserPlan(session.user.id, session.user.email)) ?? "free";
     const access = await getLibraryAccess(session.user.id, plan);
-    const withLocks = subcultures.map((s) => ({ ...s, locked: !canOpenSubculture(access, s.id) }));
+    const withLocks = subcultures.map(({ platforms, ...s }) => {
+      const locked = !canOpenSubculture(access, s.id);
+      return { ...s, locked, platformNames: locked ? [] : topPlatformNames(platforms) };
+    });
 
     return NextResponse.json({
       subcultures: withLocks,
@@ -50,4 +54,15 @@ export async function GET(req: NextRequest) {
     console.error("[subcultures]", err);
     return serverError();
   }
+}
+
+/** Platform names for Library cards: primary platforms first, at most four. Locked teasers get none. */
+function topPlatformNames(platforms: unknown): string[] {
+  if (!Array.isArray(platforms)) return [];
+  const rank = (lvl: unknown) => (lvl === "primary" ? 0 : lvl === "secondary" ? 1 : 2);
+  return (platforms as { platform?: unknown; engagement_level?: unknown }[])
+    .filter((p) => typeof p?.platform === "string")
+    .sort((a, b) => rank(a.engagement_level) - rank(b.engagement_level))
+    .map((p) => p.platform as string)
+    .slice(0, 4);
 }
