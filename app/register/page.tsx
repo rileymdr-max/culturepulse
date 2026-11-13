@@ -50,7 +50,7 @@ export default function RegisterPage() {
         </>
       }
       title="Create your account"
-      subtitle="Free plan with one monitor. No credit card. New accounts are reviewed, usually within a day."
+      subtitle="Create your account, then pick a plan or a one-time Brand Culture Snapshot. New accounts are reviewed, usually within a day."
       switchPrompt="Already have an account?"
       switchHref="/login"
       switchLabel="Sign in"

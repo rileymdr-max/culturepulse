@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireSession, badRequest, serverError, paymentRequired } from "@/lib/api-helpers";
 import { canGenerateBrief, getPlan } from "@/lib/plans";
-import { countBriefsThisMonth, getUserPlan } from "@/lib/plan-usage";
+import { canOpenSubculture, countBriefsThisMonth, getLibraryAccess, getUserPlan } from "@/lib/plan-usage";
 import { prisma, withDbRetry } from "@/lib/prisma";
 import { generateContentBrief, type BriefTopPost } from "@/lib/content-intelligence";
 import { computeAccelerationSignal } from "@/lib/acceleration";
@@ -84,6 +84,9 @@ export async function POST(req: NextRequest) {
       );
     }
     if (!subculture) return NextResponse.json({ error: "Subculture not found" }, { status: 404 });
+    if (!canOpenSubculture(await getLibraryAccess(session.user.id, plan), subculture.id)) {
+      return paymentRequired("Add this subculture to your library picks to write briefs for it.");
+    }
 
     // Build signal context if a monitorId was provided
     let signalContext = undefined;

@@ -15,8 +15,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { canRunBrandAudit } from "@/lib/plans";
-import { countBrandAudits, getUserPlan } from "@/lib/plan-usage";
+import { checkBrandAudit, getUserPlan } from "@/lib/plan-usage";
 import { z } from "zod";
 import { requireSession, enforceRateLimit, badRequest, serverError, paymentRequired } from "@/lib/api-helpers";
 import { getMockAudience } from "@/lib/platforms/audience";
@@ -49,14 +48,6 @@ export async function POST(req: NextRequest) {
   const rateLimitError = await enforceRateLimit(req, session.user.id, "audience", 20);
   if (rateLimitError) return rateLimitError;
 
-  // ── Plan: Audience runs alongside a Brand Audit, so it shares that allowance.
-  // The audit is logged when it finishes, so this check sees the same count.
-  const plan = await getUserPlan(session.user.id, session.user.email);
-  if (!plan) return serverError("User not found.");
-  if (!canRunBrandAudit(plan, await countBrandAudits(session.user.id, plan))) {
-    return paymentRequired("Brand Audits are included on Pro and above. Upgrade to run another audit.");
-  }
-
   let body: unknown;
   try {
     body = await req.json();
@@ -70,6 +61,13 @@ export async function POST(req: NextRequest) {
   }
 
   const { handles, platform, excludedPlatforms } = parsed.data;
+
+  // ── Plan: Audience runs alongside a Brand Audit and shares its allowance.
+  // The audit is charged when it finishes, so this check sees the same state.
+  const plan = await getUserPlan(session.user.id, session.user.email);
+  if (!plan) return serverError("User not found.");
+  const permit = await checkBrandAudit(session.user.id, plan, handles.default);
+  if (!permit.ok) return paymentRequired(permit.message);
   const useApify = !!process.env.APIFY_API_TOKEN && process.env.FORCE_MOCK_DATA !== "true";
   const defaultHandle = handles.default.replace(/^[@u\/]+/, "").toLowerCase();
 

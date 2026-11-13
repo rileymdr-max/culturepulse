@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import type { BrandAuditResult } from "@/lib/types/brand-audit";
+import { PLANS, PLAN_ORDER, type PlanId } from "@/lib/plans";
 
 const ADMIN_EMAIL = "rileymdr@gmail.com";
 
@@ -338,6 +339,8 @@ interface SignupUser {
   email: string;
   createdAt: string;
   approvedAt: string | null;
+  plan: string;
+  stripeSubscriptionId: string | null;
 }
 
 /** Always mounted (so the tab label can show the pending count); renders only when visible. */
@@ -393,6 +396,23 @@ function SignupsTab({ visible, onPendingCount }: { visible: boolean; onPendingCo
     }
   }
 
+  async function setPlan(user: SignupUser, plan: string) {
+    setBusy(user.id);
+    setNotice(null);
+    try {
+      const res = await fetch(`/api/admin/users/${user.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "setPlan", plan }),
+      });
+      const d = await res.json();
+      setNotice(res.ok ? `${user.email} is now on ${PLANS[plan as PlanId].name}.` : d.error ?? "Something went wrong.");
+      await load();
+    } finally {
+      setBusy(null);
+    }
+  }
+
   if (!visible) return null;
 
   const fmt = (iso: string) =>
@@ -439,6 +459,20 @@ function SignupsTab({ visible, onPendingCount }: { visible: boolean; onPendingCo
                   {u.name ?? "No name"} <span className="text-muted-foreground">· {u.email}</span>
                 </p>
                 <p className="text-xs text-muted-foreground">approved {u.approvedAt ? fmt(u.approvedAt) : ""}</p>
+                {u.email !== ADMIN_EMAIL && (
+                  <select
+                    aria-label={`Plan for ${u.email}`}
+                    value={u.plan}
+                    disabled={busy === u.id || !!u.stripeSubscriptionId}
+                    title={u.stripeSubscriptionId ? "Pays through Stripe; change the plan there" : "Set plan by hand (Enterprise, comps)"}
+                    onChange={(e) => setPlan(u, e.target.value)}
+                    className="rounded-md border border-border bg-background px-2 py-1 text-xs"
+                  >
+                    {PLAN_ORDER.map((id) => (
+                      <option key={id} value={id}>{PLANS[id].name}</option>
+                    ))}
+                  </select>
+                )}
                 {u.email !== ADMIN_EMAIL && (
                   <Button
                     size="sm"

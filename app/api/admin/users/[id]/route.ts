@@ -3,6 +3,9 @@
  *  - approve: the user can sign in; they get a "You're in" email.
  *  - decline: the pending account is deleted (they can sign up again later).
  *  - remove:  deletes any non-admin account, approved or not, with all its data.
+ * PATCH /api/admin/users/:id   { action: "setPlan", plan }
+ *  - setPlan: puts an account on a plan by hand (Enterprise contracts, comps).
+ *    Accounts paying through Stripe change plans in Stripe instead.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -14,7 +17,10 @@ import { DEMO_EMAIL } from "@/lib/demo-policy";
 
 const ADMIN_EMAIL = "rileymdr@gmail.com";
 
-const bodySchema = z.object({ action: z.enum(["approve", "decline", "remove"]) });
+const bodySchema = z.union([
+  z.object({ action: z.enum(["approve", "decline", "remove"]) }),
+  z.object({ action: z.literal("setPlan"), plan: z.enum(["free", "starter", "pro", "agency", "enterprise"]) }),
+]);
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const { error } = await requireAdmin();
@@ -25,9 +31,20 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
   const user = await prisma.user.findUnique({
     where: { id: params.id },
-    select: { id: true, email: true, name: true, approvedAt: true },
+    select: { id: true, email: true, name: true, approvedAt: true, stripeSubscriptionId: true },
   });
   if (!user) return NextResponse.json({ error: "User not found." }, { status: 404 });
+
+  if (parsed.data.action === "setPlan") {
+    if (user.stripeSubscriptionId) {
+      return NextResponse.json(
+        { error: "This account pays through Stripe. Change its plan in the Stripe dashboard." },
+        { status: 400 }
+      );
+    }
+    await prisma.user.update({ where: { id: user.id }, data: { plan: parsed.data.plan } });
+    return NextResponse.json({ ok: true, plan: parsed.data.plan });
+  }
 
   if (parsed.data.action === "remove") {
     if (user.email === ADMIN_EMAIL || user.email === DEMO_EMAIL) {

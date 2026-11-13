@@ -215,7 +215,7 @@ export default function WorkspacePage() {
         </header>
 
         <div className="mt-8">
-          <PlanGate requiredPlan="agency" feature="Workspaces">
+          <PlanGate requiredPlan="pro" feature="Workspaces">
             <>
               {/* Create */}
               <form

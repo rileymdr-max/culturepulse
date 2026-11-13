@@ -49,7 +49,7 @@ export function NavHeader({ onOpenSaved, compareCount = 0, onOpenCompare }: NavH
   ];
 
   return (
-    <header className="sticky top-0 z-30 border-b-2 border-foreground bg-background/90 backdrop-blur-md">
+    <header className="sticky top-0 z-30 print:hidden border-b-2 border-foreground bg-background/90 backdrop-blur-md">
       <div className="max-w-screen-xl mx-auto px-4 sm:px-6 flex items-center h-14 gap-4">
         {/* Brand */}
         <Link href="/dashboard" className="flex items-center shrink-0" aria-label="CulturePulse home">
@@ -61,7 +61,7 @@ export function NavHeader({ onOpenSaved, compareCount = 0, onOpenCompare }: NavH
         <nav className="flex items-center gap-1 flex-1 overflow-x-auto scrollbar-hide">
           {navLinks.map((link) => {
             if ("adminOnly" in link && link.adminOnly && session?.user?.email !== "rileymdr@gmail.com") return null;
-            if ("agencyOnly" in link && link.agencyOnly && currentPlan !== "agency") return null;
+            if ("agencyOnly" in link && link.agencyOnly && PLANS[currentPlan].limits.workspaces === 0) return null;
             const active = "exact" in link && link.exact ? pathname === link.href : pathname.startsWith(link.href);
             return (
               <Link
@@ -116,6 +116,7 @@ export function NavHeader({ onOpenSaved, compareCount = 0, onOpenCompare }: NavH
           <Link href="/dashboard/billing">
             <span className={cn(
               "hidden sm:inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full border cursor-pointer transition-colors hover:opacity-80",
+              currentPlan === "enterprise" ? "bg-foreground text-background border-foreground" :
               currentPlan === "agency" ? "bg-[#BBA8FF] text-foreground border-foreground" :
               currentPlan === "pro"    ? "bg-[#FFE14D] text-foreground border-foreground" :
               currentPlan === "starter"? "bg-accent text-accent-foreground border-foreground" :

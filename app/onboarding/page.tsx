@@ -8,6 +8,8 @@ import { BRAND_ROOT, BTN_GO, CARD, D, M, STICKER, Wordmark } from "@/components/
 import { FormNotice } from "@/components/marketing/auth-shell";
 import { DemoVideoButton } from "@/components/marketing/demo-video-button";
 import type { BrandAuditResult, MatchedSubculture, DiscoveredSubculture } from "@/lib/types/brand-audit";
+import { useBillingInfo, useCheckout, useCurrentPlan } from "@/hooks/use-billing";
+import { PLANS, SNAPSHOT } from "@/lib/plans";
 
 // ─── Loading messages that rotate while the audit runs ───────────────────────
 const LOADING_MESSAGES = [
@@ -97,8 +99,8 @@ function StepAudit({
             <p className={KICKER}>Welcome to CulturePulse</p>
             <h1 className={cn(D, "text-5xl leading-[0.92] sm:text-6xl")}>What&rsquo;s your brand&rsquo;s handle?</h1>
             <p className="text-[17px] text-[#3B3832]">
-              Your first audit is on us. We&rsquo;ll scan X, TikTok, Reddit, Instagram, YouTube and Pinterest to
-              surface the subcultures your audience actually belongs to.
+              We&rsquo;ll scan X, TikTok, Reddit, Instagram, YouTube and Pinterest to surface the subcultures your
+              audience actually belongs to.
             </p>
           </div>
 
@@ -271,11 +273,63 @@ function StepResults({
 }
 
 // ─── Main onboarding shell ────────────────────────────────────────────────────
+/** Shown when the account has no plan and no Snapshot credit to run an audit with. */
+function StepStart({ onSeePlans }: { onSeePlans: () => void }) {
+  const { mutate: checkout, isPending, error } = useCheckout();
+  return (
+    <div className="mx-auto flex w-full max-w-3xl flex-col items-center gap-10">
+      <div className="space-y-4 text-center">
+        <p className={KICKER}>Welcome to CulturePulse</p>
+        <h1 className={cn(D, "text-5xl leading-[0.92] sm:text-6xl")}>Choose how to start</h1>
+        <p className="text-[17px] text-[#3B3832]">
+          Start with a one-time audit of your brand, or go straight to a plan.
+        </p>
+      </div>
+      {error && <FormNotice tone="error">{error.message}</FormNotice>}
+      <div className="grid w-full gap-6 sm:grid-cols-2">
+        <div className={cn(CARD, "flex flex-col p-6")}>
+          <h2 className={cn(D, "text-2xl")}>{SNAPSHOT.name}</h2>
+          <p className={cn(D, "mt-3 text-4xl")}>${SNAPSHOT.price}</p>
+          <ul className="mt-5 flex-1 space-y-2 text-[15px]">
+            {SNAPSHOT.features.map((f) => (
+              <li key={f}>· {f}</li>
+            ))}
+          </ul>
+          <button
+            type="button"
+            disabled={isPending}
+            onClick={() => checkout({ item: "snapshot" })}
+            className={cn(BTN_GO, "mt-6 w-full")}
+          >
+            {isPending ? "Opening checkout…" : "Get my Snapshot"}
+            <ArrowRight className="h-4 w-4" aria-hidden />
+          </button>
+        </div>
+        <div className={cn(CARD, "flex flex-col p-6")}>
+          <h2 className={cn(D, "text-2xl")}>A plan</h2>
+          <p className={cn(D, "mt-3 text-4xl")}>From ${PLANS.starter.price}/mo</p>
+          <p className="mt-5 flex-1 text-[15px] text-[#3B3832]">
+            Monthly Brand Audits, library access, live monitors and content briefs. Agencies managing many brands
+            should look at Studio or Enterprise.
+          </p>
+          <button type="button" onClick={onSeePlans} className={cn(BTN_GO, "mt-6 w-full bg-transparent text-[#111110]")}>
+            See plans
+            <ArrowRight className="h-4 w-4" aria-hidden />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function OnboardingPage() {
   const router = useRouter();
   const [step, setStep] = useState<1 | 2>(1);
   const [auditHandle, setAuditHandle] = useState("");
   const [auditResult, setAuditResult] = useState<BrandAuditResult | null>(null);
+  const plan = PLANS[useCurrentPlan()];
+  const { data: billing, isLoading: billingLoading } = useBillingInfo();
+  const canAudit = plan.limits.brandAudits !== 0 || (billing?.snapshot?.credits ?? 0) > 0;
 
   async function handleEnterDashboard() {
     // Mark onboarding complete. Wait briefly so a later visit to "/" doesn't bounce back here,
@@ -307,7 +361,15 @@ export default function OnboardingPage() {
 
       <main className="flex flex-1 items-start justify-center px-4 py-10 sm:px-6 sm:py-12">
         <div className="w-full">
-          {step === 1 && (
+          {step === 1 && !billingLoading && !canAudit && (
+            <StepStart
+              onSeePlans={async () => {
+                await fetch("/api/onboarding", { method: "POST" }).catch(() => {});
+                router.push("/dashboard/billing");
+              }}
+            />
+          )}
+          {step === 1 && canAudit && (
             <StepAudit
               onResult={(h, r) => {
                 setAuditHandle(h);

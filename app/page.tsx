@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Check, Search, ArrowUpRight } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { isAdmin } from "@/lib/admin";
-import { PLANS, PLAN_ORDER } from "@/lib/plans";
+import { HomePricing } from "@/components/marketing/home-pricing";
 import { PendingLink } from "@/components/pending-link";
 import { DemoVideoButton } from "@/components/marketing/demo-video-button";
 import { cn } from "@/lib/utils";
@@ -64,7 +64,7 @@ export default async function HomePage() {
               </a>
             </div>
             <p className="mt-4 text-sm text-[#66625A]">
-              Free plan · No credit card required
+              Plans from $299/mo · or a one-time $499 Brand Culture Snapshot
             </p>
             <p className={cn(M, "mt-10 text-xs uppercase tracking-[0.08em] text-[#66625A]")}>
               Listening across {PLATFORMS.join(" · ")}
@@ -216,65 +216,13 @@ export default async function HomePage() {
         <section id="pricing" className="scroll-mt-20 border-t-2 border-[#111110] bg-[#FFFDF8]">
           <div className="mx-auto max-w-[1360px] px-4 py-20 sm:px-6 lg:px-11 lg:py-24">
             <h2 className={cn(D, "max-w-3xl text-5xl leading-[0.95] sm:text-6xl lg:text-7xl")}>
-              Plans from <span className="text-[#0B6B45]">$0</span>. Upgrade when you need more depth.
+              Priced by the <span className="text-[#0B6B45]">brands</span> you manage.
             </h2>
-            <div className="mt-14 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-              {PLAN_ORDER.map((id) => {
-                const plan = PLANS[id];
-                const featured = id === "pro";
-                return (
-                  <div
-                    key={id}
-                    className={cn(
-                      CARD,
-                      "relative flex flex-col overflow-visible p-6",
-                      featured && "bg-[#0B6B45] text-white"
-                    )}
-                  >
-                    {featured && (
-                      <span className={cn(STICKER, "absolute -top-4 right-5 rotate-3 bg-[#FFE14D] px-3 py-1 text-xs text-[#111110]")}>
-                        Recommended
-                      </span>
-                    )}
-                    <h3 className={cn(D, "text-2xl")}>{plan.name}</h3>
-                    <p className="mt-3 flex items-baseline gap-1">
-                      <span className={cn(D, "text-5xl tabular-nums")}>${plan.price.toLocaleString("en-US")}</span>
-                      {plan.price > 0 && (
-                        <span className={cn("text-sm", featured ? "text-white/75" : "text-[#66625A]")}>/mo</span>
-                      )}
-                    </p>
-                    <ul className="mt-6 flex-1 space-y-2.5 text-[15px]">
-                      {plan.features.map((f) => (
-                        <li key={f} className="flex gap-2.5">
-                          <Check
-                            className={cn("mt-0.5 h-4 w-4 shrink-0", featured ? "text-[#FFE14D]" : "text-[#0B6B45]")}
-                            strokeWidth={3}
-                            aria-hidden
-                          />
-                          {f}
-                        </li>
-                      ))}
-                      {plan.comingSoon?.map((f) => (
-                        <li key={f} className={cn("flex gap-2.5", featured ? "text-white/70" : "text-[#66625A]")}>
-                          <span className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
-                          {f} (coming soon)
-                        </li>
-                      ))}
-                    </ul>
-                    <PendingLink
-                      href={SIGNUP_HREF}
-                      className={cn(
-                        "mt-8 inline-flex w-full items-center justify-center rounded-full border-2 border-[#111110] px-5 py-3 text-[15px] font-bold transition-colors",
-                        featured
-                          ? "bg-[#FFE14D] text-[#111110] hover:bg-[#FFEA80]"
-                          : "bg-transparent hover:bg-[#111110] hover:text-[#F2EDE3]"
-                      )}
-                    >
-                      {id === "free" ? "Start free" : `Choose ${plan.name}`}
-                    </PendingLink>
-                  </div>
-                );
-              })}
+            <p className="mt-5 max-w-2xl text-lg text-[#3B3832]">
+              Start with one brand, or bring your whole client roster. Big teams can talk to us about Enterprise.
+            </p>
+            <div className="mt-10">
+              <HomePricing />
             </div>
           </div>
         </section>
@@ -287,7 +235,7 @@ export default async function HomePage() {
                 Find your first <br className="hidden sm:inline" />
                 <span className="text-[#FFE14D]">breakout</span> today.
               </h2>
-              <p className="mt-5 text-lg text-[#F2EDE3]/80">Start on the free plan with one monitor. No credit card required.</p>
+              <p className="mt-5 text-lg text-[#F2EDE3]/80">Start with a $499 Brand Culture Snapshot, credited toward your first month.</p>
             </div>
             <div className="flex flex-wrap gap-4">
               <PendingLink
@@ -295,7 +243,7 @@ export default async function HomePage() {
                 arrow
                 className={cn(BTN_GO, "bg-[#F2EDE3] text-[#111110] focus-visible:outline-[#F2EDE3]")}
               >
-                Start free
+                Get started
               </PendingLink>
               <a
                 href={DEMO_HREF}
@@ -345,7 +293,7 @@ function SiteNav() {
             Sign in
           </Link>
           <PendingLink href={SIGNUP_HREF} className={BTN_INK}>
-            Start free
+            Get started
           </PendingLink>
         </div>
       </div>

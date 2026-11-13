@@ -24,24 +24,41 @@ async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
 
 export interface PlanUsage {
   briefsThisMonth: number;
-  /** Brand Audits in the plan's period: this month, or ever on trial plans. */
-  brandAudits: number;
+  brandAuditsThisMonth: number;
+  customSubculturesThisMonth: number;
+  /** Brands with a saved audit; each holds a brand slot. */
+  brands: string[];
+  libraryPicked: number;
+  /** -1 = whole library. */
+  libraryPickLimit: number;
+  seatsUsed: number;
+}
+
+export interface SnapshotInfo {
+  credits: number;
+  purchasedAt: string | null;
+  creditUsedAt: string | null;
 }
 
 export function useBillingInfo() {
   return useQuery({
     queryKey: ["billing"],
-    queryFn: () => fetchJson<{ billing: BillingInfo; usage: PlanUsage }>("/api/billing"),
+    queryFn: () => fetchJson<{ billing: BillingInfo; usage: PlanUsage; snapshot: SnapshotInfo }>("/api/billing"),
   });
 }
 
+export type BillingInterval = "month" | "year";
+
+/** A self-serve plan, or the one-time Brand Culture Snapshot. */
+export type CheckoutItem = Exclude<PlanId, "free" | "enterprise"> | "snapshot";
+
 export function useCheckout() {
   return useMutation({
-    mutationFn: (planId: Exclude<PlanId, "free">) =>
+    mutationFn: ({ item, interval = "month" }: { item: CheckoutItem; interval?: BillingInterval }) =>
       fetchJson<{ url: string }>("/api/billing/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ planId }),
+        body: JSON.stringify({ item, interval }),
       }),
     onSuccess: ({ url }) => {
       window.location.href = url;
@@ -59,8 +76,18 @@ export function useBillingPortal() {
   });
 }
 
-/** Returns the plan from the current NextAuth session (no extra fetch). */
+/**
+ * The signed-in user's plan. Prefers the live plan from /api/billing (shared,
+ * cached query) so admin plan changes and Stripe upgrades show up without
+ * signing out; falls back to the plan stored in the login session meanwhile.
+ */
 export function useCurrentPlan(): PlanId {
-  const { data: session } = useSession();
-  return ((session?.user as { plan?: string } | undefined)?.plan as PlanId) ?? "free";
+  const { data: session, status } = useSession();
+  const { data } = useQuery({
+    queryKey: ["billing"],
+    queryFn: () => fetchJson<{ billing: BillingInfo; usage: PlanUsage; snapshot: SnapshotInfo }>("/api/billing"),
+    enabled: status === "authenticated",
+    staleTime: 30_000,
+  });
+  return data?.billing?.plan ?? ((session?.user as { plan?: string } | undefined)?.plan as PlanId) ?? "free";
 }

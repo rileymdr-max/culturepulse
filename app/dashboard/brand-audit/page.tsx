@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useSearchParams } from "next/navigation";
-import { AlertCircle, ArrowRight, ChevronDown, Plus, Check, Loader2, FileText, Search, X, History, ChevronRight } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { AlertCircle, ArrowRight, ChevronDown, Plus, Check, Loader2, FileText, Search, X, History, ChevronRight, Download } from "lucide-react";
 import Link from "next/link";
 import { NavHeader } from "@/components/nav-header";
 import { Button } from "@/components/ui/button";
@@ -11,7 +12,7 @@ import { useBrandAudit } from "@/hooks/use-brand-audit";
 import { useAudience } from "@/hooks/use-audience";
 import { useCreateBrief } from "@/hooks/use-briefs";
 import { useBillingInfo, useCurrentPlan } from "@/hooks/use-billing";
-import { canCreateCustomSubculture, getPlan } from "@/lib/plans";
+import { getPlan } from "@/lib/plans";
 import { formatNumber } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import type { BrandAuditResult, MatchedSubculture, DiscoveredSubculture } from "@/lib/types/brand-audit";
@@ -66,27 +67,30 @@ function MeterBar({ value, className, fill = "bg-primary" }: { value: number; cl
 
 // Allowance ──────────────────────────────────────────────────────────────────
 
-/** How many Brand Audits the plan has left, with an upgrade link when none are. */
+/** Brand slots and audits left on the plan, plus any Snapshot credits. */
 function AuditAllowance() {
   const plan = getPlan(useCurrentPlan());
   const { data } = useBillingInfo();
-  const { brandAudits: limit, brandAuditPeriod } = plan.limits;
-  if (limit === -1 || !data?.usage) return null;
-  const left = Math.max(0, limit - data.usage.brandAudits);
-  const trial = brandAuditPeriod === "lifetime";
+  if (!data?.usage) return null;
+  const { brandAudits, brandSlots } = plan.limits;
+  const credits = data.snapshot?.credits ?? 0;
+  const auditsLeft = brandAudits === -1 ? Infinity : Math.max(0, brandAudits - data.usage.brandAuditsThisMonth);
+  const parts: string[] = [];
+  if (brandAudits !== 0) {
+    parts.push(brandAudits === -1 ? "Unlimited Brand Audits (once a day per brand)" : `${auditsLeft} of ${brandAudits} new brands left to audit this month (re-runs are free, once a day)`);
+    if (brandSlots !== -1) parts.push(`${data.usage.brands.length} of ${brandSlots} brand${brandSlots === 1 ? "" : "s"} in use`);
+  }
+  if (credits > 0) parts.push(`${credits} Snapshot audit${credits === 1 ? "" : "s"} ready`);
+  const blocked = auditsLeft === 0 && credits === 0;
 
   return (
-    <p className="mt-3 text-sm text-muted-foreground">
-      {trial
-        ? left > 0
-          ? "Your plan includes 1 trial Brand Audit."
-          : "You’ve used your trial Brand Audit."
-        : `${left} of ${limit} Brand Audits left this month.`}
-      {left === 0 && (
+    <p className="mt-3 text-sm text-muted-foreground print:hidden">
+      {parts.length > 0 ? parts.join(" · ") + "." : "Brand Audits need a plan or a one-time Brand Culture Snapshot."}
+      {blocked && (
         <>
           {" "}
           <Link href="/dashboard/billing" className="font-medium text-foreground underline underline-offset-4">
-            {trial ? "Upgrade to Pro for 5 a month" : "Upgrade to Studio for unlimited"}
+            See plans
           </Link>
         </>
       )}
@@ -104,6 +108,7 @@ interface HistoryEntry {
 }
 
 export default function BrandAuditPage() {
+  const queryClient = useQueryClient();
   const searchParams = useSearchParams();
   const [handle, setHandle] = useState("");
   const [platform, setPlatform] = useState<string>("all");
@@ -253,6 +258,14 @@ export default function BrandAuditPage() {
     return map;
   }
 
+  async function removeBrand(h: string) {
+    if (!window.confirm(`Remove @${h}? Its saved audit is deleted and its brand slot is freed.`)) return;
+    const res = await fetch(`/api/brand-audit?handle=${encodeURIComponent(h)}`, { method: "DELETE" });
+    if (!res.ok) return;
+    setAuditHistory((list) => list.filter((e) => e.handle.toLowerCase() !== h.toLowerCase()));
+    queryClient.invalidateQueries({ queryKey: ["billing"] });
+  }
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!handle.trim()) return;
@@ -275,10 +288,16 @@ export default function BrandAuditPage() {
             Enter a brand’s social handle to see which subcultures make up its audience, and which ones haven’t been mapped yet.
           </p>
           <AuditAllowance />
+          {searchParams.get("snapshot") && (
+            <p role="status" className="mt-4 rounded-lg bg-primary/10 px-4 py-3 text-sm print:hidden">
+              Thanks for buying a Brand Culture Snapshot. Enter your brand’s handle below to run your audit, then use
+              “Download PDF” to save the report. Your 3 library picks are ready in the Library.
+            </p>
+          )}
         </header>
 
         {/* Input */}
-        <form onSubmit={handleSubmit} className="mt-8">
+        <form onSubmit={handleSubmit} className="mt-8 print:hidden">
           <label htmlFor="audit-handle" className="sr-only">Brand social handle</label>
           <div className="flex items-center gap-2 rounded-xl border border-input bg-card p-2 shadow-sm transition-shadow focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20">
             <span className="ml-2 text-lg text-muted-foreground" aria-hidden>@</span>
@@ -418,28 +437,36 @@ export default function BrandAuditPage() {
 
         {/* History strip */}
         {auditHistory.length > 0 && (
-          <div ref={historyRef} className="relative mt-4">
+          <div ref={historyRef} className="relative mt-4 print:hidden">
             <button
               onClick={() => setHistoryOpen((v) => !v)}
               className="flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
             >
               <History className="h-3.5 w-3.5" />
-              Previous runs
+              Your brands
               <ChevronRight className={cn("h-3.5 w-3.5 transition-transform duration-200", historyOpen && "rotate-90")} />
             </button>
             {historyOpen && (
               <div className="absolute left-0 top-full z-10 mt-1.5 w-72 rounded-xl border border-border bg-card shadow-lg animate-in fade-in slide-in-from-top-1 duration-150">
                 <ul className="divide-y divide-border py-1">
                   {auditHistory.map((entry) => (
-                    <li key={entry.id}>
+                    <li key={entry.id} className="flex items-center">
                       <button
                         onClick={() => loadHistoryRun(entry.id, entry.handle)}
-                        className="flex w-full items-center justify-between gap-3 px-4 py-2.5 text-left transition-colors hover:bg-accent/50"
+                        className="flex min-w-0 flex-1 items-center justify-between gap-3 py-2.5 pl-4 pr-2 text-left transition-colors hover:bg-accent/50"
                       >
-                        <span className="font-medium text-sm text-foreground">@{entry.handle}</span>
+                        <span className="truncate font-medium text-sm text-foreground">@{entry.handle}</span>
                         <span className="text-xs text-muted-foreground tabular-nums shrink-0">
                           {new Date(entry.createdAt).toLocaleDateString([], { month: "short", day: "numeric" })}
                         </span>
+                      </button>
+                      <button
+                        onClick={() => removeBrand(entry.handle)}
+                        aria-label={`Remove @${entry.handle} and free its brand slot`}
+                        title="Remove brand (frees a brand slot)"
+                        className="mr-2 rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                      >
+                        <X className="h-3.5 w-3.5" />
                       </button>
                     </li>
                   ))}
@@ -474,6 +501,16 @@ export default function BrandAuditPage() {
               {platform === "all" ? "all platforms" : PLATFORMS.find((p) => p.value === platform)?.label}…
             </p>
             <AuditSkeleton />
+          </div>
+        )}
+
+        {/* Download as PDF (browser print → Save as PDF) */}
+        {!isPending && displayAudit && (
+          <div className="mt-6 flex justify-end print:hidden">
+            <Button variant="outline" size="sm" onClick={() => window.print()}>
+              <Download className="h-3.5 w-3.5" />
+              Download PDF
+            </Button>
           </div>
         )}
 
@@ -664,7 +701,7 @@ function DiscoveredRow({ rank, sub }: { rank: number; sub: DiscoveredSubculture 
   const [addState, setAddState] = useState<AddState>("idle");
   const [savedSlug, setSavedSlug] = useState<string | null>(null);
   const { mutate: createBrief, isPending: isGeneratingBrief, data: briefResult } = useCreateBrief();
-  const canSave = canCreateCustomSubculture(useCurrentPlan());
+  const canSave = getPlan(useCurrentPlan()).limits.customSubcultures !== 0;
 
   async function handleAddToLibrary() {
     setAddState("loading");

@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
     const existing = await prisma.workspace.count({ where: { ownerId: session.user.id } });
 
     if (!canCreateWorkspace(getEffectivePlan(session.user.email, user.plan), existing)) {
-      return paymentRequired("Workspaces are available on the Studio plan. Upgrade to create a workspace.");
+      return paymentRequired("You've reached your plan's workspace limit. Pro includes 1 workspace; Studio includes 10.");
     }
 
     const baseSlug = toSlug(parsed.data.name);

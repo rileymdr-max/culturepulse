@@ -1,13 +1,15 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Plus, Loader2, AlertCircle, Check, X, ArrowRight } from "lucide-react";
+import { Plus, Loader2, AlertCircle, Check, X, ArrowRight, Lock } from "lucide-react";
 import Link from "next/link";
 import { NavHeader } from "@/components/nav-header";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-import { useSubcultures, useGenerateSubculture, type SubcultureSummary } from "@/hooks/use-subcultures";
+import { useSubcultures, useGenerateSubculture, usePickSubculture, type SubcultureSummary } from "@/hooks/use-subcultures";
+import { useCurrentPlan } from "@/hooks/use-billing";
+import { getPlan } from "@/lib/plans";
 
 /**
  * AI-written categories are free-form ("Food & Beverage / Hobbyist Craft"), so exact-match
@@ -31,11 +33,38 @@ const bucketOf = (c: string) => match(c.split(" / ")[0]) ?? match(c) ?? "Other";
 
 // Card ───────────────────────────────────────────────────────────────────────
 
-function SubcultureCard({ s }: { s: SubcultureSummary }) {
+function SubcultureCard({ s, canPick }: { s: SubcultureSummary; canPick: boolean }) {
+  const { mutate: pick, isPending, error } = usePickSubculture();
   const facts = [
     s.enrichedByApify ? "Live data" : null,
     s.status !== "approved" ? "Draft" : null,
   ].filter(Boolean);
+
+  if (s.locked) {
+    return (
+      <div className="flex h-full flex-col rounded-2xl border-[1.5px] border-dashed border-foreground/40 bg-card p-5">
+        <p className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+          <Lock className="h-3 w-3" aria-hidden />
+          {s.category}
+        </p>
+        <h3 className="mt-1 font-semibold tracking-tight">{s.name}</h3>
+        <p className="mt-2 line-clamp-2 flex-1 text-sm leading-relaxed text-muted-foreground">{s.description}</p>
+        {error && <p className="mt-2 text-xs text-destructive">{error.message}</p>}
+        <div className="mt-4">
+          {canPick ? (
+            <Button size="sm" variant="outline" disabled={isPending} onClick={() => pick({ subcultureId: s.id })}>
+              {isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
+              Add to my picks
+            </Button>
+          ) : (
+            <Link href="/dashboard/billing" className="text-sm font-medium underline underline-offset-4">
+              Unlock with a plan
+            </Link>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <Link
@@ -46,7 +75,7 @@ function SubcultureCard({ s }: { s: SubcultureSummary }) {
       <h3 className="mt-1 font-semibold tracking-tight transition-colors group-hover:text-primary">{s.name}</h3>
       <p className="mt-2 line-clamp-3 flex-1 text-sm leading-relaxed text-muted-foreground">{s.description}</p>
       <div className="mt-4 flex items-center justify-between gap-3 text-xs text-muted-foreground">
-        <span>{facts.length ? facts.join(" · ") : " "}</span>
+        <span>{facts.length ? facts.join(" · ") : " "}</span>
         <ArrowRight className="h-4 w-4 shrink-0 transition-transform group-hover:translate-x-0.5 group-hover:text-primary" aria-hidden />
       </div>
     </Link>
@@ -202,6 +231,9 @@ export default function SubculturesPage() {
   }, [all]);
   const subcultures = activeCategory === "All" ? all : all.filter((s) => bucketOf(s.category) === activeCategory);
   const n = subcultures.length;
+  const access = data?.access;
+  const picksLeft = access && !access.full ? Math.max(0, access.pickLimit - access.picked) : 0;
+  const canCreate = getPlan(useCurrentPlan()).limits.customSubcultures !== 0;
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -215,10 +247,36 @@ export default function SubculturesPage() {
               Subculture profiles with the keywords, vernacular and moments your monitors listen for.
             </p>
           </div>
-          <Button onClick={() => setShowGenerate(true)}>
-            <Plus className="h-4 w-4" />New profile
-          </Button>
+          {canCreate ? (
+            <Button onClick={() => setShowGenerate(true)}>
+              <Plus className="h-4 w-4" />New profile
+            </Button>
+          ) : (
+            <Link href="/dashboard/billing">
+              <Button variant="outline">
+                <Plus className="h-4 w-4" />New profile · Pro
+              </Button>
+            </Link>
+          )}
         </header>
+
+        {access && !access.full && (
+          <p role="status" className="mt-6 rounded-lg bg-muted px-4 py-3 text-sm">
+            {access.pickLimit === 0 ? (
+              <>Full profiles come with every plan, or 3 with a one-time Brand Culture Snapshot. </>
+            ) : (
+              <>
+                <span className="font-medium tabular-nums">{access.picked} of {access.pickLimit}</span> library picks used
+                {picksLeft > 0 ? ". Pick the profiles you want in full." : ". You can swap a pick 30 days after adding it. "}
+              </>
+            )}
+            {picksLeft === 0 && (
+              <Link href="/dashboard/billing" className="font-medium underline underline-offset-4">
+                Pro includes the full library
+              </Link>
+            )}
+          </p>
+        )}
 
         {/* Category filter — built from the profiles you actually have */}
         {categories.length > 1 && (
@@ -275,7 +333,7 @@ export default function SubculturesPage() {
           </div>
         ) : (
           <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {subcultures.map((s) => <SubcultureCard key={s.id} s={s} />)}
+            {subcultures.map((s) => <SubcultureCard key={s.id} s={s} canPick={picksLeft > 0} />)}
           </div>
         )}
       </main>
