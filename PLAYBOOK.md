@@ -2,9 +2,11 @@
 
 How the site is built, where its data comes from, how the scores work, what it runs on, and how to change it.
 
-_Last updated: November 13, 2026_
+_Last updated: November 17, 2026_
 
 > **This is a living document.** Every change to the site should update the matching section here, and add a line to the [Change log](#9-change-log) at the bottom. Claude is instructed to do this automatically (see `CLAUDE.md`). No passwords or keys go in this file.
+
+**Online copy:** a readable version of this playbook is pinned in your claude.ai sidebar ([CulturePulse Playbook](https://claude.ai/artifact/9RYdjLUyNWAExoX9otPSch)). Claude republishes it whenever this file changes (`scripts/build-playbook-page.mjs`).
 
 **Companion file:** [MAINTENANCE-NOTES.md](MAINTENANCE-NOTES.md) holds the reminders and "if something breaks" checklists (token renewals, password rotation, open issues).
 
@@ -289,13 +291,15 @@ Code: `lib/plans.ts` (plans, Snapshot, sales link), `lib/plan-usage.ts` (countin
 
 What the project runs on. **Check the actual plan and billing in each dashboard** — prices change; update this table when they do.
 
+**Costs and renewal dates** are tracked in the [CulturePulse Subscriptions](https://claude.ai/artifact/SxHM2Bw8xdwMnfRH6kNt77) sheet (cost, billing cycle, next renewal, monthly and yearly totals). Add a row there whenever you sign up for or cancel something. Its **Usage** tab is filled in automatically every Monday morning by a Claude scheduled task ("CulturePulse weekly usage log", in the Claude app's Scheduled section): Apify spend comes straight from Apify, Anthropic API and Vercel spend are read from their billing pages in Chrome.
+
 | Service | What it's for | Plan / cost notes | Where to manage it | Settings it needs (in Vercel) |
 |---|---|---|---|---|
-| **Vercel** | Hosting, deploys, cron jobs, analytics | **Pro** plan. Analytics within included allowance; don't turn on "Web Analytics Plus" ($10/mo) unless needed | vercel.com → project **culturepulse** | — |
-| **Neon** | Postgres database (production + preview branches) | Project **culture pulse**, in your own Neon login (not the "Neon × Vercel" one) | console.neon.tech | `DATABASE_URL`, `DIRECT_URL` (separate for Production and Preview) |
-| **Apify** | All social scraping (§3) | Pay-as-you-go credit. ~$35–40/month expected once auto-runs are on (5 monitors × 4/day), more with more monitors/users | console.apify.com | `APIFY_API_TOKEN` |
-| **Anthropic** | Claude for profiles, audits, briefs (§4) | Pay per use | console.anthropic.com | `ANTHROPIC_API_KEY` |
-| **Resend** | Email (alerts, digest, approvals) | Sending domain `culture-pulse.com` verified | resend.com | `RESEND_API_KEY`, `RESEND_FROM` |
+| **Vercel** | Hosting, deploys, cron jobs, analytics | **Pro** plan, about $21/month. Analytics within included allowance; don't turn on "Web Analytics Plus" ($10/mo) unless needed | vercel.com → project **culturepulse** | — |
+| **Neon** | Postgres database (production + preview branches) | **Free** plan (1 GB storage, 100 compute hours/month). Project **culture pulse**, in your own Neon login (not the "Neon × Vercel" one) | console.neon.tech | `DATABASE_URL`, `DIRECT_URL` (separate for Production and Preview) |
+| **Apify** | All social scraping (§3) | **Scale** plan, $199/month (includes $199 of usage; since Nov 11, 2026). Actual usage ~$35–40/month once auto-runs are on (5 monitors × 4/day), more with more monitors/users | console.apify.com | `APIFY_API_TOKEN` |
+| **Anthropic** | Claude for profiles, audits, briefs (§4) | Prepaid credits, auto-reload to $50 when below $10 (~$40/month so far) | console.anthropic.com | `ANTHROPIC_API_KEY` |
+| **Resend** | Email (alerts, digest, approvals) | **Free** plan (3,000 emails/month). Sending domain `culture-pulse.com` verified | resend.com | `RESEND_API_KEY`, `RESEND_FROM` |
 | **Stripe** | Subscriptions / payments | Checkout + portal + webhook built | dashboard.stripe.com | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_STARTER/PRO/AGENCY` (monthly), `STRIPE_PRICE_STARTER_ANNUAL/PRO_ANNUAL/AGENCY_ANNUAL`, `STRIPE_PRICE_SNAPSHOT` (one-time $499), `STRIPE_COUPON_SNAPSHOT_CREDIT` ($499 off, once), `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` |
 | **GitHub** | Code storage (`rileymdr-max/culturepulse`) | Push token **expires Feb 7, 2027** (see MAINTENANCE-NOTES) | github.com | — |
 | **Squarespace** | Domain registration + DNS for `culture-pulse.com` | Annual domain renewal | squarespace.com → Domains | — |
@@ -404,6 +408,9 @@ Newest first. One line per change that affects anything in this playbook.
 
 | Date | Change |
 |---|---|
+| 2026-11-17 | Playbook published as a private page pinned in the claude.ai sidebar; Claude republishes it with every playbook change. |
+| 2026-11-17 | Weekly usage log added: every Monday a scheduled task adds Apify, Anthropic API and Vercel spend to the Usage tab of the Subscriptions sheet. |
+| 2026-11-17 | Subscriptions sheet started to track every platform's cost, billing cycle and renewal date; linked from §7. Plan details in §7 corrected from the billing pages (Apify is on the $199/month Scale plan, not pay-as-you-go; Neon and Resend are free). |
 | 2026-11-13 | Compare hidden: removed from the top nav and from the Pro plan's feature list, since nothing in the app could start a comparison. To come back later as a subculture comparison on the Library page. |
 | 2026-11-13 | Library page redesigned: category icons, platform logos on each card, quick-stat tiles and a clearer picks notice. The Library list now also sends each unlocked profile's main platform names. |
 | 2026-11-13 | Subculture profile pages redesigned in the same card style as briefs: same content, now with icons, platform logos, colour-coded sections and quick stats. |

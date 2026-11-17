@@ -11,7 +11,9 @@
 - New/removed service, subscription, or environment variable → §7
 - New screens, folders, workflow or launch-checklist items → §1, §2, §8
 
-Then bump the "Last updated" date and add one plain-language line to the §9 Change log. Skip only for changes with no effect on anything the playbook describes (e.g. pure styling tweaks). Never put passwords, keys or tokens in it.
+Then bump the "Last updated" date and add one plain-language line to the §9 Change log.
+
+**Then republish the pinned playbook page** so it matches: run `node scripts/build-playbook-page.mjs <scratchpad>/playbook.html`, then publish that file with the Artifact tool to `url` https://claude.ai/artifact/9RYdjLUyNWAExoX9otPSch (read it first if this conversation hasn't). Do this after the playbook change is final, in the same piece of work. Skip only for changes with no effect on anything the playbook describes (e.g. pure styling tweaks). Never put passwords, keys or tokens in it.
 
 Reminders and break-fix checklists go in `MAINTENANCE-NOTES.md`, not the playbook.
 

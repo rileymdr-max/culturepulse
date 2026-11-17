@@ -2,11 +2,19 @@
 
 Things to remember about how CulturePulse is set up. No passwords or keys are stored in this file.
 
-_Last updated: November 11, 2026_
+_Last updated: November 17, 2026_
 
 ---
 
 ## Coming up
+
+### Before Dec 30, 2026: update the card Vercel charges
+- The American Express card on Vercel's team billing expires **12/2026**. Vercel bills on the 30th (about $21/month).
+- **Fix:** Vercel → team **rileymdr-max's projects** → Settings → Billing → Payment Method → add the new card and make it the default.
+
+### Review the Apify plan
+- Apify is on the **Scale plan, $199/month** (since Nov 11, 2026). It includes $199 of usage, but CulturePulse used about $36 in the first period.
+- Worth checking whether a smaller plan covers the usage, especially before monitor auto-runs come back on (~$35–40/month expected).
 
 ### Before launch: turn automatic monitor runs back on
 - **Why it's off:** since Nov 11, 2026, monitors only run when you click **Run all now** (or a card's run button), to save Apify credit while we build. Each run of 5 monitors costs roughly $0.30–0.50 in Apify credit, mostly Reddit.
@@ -32,6 +40,11 @@ _Last updated: November 11, 2026_
 ---
 
 ## Good to know
+
+### Weekly usage log (since Nov 17, 2026)
+- Every Monday around 8:35 AM, a Claude scheduled task adds this week's Apify, Anthropic API and Vercel spend to the **Usage** tab of the CulturePulse Subscriptions sheet.
+- It only runs while the Claude app is open (if it's closed, it runs when you next open it). The Anthropic and Vercel readings also need Chrome open and signed in.
+- **If a row says "Signed out" or "Chrome not connected":** sign in to that site in Chrome, then open the task in the Claude app's **Scheduled** section and click **Run now**.
 
 ### Your local `.env` file points at the live database
 - `DIRECT_URL` in `.env` points at the **production** database. It currently holds an old, dead password, so it can't connect, which is safe for now.
