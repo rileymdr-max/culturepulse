@@ -291,7 +291,7 @@ Code: `lib/plans.ts` (plans, Snapshot, sales link), `lib/plan-usage.ts` (countin
 
 What the project runs on. **Check the actual plan and billing in each dashboard** — prices change; update this table when they do.
 
-**Costs and renewal dates** are tracked in the [CulturePulse Subscriptions](https://claude.ai/artifact/SxHM2Bw8xdwMnfRH6kNt77) sheet (cost, billing cycle, next renewal, monthly and yearly totals). Add a row there whenever you sign up for or cancel something. Its **Usage** tab is filled in automatically every Monday morning by a Claude scheduled task ("CulturePulse weekly usage log", in the Claude app's Scheduled section): Apify spend comes straight from Apify, Anthropic API and Vercel spend are read from their billing pages in Chrome.
+**Costs and renewal dates** are tracked in the [CulturePulse Subscriptions](https://claude.ai/artifact/SxHM2Bw8xdwMnfRH6kNt77) sheet (cost, billing cycle, next renewal, monthly and yearly totals). Add a row there whenever you sign up for or cancel something. Its **Usage** and **Hours** tabs are filled in automatically every Monday morning by a Claude scheduled task ("CulturePulse weekly usage + hours log", in the Claude app's Scheduled section): Apify spend comes straight from Apify, Anthropic API and Vercel spend are read from their billing pages in Chrome, and last week's hours come from `scripts/work-hours.py`. That script estimates hands-on time from Claude Code session time stamps and commit times (activity less than 30 minutes apart counts as one work block). It can't see planning in claude.ai chats or time away from the computer.
 
 | Service | What it's for | Plan / cost notes | Where to manage it | Settings it needs (in Vercel) |
 |---|---|---|---|---|
@@ -408,6 +408,7 @@ Newest first. One line per change that affects anything in this playbook.
 
 | Date | Change |
 |---|---|
+| 2026-11-17 | Hours tracking added: an Hours tab in the Subscriptions sheet (about 35 hours from March to mid-November), updated every Monday from `scripts/work-hours.py`. |
 | 2026-11-17 | Playbook published as a private page pinned in the claude.ai sidebar; Claude republishes it with every playbook change. |
 | 2026-11-17 | Weekly usage log added: every Monday a scheduled task adds Apify, Anthropic API and Vercel spend to the Usage tab of the Subscriptions sheet. |
 | 2026-11-17 | Subscriptions sheet started to track every platform's cost, billing cycle and renewal date; linked from §7. Plan details in §7 corrected from the billing pages (Apify is on the $199/month Scale plan, not pay-as-you-go; Neon and Resend are free). |
