@@ -42,7 +42,8 @@ _Last updated: November 17, 2026_
 ## Good to know
 
 ### Weekly usage log (since Nov 17, 2026)
-- Every Monday around 8:35 AM, a Claude scheduled task adds this week's Apify, Anthropic API and Vercel spend to the **Usage** tab of the CulturePulse Subscriptions sheet.
+- Every Monday around 8:35 AM, a Claude scheduled task adds this week's Apify, Anthropic API and Vercel spend to the **Usage** tab of the CulturePulse Subscriptions sheet, and last week's hours worked to the **Hours** tab.
+- Hours are an estimate from Claude Code session times and commits (`scripts/work-hours.py`). Planning in claude.ai chats and offline time aren't counted; add those by hand in the Notes column if you want them.
 - It only runs while the Claude app is open (if it's closed, it runs when you next open it). The Anthropic and Vercel readings also need Chrome open and signed in.
 - **If a row says "Signed out" or "Chrome not connected":** sign in to that site in Chrome, then open the task in the Claude app's **Scheduled** section and click **Run now**.
 
