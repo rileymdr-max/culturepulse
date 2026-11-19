@@ -517,6 +517,18 @@ async function enrichTrends(query: string): Promise<TrendsSignal | undefined> {
   }
 }
 
+// Captions are shortened with .slice(), which can cut an emoji in half. A lone
+// half (surrogate) breaks JSON for Claude and Postgres, so strip any left over.
+const LONE_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g;
+function cleanStrings<T>(value: T): T {
+  if (typeof value === "string") return value.replace(LONE_SURROGATE, "") as T;
+  if (Array.isArray(value)) return value.map(cleanStrings) as T;
+  if (value && typeof value === "object") {
+    return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, cleanStrings(v)])) as T;
+  }
+  return value;
+}
+
 // ─── Main enricher ────────────────────────────────────────────────────────────
 
 export type SignalPlatform = "reddit" | "tiktok" | "twitter" | "youtube" | "instagram" | "trends";
@@ -542,7 +554,7 @@ export async function enrichSubcultureWithSignals(
       want("trends") ? enrichTrends(query) : skip,
     ]);
 
-  return {
+  return cleanStrings({
     reddit: redditResult.status === "fulfilled" ? redditResult.value : undefined,
     tiktok: tiktokResult.status === "fulfilled" ? tiktokResult.value : undefined,
     twitter: twitterResult.status === "fulfilled" ? twitterResult.value : undefined,
@@ -550,7 +562,7 @@ export async function enrichSubcultureWithSignals(
     instagram: instagramResult.status === "fulfilled" ? instagramResult.value : undefined,
     trends: trendsResult.status === "fulfilled" ? trendsResult.value : undefined,
     enriched_at: new Date().toISOString(),
-  };
+  });
 }
 
 // ─── Signal context formatter (for Claude prompt) ────────────────────────────
