@@ -685,5 +685,5 @@ export function buildSignalContext(signals: SubcultureSignalData): string {
     lines.push(`=== END SIGNAL DATA (sources: ${platformsFound}) ===`);
   }
 
-  return lines.join("\n");
+  return cleanStrings(lines.join("\n"));
 }
