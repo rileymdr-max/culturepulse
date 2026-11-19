@@ -21,6 +21,7 @@ import { useSubculture, usePickSubculture, type LibraryAccessInfo, type Subcultu
 import { useMonitors, useCreateMonitor, type MonitorData } from "@/hooks/use-monitors";
 import { useCreateBrief, useBriefs } from "@/hooks/use-briefs";
 import type { SubcultureSignalData } from "@/lib/types/subculture";
+import { rankCommunities, topicWords } from "@/lib/reddit-communities";
 
 const signed = (n: number) => `${n > 0 ? "+" : n < 0 ? "−" : ""}${Math.abs(n)}%`;
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -133,15 +134,19 @@ const compact = (n: number) =>
 type SnapshotItem = { platform: string; title: string; url: string; meta: string; weight: number };
 
 /** What the last live scrape found: one tile per source + the top posts. */
-function LiveSnapshot({ data }: { data: SubcultureSignalData }) {
+function LiveSnapshot({ data, topic }: { data: SubcultureSignalData; topic: string[] }) {
   const tiles: { platform: string; value: string; label: string; detail?: string }[] = [];
   const items: SnapshotItem[] = [];
   const { reddit, tiktok, twitter, youtube, instagram, trends } = data;
 
   if (reddit) {
+    // Only on-topic communities (see lib/reddit-communities.ts) — and only their
+    // posts, so one viral post from an unrelated subreddit isn't featured.
+    const onTopic = rankCommunities(reddit.communities, topic);
+    const keep = new Set(onTopic.map((c) => c.subreddit));
     tiles.push({ platform: "Reddit", value: String(reddit.total_posts_found), label: "posts",
-      detail: reddit.communities.slice(0, 2).map((c) => `r/${c.subreddit}`).join(" · ") });
-    reddit.top_posts.slice(0, 3).forEach((p) => items.push({ platform: "Reddit", title: p.title, url: p.url,
+      detail: onTopic.slice(0, 2).map((c) => `r/${c.subreddit}`).join(" · ") || undefined });
+    reddit.top_posts.filter((p) => keep.has(p.subreddit)).slice(0, 3).forEach((p) => items.push({ platform: "Reddit", title: p.title, url: p.url,
       meta: `r/${p.subreddit} · ${compact(p.score)} upvotes`, weight: p.score + 3 * p.comments }));
   }
   if (tiktok) {
@@ -502,7 +507,7 @@ export default function SubcultureDetailPage() {
       </div>
 
       {existingMonitor && <div className="mt-6"><LiveSignal monitor={existingMonitor} /></div>}
-      {s.signalData && <div className="mt-6"><LiveSnapshot data={s.signalData} /></div>}
+      {s.signalData && <div className="mt-6"><LiveSnapshot data={s.signalData} topic={topicWords(s.name)} /></div>}
 
       {/* Jump links */}
       <nav aria-label="Profile sections" className="mt-8 flex flex-wrap gap-2">

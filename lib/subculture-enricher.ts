@@ -9,6 +9,7 @@
  */
 
 import { runActor } from "@/lib/apify";
+import { rankCommunities, topicWords } from "@/lib/reddit-communities";
 import type {
   SubcultureSignalData,
   RedditSignal,
@@ -126,15 +127,21 @@ async function enrichReddit(query: string, maxAgeDays?: number): Promise<RedditS
       subredditMap.set(sub, entry);
     }
 
-    const communities: RedditCommunity[] = Array.from(subredditMap.entries())
+    const allCommunities: RedditCommunity[] = Array.from(subredditMap.entries())
       .sort(([, a], [, b]) => b.engagement - a.engagement)
-      .slice(0, 5)
       .map(([sub, data]) => ({
         subreddit: sub,
         posts_found: data.posts.length,
         engagement: data.engagement,
         subscriber_count: data.subscribers,
       }));
+    // Snapshots: rank by topic match + post count, so one viral off-topic post
+    // can't make a random subreddit the "top community". Monitors keep the
+    // engagement ranking so their scores stay comparable run to run.
+    const communities = (maxAgeDays
+      ? rankCommunities(allCommunities, topicWords(query, primary))
+      : allCommunities
+    ).slice(0, 5);
 
     const topPosts: RedditPost[] = posts
       .filter((p) => p.title && p.postUrl)
