@@ -82,9 +82,10 @@ function Panel({ icon: Icon, label, tone = "bg-card", className, strong = false,
  * Long lists show the first `limit` items with a Show all toggle.
  */
 function Chips({ items, limit = 15, chip = "bg-muted text-foreground", quote = false }: {
-  items: string[]; limit?: number; chip?: string; quote?: boolean;
+  items?: string[] | null; limit?: number; chip?: string; quote?: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
+  items = Array.isArray(items) ? items : [];
   if (!items.length) return <p className="text-sm text-muted-foreground">None recorded yet.</p>;
 
   const avg = items.reduce((n, s) => n + s.length, 0) / items.length;
@@ -595,9 +596,9 @@ export default function SubcultureDetailPage() {
                       {cap(p.engagement_level)}
                     </span>
                   </div>
-                  {p.content_formats.length > 0 && (
+                  {(p.content_formats?.length ?? 0) > 0 && (
                     <div className="mt-4 flex flex-wrap gap-1.5">
-                      {p.content_formats.map((f) => (
+                      {p.content_formats?.map((f) => (
                         <span key={f} className="rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium">{f}</span>
                       ))}
                     </div>
@@ -618,10 +619,10 @@ export default function SubcultureDetailPage() {
               <p className="leading-relaxed">{s.psychographics.villain}</p>
             </Panel>
             <Panel strong icon={Heart} label="Core values">
-              <Chips items={s.psychographics.core_values} chip="bg-[#EEE8FF] text-foreground" />
+              <Chips items={s.psychographics?.core_values} chip="bg-[#EEE8FF] text-foreground" />
             </Panel>
             <Panel strong icon={Compass} label="Motivations">
-              <Chips items={s.psychographics.motivations} chip="bg-muted text-foreground" />
+              <Chips items={s.psychographics?.motivations} chip="bg-muted text-foreground" />
             </Panel>
           </div>
         </Section>
@@ -630,11 +631,11 @@ export default function SubcultureDetailPage() {
         <Section id="brand-fit" n={6} title="Brand fit">
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
             <Panel strong icon={Target} label="Industries that fit" tone="bg-accent/60">
-              <Chips items={s.brandFitSignals.fit_industries} chip="border-[1.5px] border-foreground bg-card text-foreground" />
+              <Chips items={s.brandFitSignals?.fit_industries} chip="border-[1.5px] border-foreground bg-card text-foreground" />
             </Panel>
             <Panel strong icon={TriangleAlert} label="Red flags" tone="bg-[#FFF6C2]">
-              {s.brandFitSignals.red_flags.length > 0
-                ? <div className="[&>ul]:mt-0"><FitList items={s.brandFitSignals.red_flags} icon={TriangleAlert} iconClass="bg-[#FFE14D] text-foreground" /></div>
+              {(s.brandFitSignals?.red_flags?.length ?? 0) > 0
+                ? <div className="[&>ul]:mt-0"><FitList items={s.brandFitSignals.red_flags ?? []} icon={TriangleAlert} iconClass="bg-[#FFE14D] text-foreground" /></div>
                 : <p className="text-sm text-muted-foreground">None recorded yet.</p>}
             </Panel>
             <Panel strong icon={Network} label="Adjacent subcultures" tone="bg-[#EEE8FF]" className="md:col-span-2">
