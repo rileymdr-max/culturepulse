@@ -82,9 +82,10 @@ function Panel({ icon: Icon, label, tone = "bg-card", className, strong = false,
  * Long lists show the first `limit` items with a Show all toggle.
  */
 function Chips({ items, limit = 15, chip = "bg-muted text-foreground", quote = false }: {
-  items: string[]; limit?: number; chip?: string; quote?: boolean;
+  items?: string[] | null; limit?: number; chip?: string; quote?: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
+  items = Array.isArray(items) ? items : [];
   if (!items.length) return <p className="text-sm text-muted-foreground">None recorded yet.</p>;
 
   const avg = items.reduce((n, s) => n + s.length, 0) / items.length;
@@ -188,6 +189,20 @@ function LiveSnapshot({ data, topic }: { data: SubcultureSignalData; topic: stri
   }
   const when = new Date(data.enriched_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 
+  // Fans' comments on official/press posts: best comment from each thread in turn.
+  const threads = data.audience_comments ?? [];
+  const fanComments: { text: string; meta: string; url: string; platform: string }[] = [];
+  for (let round = 0; fanComments.length < 4 && threads.some((t) => t.comments[round]); round++) {
+    for (const t of threads) {
+      const c = t.comments[round];
+      if (c && fanComments.length < 4) fanComments.push({
+        text: c.text, url: t.on_url, platform: SIGNAL_PLATFORM_LABEL[t.platform] ?? t.platform,
+        meta: `${c.author ? `@${c.author} · ` : ""}${compact(c.likes)} like${c.likes === 1 ? "" : "s"} · on ${t.on_account}'s ${SIGNAL_PLATFORM_LABEL[t.platform] ?? t.platform} post`,
+      });
+    }
+  }
+  const excluded = data.excluded;
+
   return (
     <section aria-label="Live snapshot" className={cn(BOX, "overflow-hidden bg-card")}>
       <div className="flex flex-wrap items-center justify-between gap-3 border-b-2 border-foreground px-5 py-2.5">
@@ -227,6 +242,28 @@ function LiveSnapshot({ data, topic }: { data: SubcultureSignalData; topic: stri
             ))}
           </ol>
         </div>
+      )}
+      {fanComments.length > 0 && (
+        <div className="border-t-2 border-foreground px-5 py-4">
+          <p className={EYEBROW}>Fans on official &amp; press posts</p>
+          <ul className="mt-2 space-y-2">
+            {fanComments.map((c, idx) => (
+              <li key={`${c.url}-${idx}`} className="flex min-w-0 items-start gap-2.5">
+                <PlatformLogos platform={c.platform} className="mt-0.5 h-4 w-4" />
+                <a href={c.url} target="_blank" rel="noopener noreferrer" className="group min-w-0 flex-1">
+                  <span className="line-clamp-2 text-sm group-hover:text-primary">&ldquo;{c.text}&rdquo;</span>
+                  <span className="block text-xs text-muted-foreground">{c.meta}</span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {excluded && excluded.posts > 0 && (
+        <p className="border-t border-foreground/15 px-5 py-2.5 text-xs text-muted-foreground">
+          Fans and people discussing it only. Left out {excluded.posts} post{excluded.posts === 1 ? "" : "s"} by the subject itself or press
+          {excluded.accounts.length > 0 && <> ({excluded.accounts.slice(0, 5).join(", ")}{excluded.accounts.length > 5 ? "…" : ""})</>}.
+        </p>
       )}
     </section>
   );
@@ -595,9 +632,9 @@ export default function SubcultureDetailPage() {
                       {cap(p.engagement_level)}
                     </span>
                   </div>
-                  {p.content_formats.length > 0 && (
+                  {(p.content_formats?.length ?? 0) > 0 && (
                     <div className="mt-4 flex flex-wrap gap-1.5">
-                      {p.content_formats.map((f) => (
+                      {p.content_formats?.map((f) => (
                         <span key={f} className="rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium">{f}</span>
                       ))}
                     </div>
@@ -618,10 +655,10 @@ export default function SubcultureDetailPage() {
               <p className="leading-relaxed">{s.psychographics.villain}</p>
             </Panel>
             <Panel strong icon={Heart} label="Core values">
-              <Chips items={s.psychographics.core_values} chip="bg-[#EEE8FF] text-foreground" />
+              <Chips items={s.psychographics?.core_values} chip="bg-[#EEE8FF] text-foreground" />
             </Panel>
             <Panel strong icon={Compass} label="Motivations">
-              <Chips items={s.psychographics.motivations} chip="bg-muted text-foreground" />
+              <Chips items={s.psychographics?.motivations} chip="bg-muted text-foreground" />
             </Panel>
           </div>
         </Section>
@@ -630,11 +667,11 @@ export default function SubcultureDetailPage() {
         <Section id="brand-fit" n={6} title="Brand fit">
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
             <Panel strong icon={Target} label="Industries that fit" tone="bg-accent/60">
-              <Chips items={s.brandFitSignals.fit_industries} chip="border-[1.5px] border-foreground bg-card text-foreground" />
+              <Chips items={s.brandFitSignals?.fit_industries} chip="border-[1.5px] border-foreground bg-card text-foreground" />
             </Panel>
             <Panel strong icon={TriangleAlert} label="Red flags" tone="bg-[#FFF6C2]">
-              {s.brandFitSignals.red_flags.length > 0
-                ? <div className="[&>ul]:mt-0"><FitList items={s.brandFitSignals.red_flags} icon={TriangleAlert} iconClass="bg-[#FFE14D] text-foreground" /></div>
+              {(s.brandFitSignals?.red_flags?.length ?? 0) > 0
+                ? <div className="[&>ul]:mt-0"><FitList items={s.brandFitSignals.red_flags ?? []} icon={TriangleAlert} iconClass="bg-[#FFE14D] text-foreground" /></div>
                 : <p className="text-sm text-muted-foreground">None recorded yet.</p>}
             </Panel>
             <Panel strong icon={Network} label="Adjacent subcultures" tone="bg-[#EEE8FF]" className="md:col-span-2">

@@ -9,6 +9,7 @@
  *
  * Flags: --only=slug[,slug]  --limit=N  --days=N (skip if refreshed within N days, default 30)
  *        --all (ignore --days)  --dry-run (scrape + Claude, but don't save)  --list
+ *        --snapshot-only (new Live snapshot, keep the profile text)  --new-plan (rebuild the search plan)
  *
  * Loads .env.prod.local (production DB + Apify), Anthropic key from .env.
  * Cost: roughly $0.20–0.40 Apify + one Claude call per profile.
@@ -78,7 +79,7 @@ async function main() {
     for (let r = queue.shift(); r; r = queue.shift()) {
       const started = Date.now();
       try {
-        const res = await refreshLibraryProfile(r, { dryRun: !!flag("dry-run") });
+        const res = await refreshLibraryProfile(r, { dryRun: !!flag("dry-run"), newPlan: !!flag("new-plan"), snapshotOnly: !!flag("snapshot-only") });
         const secs = Math.round((Date.now() - started) / 1000);
         if (res.ok) { ok++; console.log(`  ✓ ${r.name} — ${res.sources.join(", ")} (${secs}s)`); }
         else { failed++; failures.push(`${r.name}: ${res.reason}`); console.log(`  – ${r.name} — skipped: ${res.reason}`); }

@@ -311,5 +311,41 @@ ${buildSignalContext(signalData)}`;
   }
 
   const updated = toolUse.input as SubcultureProfile;
-  return { ...updated, name: current.name, slug: current.slug, category: current.category };
+  return { ...keepMissingFields(current, updated), name: current.name, slug: current.slug, category: current.category };
+}
+
+/**
+ * Claude occasionally leaves a field out of an update (e.g. psychographics
+ * without "motivations") or returns an object as a JSON string. Either one
+ * crashes the profile page, so parse strings and keep the current value for
+ * anything missing or the wrong shape.
+ */
+function keepMissingFields(current: SubcultureProfile, updated: SubcultureProfile): SubcultureProfile {
+  const parse = (v: unknown) => {
+    if (typeof v !== "string") return v;
+    try { return JSON.parse(v); } catch { return v; }
+  };
+  const sameShape = (a: unknown, b: unknown) =>
+    Array.isArray(a) ? Array.isArray(b) : a !== null && typeof a === "object" ? (b !== null && typeof b === "object" && !Array.isArray(b)) : typeof a === typeof b;
+
+  const out = { ...current } as Record<string, unknown>;
+  const cur = current as unknown as Record<string, unknown>;
+  for (const [key, raw] of Object.entries(updated as unknown as Record<string, unknown>)) {
+    const val = parse(raw);
+    if (!(key in cur) || cur[key] == null) { out[key] = val; continue; }
+    if (!sameShape(cur[key], val)) continue; // wrong shape: keep current
+    if (Array.isArray(val) && val.length === 0 && (cur[key] as unknown[]).length > 0) continue;
+    if (val && typeof val === "object" && !Array.isArray(val)) {
+      // Nested objects (psychographics, brand_fit_signals): fill in missing keys.
+      const merged: Record<string, unknown> = { ...(cur[key] as Record<string, unknown>) };
+      for (const [k, v] of Object.entries(val as Record<string, unknown>)) {
+        const cv = merged[k];
+        if (cv === undefined || sameShape(cv, v)) merged[k] = v;
+      }
+      out[key] = merged;
+    } else {
+      out[key] = val;
+    }
+  }
+  return out as unknown as SubcultureProfile;
 }

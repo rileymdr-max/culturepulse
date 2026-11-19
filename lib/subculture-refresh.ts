@@ -3,12 +3,12 @@
  * the subculture, have Claude update the profile against that evidence, and
  * store the scrape so the profile page can show it ("Live data" tag).
  *
- * Used by scripts/refresh-subcultures.ts. Cost per profile: roughly $0.20–0.40
- * of Apify credit plus one Claude call.
+ * Used by scripts/refresh-subcultures.ts. The scrape itself is in
+ * lib/fan-snapshot.ts (fans only; official/press accounts excluded).
  */
 import type { Subculture } from "@prisma/client";
 import { prisma, withDbRetry } from "./prisma";
-import { enrichSubcultureWithSignals } from "./subculture-enricher";
+import { buildSearchPlan, scrapeFanSnapshot } from "./fan-snapshot";
 import { refreshSubcultureProfile } from "./subculture-generator";
 import type { SubcultureProfile, SubcultureSignalData } from "./types/subculture";
 
@@ -99,10 +99,15 @@ export type RefreshResult =
 
 export async function refreshLibraryProfile(
   row: Subculture,
-  opts: { dryRun?: boolean } = {}
+  opts: { dryRun?: boolean; newPlan?: boolean; snapshotOnly?: boolean } = {}
 ): Promise<RefreshResult> {
-  const query = searchPhraseFor(row.slug, row.name);
-  const signals = await enrichSubcultureWithSignals(query, undefined, { maxAgeDays: SNAPSHOT_WINDOW_DAYS });
+  const profile = toProfile(row);
+  // The search plan (fan subreddits, hashtags, phrases, accounts to exclude)
+  // is built once and reused, so every refresh looks in the same places.
+  const saved = (row.signalData as SubcultureSignalData | null)?.search_plan;
+  const plan = !opts.newPlan && saved ? saved : await buildSearchPlan(profile);
+  const query = plan.trends_term;
+  const signals = await scrapeFanSnapshot(profile, plan, SNAPSHOT_WINDOW_DAYS);
   const sources = (["reddit", "tiktok", "twitter", "youtube", "instagram", "trends"] as const)
     .filter((k) => signals[k]);
 
@@ -111,8 +116,17 @@ export async function refreshLibraryProfile(
     return { ok: false, reason: `only ${sources.length} source(s) returned data for "${query}"` };
   }
 
-  const updated = await refreshSubcultureProfile(toProfile(row), signals);
   if (opts.dryRun) return { ok: true, sources };
+  if (opts.snapshotOnly) {
+    // New snapshot, profile text unchanged.
+    await withDbRetry(() => prisma.subculture.update({
+      where: { id: row.id },
+      data: { signalData: signals as object, enrichedByApify: true },
+    }));
+    return { ok: true, sources };
+  }
+
+  const updated = await refreshSubcultureProfile(profile, signals);
 
   await withDbRetry(() =>
     prisma.subculture.update({

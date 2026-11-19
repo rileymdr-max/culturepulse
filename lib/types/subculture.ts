@@ -143,6 +143,36 @@ export interface SubcultureSignalData {
   enriched_at: string;
   /** Posts/videos are limited to this many days back (library + Discover). Unset on old scrapes and monitors. */
   window_days?: number;
+  /** Library snapshots: where to look (fan subreddits, hashtags, phrases), saved so each refresh searches the same places. */
+  search_plan?: SearchPlan;
+  /** Library snapshots: posts by the show/brand/cast/press themselves, left out of every count above. */
+  excluded?: { posts: number; accounts: string[] };
+  /** Library snapshots: what fans said in the comments on those official/press posts. */
+  audience_comments?: AudienceCommentThread[];
+}
+
+export interface SearchPlan {
+  /** Fan-run subreddits, no "r/" (e.g. "vanderpumprules"). */
+  subreddits: string[];
+  reddit_queries: string[];
+  /** Fan hashtags, no "#". */
+  tiktok_hashtags: string[];
+  tiktok_queries: string[];
+  x_queries: string[];
+  youtube_queries: string[];
+  instagram_hashtags: string[];
+  trends_term: string;
+  /** Handles/names of the shows, brands, networks, teams, cast, talent and press outlets to leave out. */
+  official_accounts: string[];
+  created_at: string;
+}
+
+export interface AudienceCommentThread {
+  platform: "tiktok" | "youtube" | "instagram" | "twitter";
+  /** The official/press account whose post fans were commenting on. */
+  on_account: string;
+  on_url: string;
+  comments: Array<{ text: string; likes: number; author?: string }>;
 }
 
 // ─── Profile (snake_case — matches tool output, maps to Prisma camelCase) ─────
