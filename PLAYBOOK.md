@@ -131,7 +131,7 @@ Code: `lib/subculture-enricher.ts`. The search phrase is cut down to its key wor
 | Instagram | `apify/instagram-scraper` | Hashtag page (two words joined, e.g. `#homecoffee`, falling back to one word), 20 posts from the last 7 days | Posting rate (posts/day) and, on monitors, **re-checked engagement** (see below) |
 | Google Trends | `apify/google-trends-scraper` | Past 12 months, weekly | **Search interest 0–100** (latest full week); rising/stable/declining; related searches |
 
-**14-day window (Discover search + library):** Discover search and the library refresh only use content from the **last 14 days**, so Live snapshots show what's happening now. Monitors still use the inputs in the table above, so their scores stay comparable run to run.
+**14-day window (Discover search + library):** Discover search and the library refresh only use content from the **last 14 days**, so Live snapshots show what's happening now. Discover searches also keep 2-letter words ("reality TV", "PC build"); monitors still drop them so their scores stay comparable. Monitors still use the inputs in the table above, so their scores stay comparable run to run.
 
 | Platform | With the 14-day window |
 |---|---|
@@ -173,20 +173,30 @@ Each platform is capped at 4 communities before being sent to Claude so no one p
 
 ### 3.3a Library refresh (keeping pre-built profiles live)
 
-The pre-built library profiles were first written by Claude alone. The **library refresh** runs the same six scrapers as §3.1 for each approved profile, then asks Claude to update the profile against what the scrape shows (§4). The profile gets the **Live data** tag and a Live snapshot card on its page.
+The pre-built library profiles were first written by Claude alone. The **library refresh** scrapes six platforms for each approved profile, then asks Claude to update the profile against what the scrape shows (§4). The profile gets the **Live data** tag and a **Live snapshot** card on its page.
+
+**The snapshot listens to fans, not to the subject.** It counts fans and people discussing the subculture. It leaves out posts by the subject itself: the shows, brands, networks, studios, teams, leagues, cast, talent and press outlets. Their reach would drown out the fans. Instead, it reads the **comments** on their posts, because those commenters are fans.
+
+| Step | What happens |
+|---|---|
+| 1. Search plan | Claude reads the profile (its subreddits, hashtags, keywords, icons, moments) and picks where fans talk: up to 4 fan subreddits, fan hashtags for TikTok and Instagram, discussion phrases for X, TikTok and YouTube (e.g. "Housewives reunion reaction", not "Bravo"), one Google Trends term, and a list of official/press accounts to leave out. Every phrase must name the subject, so it can't match unrelated posts. Built once and saved with the snapshot, so every refresh looks in the same places |
+| 2. Scrape | All six platforms, last 14 days only |
+| 3. Who posted it? | Accounts on the saved list are removed. Claude then checks every other poster (name, followers, verified badge, bio, sample post) and removes official, cast/talent and press accounts, plus posts that aren't about the subculture at all. When unsure, it keeps the account |
+| 4. Fan comments | For the 2 biggest official/press posts on TikTok, YouTube, Instagram and X, it reads the top comments. The card shows the best ones under **"Fans on official & press posts"** |
+| 5. Reddit | Only the plan's fan subreddits and subreddits named after the subculture. Other subreddits a keyword search turns up are dropped |
+
+The card ends with a line saying how many official/press posts were left out and naming the main ones (e.g. "Bravo, Hayu, BuzzFeed UK…").
 
 | What | Detail |
 |---|---|
-| How to run | `npm run refresh:subcultures` (all approved profiles not refreshed in the last 30 days). `-- --list` shows each profile's search phrase without spending anything; `-- --only=slug` does one profile |
+| How to run | `npm run refresh:subcultures` (all approved profiles not refreshed in the last 30 days). `-- --only=slug` does one profile. `-- --snapshot-only` replaces the Live snapshot but leaves the profile text alone. `-- --new-plan` rebuilds the search plan (e.g. if a profile looks in the wrong places) |
 | Time window | Last 14 days (§3.1). The snapshot card says "Posts from the 14 days before [date]" |
-| Reddit communities | Reddit search finds any post that mentions the phrase, so one viral post can come from an unrelated subreddit. The card lists subreddits whose name matches the subculture first, then those with the most matching posts. Unrelated subreddits with only one post are left out, and so are their posts. If none qualify, the Reddit tile shows the post count only. Rules in `lib/reddit-communities.ts`. Monitors are unchanged |
-| Search phrase | The profile name without words like "culture", "community", "fans". Awkward names have a fixed phrase in `SEARCH_OVERRIDES` in `lib/subculture-refresh.ts` (e.g. Tunnel Fit Critics → "tunnel fit") |
-| Safety | If fewer than 2 platforms return data, the profile is left unchanged. Name, slug and category never change |
-| Cost and time | About $0.20–0.40 Apify + one Claude call (roughly $0.30–0.50) per profile, about 2 minutes each, two at a time. All 62 profiles: roughly $30–50 and about an hour |
+| Safety | If fewer than 2 platforms return data, the profile is left unchanged. Name, slug and category never change. If Claude leaves a field out when updating a profile, the old value is kept |
+| Cost and time | Roughly $1 per profile for the snapshot (more searches, the poster check and fan comments), plus about $0.30–0.50 if the profile text is also updated. About 1–2 minutes each, two at a time. All 62 profiles: roughly $65–90 and about an hour |
 | How often | Every 1–3 months is enough. Monitored subcultures already get fresh data on their own |
 | Backup | Before the first run (2026-11-19) every profile was saved to `research/library-backup-2026-11-19.json` (local only, not in git) |
 
-Code: `lib/subculture-refresh.ts`, `scripts/refresh-subcultures.ts`. New custom profiles saved from Discover search now also get the Live data tag when their scrape returned data.
+Code: `lib/fan-snapshot.ts` (plan, scrape, poster check, fan comments), `lib/subculture-refresh.ts`, `scripts/refresh-subcultures.ts`, `lib/reddit-communities.ts`. New custom profiles saved from Discover search still use the simpler §3.1 search and get the Live data tag when their scrape returned data.
 
 ### 3.4 What's *not* live
 
@@ -197,12 +207,14 @@ Code: `lib/subculture-refresh.ts`, `scripts/refresh-subcultures.ts`. New custom 
 
 ## 4. How Claude (AI) is used
 
-All AI calls use model **`claude-opus-5-5`** with the `ANTHROPIC_API_KEY` stored in Vercel. Each call uses a "tool" schema so Claude returns structured data, not free text.
+AI calls use model **`claude-opus-5-5`**, except the library snapshot's poster check, which uses the faster, cheaper **`claude-sonnet-5-5`**. All use the `ANTHROPIC_API_KEY` stored in Vercel. Each call uses a "tool" schema so Claude returns structured data, not free text.
 
 | Feature | File | Input | Output |
 |---|---|---|---|
 | **Subculture profile** | `lib/subculture-generator.ts` | Subculture name + the live scraped data from §3.1 | Keywords, vernacular, categorical behaviours, moments, media sources, icons, platforms, psychographics, adjacent subcultures, brand fit + red flags (Speedbag's 4-quadrant input doc) |
 | **Library refresh** | `lib/subculture-generator.ts` → `refreshSubcultureProfile` (adaptive thinking) | An existing profile + a fresh scrape (§3.3a) | The same profile, updated: keeps what's still accurate, adds real terms, hashtags, communities, creators and moments from the scrape, drops what's outdated |
+| **Snapshot search plan** | `lib/fan-snapshot.ts` → `buildSearchPlan` (adaptive thinking) | A library profile | Where its fans talk on each platform + the official/press accounts to leave out (§3.3a). Built once per profile |
+| **Snapshot poster check** | `lib/fan-snapshot.ts` → `findOfficialAccounts` (Sonnet) | Everyone who posted in a snapshot scrape | Which accounts are official, cast/talent or press, and which posts are off-topic, so the snapshot counts fans only |
 | **Brand Audit** | `lib/brand-audit.ts` (adaptive thinking) | Communities/topics from §3.2 | Audience summary, 5–8 matched subcultures with **match %**, newly discovered subcultures, platforms, themes |
 | **Content brief** | `lib/content-intelligence.ts` (adaptive thinking) | Subculture profile + (if from a monitor) its Acceleration Signal and top posts | Headline, **urgency**, moment summary, content angles, platform strategy, brand fit |
 
@@ -407,7 +419,7 @@ Vercel deploys automatically. Watch it at vercel.com → culturepulse → Deploy
 | Score thresholds | `lib/acceleration.ts`, `lib/signal-tier.ts` |
 | AI instructions | `SYSTEM_PROMPT` in `lib/subculture-generator.ts`, `lib/brand-audit.ts`, `lib/content-intelligence.ts` |
 | Which scraper / how many results | `lib/subculture-enricher.ts` |
-| Library refresh search phrases | `SEARCH_OVERRIDES` in `lib/subculture-refresh.ts` |
+| Library snapshot: where it searches, who it leaves out | Rerun with `npm run refresh:subcultures -- --only=slug --snapshot-only --new-plan`; the rules are in `PLAN_PROMPT` in `lib/fan-snapshot.ts` |
 | Email wording | `lib/email.ts` |
 | A setting/key | Vercel → culturepulse → Settings → Environment Variables, then **Redeploy** |
 
@@ -441,6 +453,8 @@ Newest first. One line per change that affects anything in this playbook.
 
 | Date | Change |
 |---|---|
+| 2026-11-19 | Library Live snapshots now listen to fans only. Claude plans where each subculture's fans talk (fan subreddits, fan hashtags, discussion phrases), and posts by the shows, brands, cast and press are left out. The comments on their posts are kept instead, as "Fans on official & press posts". Tested on Reality TV, Console Gaming and Surf (e.g. Reality TV TikTok: 0 → 61 fan videos). |
+| 2026-11-19 | Fixed a crash on Console Gaming's page (a profile update had dropped a list). Profile updates now keep any field Claude leaves out. |
 | 2026-11-19 | Live snapshot: Reddit "top communities" now favour subreddits named after the subculture and ones with several posts, instead of whichever had the single most popular post (Sneakerheads showed r/1000lbsisters; now r/Sneakers). Off-topic one-post subreddits and their posts are hidden. Applies to existing snapshots straight away. |
 | 2026-11-19 | Live snapshots and Discover search now only use posts from the last 14 days (before, YouTube and TikTok could show years-old videos). All library profiles re-refreshed with the window. Monitors unchanged. |
 | 2026-11-19 | Launch checklist: library profiles must be majority real data before launch (plan in MAINTENANCE-NOTES). |

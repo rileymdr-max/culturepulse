@@ -42,12 +42,15 @@ const STOP = new Set([
   "people","community","group","culture","content","platform","post",
 ]);
 
-function extractKeyTerms(query: string): { primary: string; hashtags: string[] } {
+// keepShort: keep 2-letter words ("reality TV", "PC build", "EV"). Snapshot
+// scrapes pass it; monitors don't, so their search terms (and scores) stay
+// the same run to run.
+function extractKeyTerms(query: string, keepShort = false): { primary: string; hashtags: string[] } {
   const words = query
     .toLowerCase()
     .replace(/[^a-z0-9\s]/g, "")
     .split(/\s+/)
-    .filter((w) => w.length > 2 && !STOP.has(w));
+    .filter((w) => w.length > (keepShort ? 1 : 2) && !STOP.has(w));
 
   const primary = words.slice(0, 3).join(" ") || query.split(/\s+/).slice(0, 3).join(" ");
   // Short hashtags: individual words + first-two-words concatenated
@@ -67,7 +70,7 @@ function extractKeyTerms(query: string): { primary: string; hashtags: string[] }
 const DAY_MS = 86_400_000;
 const isoDay = (msAgo: number) => new Date(Date.now() - msAgo).toISOString().slice(0, 10);
 /** True when a timestamp (ISO string or unix seconds) falls inside the window. */
-function withinWindow(ts: string | number | undefined, maxAgeDays: number): boolean {
+export function withinWindow(ts: string | number | undefined, maxAgeDays: number): boolean {
   if (ts === undefined || ts === null || ts === "") return false;
   const ms = typeof ts === "number" ? (ts < 1e12 ? ts * 1000 : ts) : Date.parse(ts);
   return Number.isFinite(ms) && Date.now() - ms <= maxAgeDays * DAY_MS;
@@ -92,7 +95,7 @@ interface ApifyRedditPost {
 
 async function enrichReddit(query: string, maxAgeDays?: number): Promise<RedditSignal | undefined> {
   try {
-    const { primary } = extractKeyTerms(query);
+    const { primary } = extractKeyTerms(query, !!maxAgeDays);
     const posts = await runActor<ApifyRedditPost>("harshmaur/reddit-scraper", {
       searchTerms: [primary],
       searchPosts: true,
@@ -183,7 +186,7 @@ interface ApifyTikTokVideo {
 
 async function enrichTikTok(query: string, maxAgeDays?: number): Promise<TikTokSignal | undefined> {
   try {
-    const { primary } = extractKeyTerms(query);
+    const { primary } = extractKeyTerms(query, !!maxAgeDays);
     // Single search query — multiple queries × 25 results blows past the 90s budget
     const videos = await runActor<ApifyTikTokVideo>("clockworks/tiktok-scraper", {
       searchQueries: [primary],
@@ -258,7 +261,7 @@ interface ApifyTweet {
 
 async function enrichTwitter(query: string, maxAgeDays?: number): Promise<TwitterSignal | undefined> {
   try {
-    const { primary } = extractKeyTerms(query);
+    const { primary } = extractKeyTerms(query, !!maxAgeDays);
     const tweets = await runActor<ApifyTweet>("apidojo/tweet-scraper", {
       searchTerms: [primary],
       maxItems: 30,
@@ -314,7 +317,7 @@ interface ApifyYouTubeVideo {
 
 async function enrichYouTube(query: string, maxAgeDays?: number): Promise<YouTubeSignal | undefined> {
   try {
-    const { primary } = extractKeyTerms(query);
+    const { primary } = extractKeyTerms(query, !!maxAgeDays);
     const videos = await runActor<ApifyYouTubeVideo>("streamers/youtube-scraper", {
       searchQueries: [primary],
       ...(maxAgeDays
@@ -507,9 +510,10 @@ interface ApifyTrendsItem {
   relatedQueries_top?: Array<{ query?: string }>;
 }
 
-async function enrichTrends(query: string, maxAgeDays?: number): Promise<TrendsSignal | undefined> {
+/** exactTerm: search this phrase as-is (library snapshots pass the search plan's term). */
+export async function enrichTrends(query: string, maxAgeDays?: number, exactTerm?: string): Promise<TrendsSignal | undefined> {
   try {
-    const { primary } = extractKeyTerms(query);
+    const primary = exactTerm ?? extractKeyTerms(query, !!maxAgeDays).primary;
     // timeRange omitted = past 12 months (weekly points)
     const [item] = await runActor<ApifyTrendsItem>("apify/google-trends-scraper", {
       searchTerms: [primary],
@@ -561,7 +565,7 @@ async function enrichTrends(query: string, maxAgeDays?: number): Promise<TrendsS
 // Captions are shortened with .slice(), which can cut an emoji in half. A lone
 // half (surrogate) breaks JSON for Claude and Postgres, so strip any left over.
 const LONE_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g;
-function cleanStrings<T>(value: T): T {
+export function cleanStrings<T>(value: T): T {
   if (typeof value === "string") return value.replace(LONE_SURROGATE, "") as T;
   if (Array.isArray(value)) return value.map(cleanStrings) as T;
   if (value && typeof value === "object") {

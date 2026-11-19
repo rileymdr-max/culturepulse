@@ -26,7 +26,7 @@ export function topicWords(...texts: (string | undefined)[]): string[] {
   return Array.from(words);
 }
 
-function nameMatches(subreddit: string, words: string[]): boolean {
+export function nameMatches(subreddit: string, words: string[]): boolean {
   const s = subreddit.toLowerCase();
   // "sneakers" ⊂ r/Sneakers; also r/vanlife ⊂ "vanlife"
   return words.some((w) => s.includes(w) || (s.length >= 5 && w.includes(s)));
