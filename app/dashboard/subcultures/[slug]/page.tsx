@@ -168,7 +168,8 @@ function LiveSnapshot({ data }: { data: SubcultureSignalData }) {
   }
   if (trends) {
     tiles.push({ platform: "Google Trends", value: `${trends.interest_score}/100`, label: `search interest · ${trends.trend}`,
-      detail: trends.related_queries.slice(0, 2).join(", ") });
+      // Related searches cover the past year, so leave them off a windowed snapshot.
+      detail: data.window_days ? "last week vs the week before" : trends.related_queries.slice(0, 2).join(", ") });
   }
   if (tiles.length === 0) return null;
 
@@ -188,7 +189,9 @@ function LiveSnapshot({ data }: { data: SubcultureSignalData }) {
         <p className={cn(EYEBROW, "flex items-center gap-1.5 text-foreground")}>
           <Radio className="h-3.5 w-3.5" aria-hidden />Live snapshot
         </p>
-        <span className="text-xs text-muted-foreground">Scraped {when}</span>
+        <span className="text-xs text-muted-foreground">
+          {data.window_days ? `Posts from the ${data.window_days} days before ${when}` : `Scraped ${when}`}
+        </span>
       </div>
       <div className="grid grid-cols-2 gap-px bg-foreground/15 sm:grid-cols-3">
         {tiles.map((t) => (

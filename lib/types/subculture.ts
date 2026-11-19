@@ -141,6 +141,8 @@ export interface SubcultureSignalData {
   instagram?: InstagramSignal;
   trends?: TrendsSignal;
   enriched_at: string;
+  /** Posts/videos are limited to this many days back (library + Discover). Unset on old scrapes and monitors. */
+  window_days?: number;
 }
 
 // ─── Profile (snake_case — matches tool output, maps to Prisma camelCase) ─────

@@ -12,6 +12,9 @@ import { enrichSubcultureWithSignals } from "./subculture-enricher";
 import { refreshSubcultureProfile } from "./subculture-generator";
 import type { SubcultureProfile, SubcultureSignalData } from "./types/subculture";
 
+/** Live snapshots only include content from the last 14 days. */
+export const SNAPSHOT_WINDOW_DAYS = 14;
+
 // Words that describe a group rather than its topic. Dropping them gives the
 // scrapers a phrase people actually post with ("home coffee", not
 // "home coffee culture").
@@ -99,7 +102,7 @@ export async function refreshLibraryProfile(
   opts: { dryRun?: boolean } = {}
 ): Promise<RefreshResult> {
   const query = searchPhraseFor(row.slug, row.name);
-  const signals = await enrichSubcultureWithSignals(query);
+  const signals = await enrichSubcultureWithSignals(query, undefined, { maxAgeDays: SNAPSHOT_WINDOW_DAYS });
   const sources = (["reddit", "tiktok", "twitter", "youtube", "instagram", "trends"] as const)
     .filter((k) => signals[k]);
 

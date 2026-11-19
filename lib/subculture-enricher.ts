@@ -58,6 +58,20 @@ function extractKeyTerms(query: string): { primary: string; hashtags: string[] }
   return { primary, hashtags };
 }
 
+// ─── Time window ──────────────────────────────────────────────────────────────
+// Library refresh and Discover search pass maxAgeDays (14) so the Live snapshot
+// only shows recent content. Monitors omit it and keep their original inputs, so
+// their run-to-run scores stay comparable.
+
+const DAY_MS = 86_400_000;
+const isoDay = (msAgo: number) => new Date(Date.now() - msAgo).toISOString().slice(0, 10);
+/** True when a timestamp (ISO string or unix seconds) falls inside the window. */
+function withinWindow(ts: string | number | undefined, maxAgeDays: number): boolean {
+  if (ts === undefined || ts === null || ts === "") return false;
+  const ms = typeof ts === "number" ? (ts < 1e12 ? ts * 1000 : ts) : Date.parse(ts);
+  return Number.isFinite(ms) && Date.now() - ms <= maxAgeDays * DAY_MS;
+}
+
 // ─── Reddit ───────────────────────────────────────────────────────────────────
 // Uses Apify's harshmaur/reddit-scraper. The official apify/reddit-scraper (and
 // several others) crawl 0 pages for search queries as of Nov 2026, and some
@@ -72,9 +86,10 @@ interface ApifyRedditPost {
   commentsCount?: number;
   postUrl?: string;
   subredditSubscribers?: number;
+  createdAt?: string;
 }
 
-async function enrichReddit(query: string): Promise<RedditSignal | undefined> {
+async function enrichReddit(query: string, maxAgeDays?: number): Promise<RedditSignal | undefined> {
   try {
     const { primary } = extractKeyTerms(query);
     const posts = await runActor<ApifyRedditPost>("harshmaur/reddit-scraper", {
@@ -84,10 +99,12 @@ async function enrichReddit(query: string): Promise<RedditSignal | undefined> {
       searchCommunities: false,
       crawlCommentsPerPost: false,
       includeNSFW: false,
-      searchSort: "relevance",
-      searchTime: "year",
-      maxPostsCount: 25,
-    }, 75, 512);
+      ...(maxAgeDays
+        // Top posts of the past month, trimmed to the window below. (The actor's
+        // own postedAfter forces newest-first, which pulls in off-topic posts.)
+        ? { searchSort: "top", searchTime: "month", maxPostsCount: 50 }
+        : { searchSort: "relevance", searchTime: "year", maxPostsCount: 25 }),
+    }, 75, 512).then((all) => maxAgeDays ? all.filter((p) => withinWindow(p.createdAt, maxAgeDays)) : all);
 
     if (!posts.length) {
       console.warn(`[enricher] Reddit returned no posts for "${primary}"`);
@@ -153,26 +170,31 @@ interface ApifyTikTokVideo {
   commentCount?: number;
   authorMeta?: { name?: string; nickName?: string; fans?: number };
   hashtags?: Array<{ name?: string }>;
+  createTimeISO?: string;
+  createTime?: number;
 }
 
-async function enrichTikTok(query: string): Promise<TikTokSignal | undefined> {
+async function enrichTikTok(query: string, maxAgeDays?: number): Promise<TikTokSignal | undefined> {
   try {
     const { primary } = extractKeyTerms(query);
     // Single search query — multiple queries × 25 results blows past the 90s budget
     const videos = await runActor<ApifyTikTokVideo>("clockworks/tiktok-scraper", {
       searchQueries: [primary],
-      resultsPerPage: 15,
+      // With a window, cast a wider net and keep only recent videos below. (The
+      // actor's own date-filtered video search times out every time, Nov 2026.)
+      resultsPerPage: maxAgeDays ? 50 : 15,
       shouldDownloadVideos: false,
       shouldDownloadCovers: false,
     }, 90, 1024); // 1 GB = 4× the CPU of the 256 MB default; ~47s instead of timing out at 90s
 
     if (!videos.length) return undefined;
 
-    // Deduplicate by URL
+    // Deduplicate by URL (and drop anything outside the window)
     const seen = new Set<string>();
     const unique = videos.filter((v) => {
       const url = v.webVideoUrl ?? "";
       if (!url || seen.has(url)) return false;
+      if (maxAgeDays && !withinWindow(v.createTimeISO ?? v.createTime, maxAgeDays)) return false;
       seen.add(url);
       return true;
     });
@@ -227,7 +249,7 @@ interface ApifyTweet {
   tweetBy?: { userName?: string; displayName?: string };
 }
 
-async function enrichTwitter(query: string): Promise<TwitterSignal | undefined> {
+async function enrichTwitter(query: string, maxAgeDays?: number): Promise<TwitterSignal | undefined> {
   try {
     const { primary } = extractKeyTerms(query);
     const tweets = await runActor<ApifyTweet>("apidojo/tweet-scraper", {
@@ -235,6 +257,7 @@ async function enrichTwitter(query: string): Promise<TwitterSignal | undefined> 
       maxItems: 30,
       sort: "Latest",
       tweetLanguage: "en",
+      ...(maxAgeDays ? { start: isoDay(maxAgeDays * DAY_MS) } : {}),
     }, 50);
 
     if (!tweets.length) return undefined;
@@ -279,16 +302,20 @@ interface ApifyYouTubeVideo {
   likes?: number;
   channelName?: string;
   numberOfSubscribers?: number;
+  date?: string;
 }
 
-async function enrichYouTube(query: string): Promise<YouTubeSignal | undefined> {
+async function enrichYouTube(query: string, maxAgeDays?: number): Promise<YouTubeSignal | undefined> {
   try {
     const { primary } = extractKeyTerms(query);
     const videos = await runActor<ApifyYouTubeVideo>("streamers/youtube-scraper", {
       searchQueries: [primary],
-      maxResults: 10,
-      sortingOrder: "views",
-    }, 45);
+      ...(maxAgeDays
+        // YouTube's search filter is "this month"; trimmed to the window below.
+        // (The actor's oldestPostDate is ignored for searches.)
+        ? { maxResults: 20, sortingOrder: "views", dateFilter: "month" }
+        : { maxResults: 10, sortingOrder: "views" }),
+    }, 45).then((all) => maxAgeDays ? all.filter((v) => withinWindow(v.date, maxAgeDays)) : all);
 
     if (!videos.length) return undefined;
 
@@ -473,7 +500,7 @@ interface ApifyTrendsItem {
   relatedQueries_top?: Array<{ query?: string }>;
 }
 
-async function enrichTrends(query: string): Promise<TrendsSignal | undefined> {
+async function enrichTrends(query: string, maxAgeDays?: number): Promise<TrendsSignal | undefined> {
   try {
     const { primary } = extractKeyTerms(query);
     // timeRange omitted = past 12 months (weekly points)
@@ -494,8 +521,15 @@ async function enrichTrends(query: string): Promise<TrendsSignal | undefined> {
     }
 
     const currentScore = values[values.length - 1] ?? 0;
-    const recentAvg = values.slice(-4).reduce((a, b) => a + b, 0) / Math.min(4, values.length);
-    const earlyAvg = values.slice(0, 4).reduce((a, b) => a + b, 0) / Math.min(4, values.length);
+    // With a 14-day window: last full week vs the week before. Otherwise the
+    // latest 4 weeks vs the first 4 weeks of the year.
+    const span = maxAgeDays ? 1 : 4;
+    const recentAvg = maxAgeDays
+      ? currentScore
+      : values.slice(-span).reduce((a, b) => a + b, 0) / Math.min(span, values.length);
+    const earlyAvg = maxAgeDays
+      ? (values[values.length - 2] ?? currentScore)
+      : values.slice(0, span).reduce((a, b) => a + b, 0) / Math.min(span, values.length);
     const trend: TrendsSignal["trend"] =
       recentAvg > earlyAvg * 1.15 ? "rising" :
       recentAvg < earlyAvg * 0.85 ? "declining" : "stable";
@@ -540,18 +574,20 @@ export type SignalPlatform = "reddit" | "tiktok" | "twitter" | "youtube" | "inst
  */
 export async function enrichSubcultureWithSignals(
   query: string,
-  platforms?: readonly string[]
+  platforms?: readonly string[],
+  opts: { maxAgeDays?: number } = {}
 ): Promise<SubcultureSignalData> {
+  const { maxAgeDays } = opts;
   const want = (p: SignalPlatform) => !platforms || platforms.includes(p);
   const skip = Promise.resolve(undefined);
   const [redditResult, tiktokResult, twitterResult, youtubeResult, instagramResult, trendsResult] =
     await Promise.allSettled([
-      want("reddit") ? enrichReddit(query) : skip,
-      want("tiktok") ? enrichTikTok(query) : skip,
-      want("twitter") ? enrichTwitter(query) : skip,
-      want("youtube") ? enrichYouTube(query) : skip,
+      want("reddit") ? enrichReddit(query, maxAgeDays) : skip,
+      want("tiktok") ? enrichTikTok(query, maxAgeDays) : skip,
+      want("twitter") ? enrichTwitter(query, maxAgeDays) : skip,
+      want("youtube") ? enrichYouTube(query, maxAgeDays) : skip,
       want("instagram") ? enrichInstagram(query) : skip,
-      want("trends") ? enrichTrends(query) : skip,
+      want("trends") ? enrichTrends(query, maxAgeDays) : skip,
     ]);
 
   return cleanStrings({
@@ -562,6 +598,7 @@ export async function enrichSubcultureWithSignals(
     instagram: instagramResult.status === "fulfilled" ? instagramResult.value : undefined,
     trends: trendsResult.status === "fulfilled" ? trendsResult.value : undefined,
     enriched_at: new Date().toISOString(),
+    ...(maxAgeDays ? { window_days: maxAgeDays } : {}),
   });
 }
 

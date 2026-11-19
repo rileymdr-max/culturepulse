@@ -55,8 +55,10 @@ async function main() {
 
   const due = rows.filter((r) => {
     if (only || days === 0 || !r.enrichedByApify) return true;
-    const at = (r.signalData as { enriched_at?: string } | null)?.enriched_at;
-    return !at || new Date(at) < cutoff;
+    const sd = r.signalData as { enriched_at?: string; window_days?: number } | null;
+    // Snapshots from before the 14-day window are always due.
+    if (!sd?.window_days) return true;
+    return !sd.enriched_at || new Date(sd.enriched_at) < cutoff;
   }).slice(0, limit);
 
   if (flag("list")) {
