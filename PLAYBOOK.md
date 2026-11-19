@@ -403,6 +403,7 @@ Vercel deploys automatically. Watch it at vercel.com → culturepulse → Deploy
 ### 8.3 Before launch checklist
 
 - [ ] Set `MONITOR_AUTO_RUN = true` in `lib/monitor-schedule.ts`
+- [ ] Make library profiles majority real data: rebuild them from larger scrapes, keep only what the posts show, hide profiles without enough data (see MAINTENANCE-NOTES)
 - [ ] Stripe in live mode with real price ids
 - [ ] In Stripe, create: monthly prices Starter $299 / Pro $899 / Studio $2,500; annual prices $2,990 / $8,990 / $25,000; a one-time $499 "Brand Culture Snapshot" price; a $499-off "once" coupon. Put their ids in the Vercel settings listed in §7
 - [ ] Update the existing Pro price in Stripe from $799 to $899 (new price id)
@@ -425,6 +426,7 @@ Newest first. One line per change that affects anything in this playbook.
 
 | Date | Change |
 |---|---|
+| 2026-11-19 | Launch checklist: library profiles must be majority real data before launch (plan in MAINTENANCE-NOTES). |
 | 2026-11-19 | Library refresh: all approved library profiles were re-checked against live scraped data from six platforms and updated by Claude. They now show the Live data tag and a Live snapshot card (platform numbers + top posts). Re-run any time with `npm run refresh:subcultures`. |
 | 2026-11-17 | Hours tracking added: an Hours tab in the Subscriptions sheet (about 35 hours from March to mid-November), updated every Monday from `scripts/work-hours.py`. |
 | 2026-11-17 | Playbook published as a private page pinned in the claude.ai sidebar; Claude republishes it with every playbook change. |

@@ -20,6 +20,12 @@ _Last updated: November 17, 2026_
 - The library profiles were refreshed with live data on Nov 19, 2026. Culture moves fast, so re-run every 1–3 months: ask Claude to "refresh the subculture library", or run `npm run refresh:subcultures` (about $30–50, about an hour). It skips profiles refreshed in the last 30 days.
 - New approved profiles (for example from Brand Audit drafts) get picked up on the next run.
 
+### Before launch: make sure library profiles are majority real data
+- **Goal (decided Nov 19, 2026):** every subculture profile should be based mostly on real scraped data, not Claude's general knowledge.
+- **Where it stands:** the Nov 19 refresh grounds profiles in a live scrape but still mixes in Claude's own knowledge, and samples are small (about 100 posts per profile).
+- **What "real data" version would mean:** bigger scrapes (a few hundred posts, about $1–2 per profile); profiles rebuilt from the posts only; the code keeps a term, creator or community only if it actually appears in the posts; psychographics and brand fit drawn only from the posts, with links to them; "seen in N posts" on the page; profiles without enough data hidden as drafts. About $100–150 for the whole library.
+- **To do it:** ask Claude to "make the subculture library real-data only".
+
 ### Before launch: turn automatic monitor runs back on
 - **Why it's off:** since Nov 11, 2026, monitors only run when you click **Run all now** (or a card's run button), to save Apify credit while we build. Each run of 5 monitors costs roughly $0.30–0.50 in Apify credit, mostly Reddit.
 - **What you'll see while it's off:** the Signal Board says "Auto-runs paused · run manually". The 6-hourly scheduled job still fires but skips.
