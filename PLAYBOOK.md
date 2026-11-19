@@ -131,6 +131,19 @@ Code: `lib/subculture-enricher.ts`. The search phrase is cut down to its key wor
 | Instagram | `apify/instagram-scraper` | Hashtag page (two words joined, e.g. `#homecoffee`, falling back to one word), 20 posts from the last 7 days | Posting rate (posts/day) and, on monitors, **re-checked engagement** (see below) |
 | Google Trends | `apify/google-trends-scraper` | Past 12 months, weekly | **Search interest 0–100** (latest full week); rising/stable/declining; related searches |
 
+**14-day window (Discover search + library):** Discover search and the library refresh only use content from the **last 14 days**, so Live snapshots show what's happening now. Monitors still use the inputs in the table above, so their scores stay comparable run to run.
+
+| Platform | With the 14-day window |
+|---|---|
+| Reddit | Top 50 posts of the past month, then only those posted in the last 14 days are kept |
+| TikTok | 50 search results, then only videos from the last 14 days are kept (TikTok's own date filter times out) |
+| X / Twitter | 30 latest posts, from 14 days ago onward |
+| YouTube | 20 most-viewed videos from this month, then only the last 14 days are kept |
+| Instagram | Unchanged: last 7 days |
+| Google Trends | Score = last full week; rising/declining = last week vs the week before. Related searches (past year) are given to Claude but not shown on the card |
+
+Smaller subcultures can have little or nothing on a platform in 14 days; that platform is then left off the snapshot.
+
 **Instagram engagement (monitors only):** a hashtag only lists its newest posts, which are minutes old with no likes yet. So each monitor run re-visits the posts the *previous* run found and measures likes + comments + shares + views÷10, per post per day since posting (×10 to keep precision). The first run has nothing to re-check, so it's left out of scores.
 
 **Approximate costs:** Reddit ~$0.06 per search (billed per post); Google Trends ~$0.005 per term; a 5-monitor "Run all" ~$0.30–0.50, mostly Reddit.
@@ -165,6 +178,7 @@ The pre-built library profiles were first written by Claude alone. The **library
 | What | Detail |
 |---|---|
 | How to run | `npm run refresh:subcultures` (all approved profiles not refreshed in the last 30 days). `-- --list` shows each profile's search phrase without spending anything; `-- --only=slug` does one profile |
+| Time window | Last 14 days (§3.1). The snapshot card says "Posts from the 14 days before [date]" |
 | Search phrase | The profile name without words like "culture", "community", "fans". Awkward names have a fixed phrase in `SEARCH_OVERRIDES` in `lib/subculture-refresh.ts` (e.g. Tunnel Fit Critics → "tunnel fit") |
 | Safety | If fewer than 2 platforms return data, the profile is left unchanged. Name, slug and category never change |
 | Cost and time | About $0.20–0.40 Apify + one Claude call (roughly $0.30–0.50) per profile, about 2 minutes each, two at a time. All 62 profiles: roughly $30–50 and about an hour |
@@ -255,7 +269,7 @@ Code: `lib/similarity.ts`. 0–100 = 40% topic overlap (shared trending topics) 
 
 ### 5.9 Google Trends direction
 
-Average of the latest 4 weeks vs. the first 4 weeks of the year: >15% higher = rising, >15% lower = declining.
+Monitors: average of the latest 4 weeks vs. the first 4 weeks of the year: >15% higher = rising, >15% lower = declining. Discover search and library snapshots (14-day window): last full week vs. the week before, same 15% thresholds.
 
 ---
 
@@ -426,6 +440,7 @@ Newest first. One line per change that affects anything in this playbook.
 
 | Date | Change |
 |---|---|
+| 2026-11-19 | Live snapshots and Discover search now only use posts from the last 14 days (before, YouTube and TikTok could show years-old videos). All library profiles re-refreshed with the window. Monitors unchanged. |
 | 2026-11-19 | Launch checklist: library profiles must be majority real data before launch (plan in MAINTENANCE-NOTES). |
 | 2026-11-19 | Library refresh: all approved library profiles were re-checked against live scraped data from six platforms and updated by Claude. They now show the Live data tag and a Live snapshot card (platform numbers + top posts). Re-run any time with `npm run refresh:subcultures`. |
 | 2026-11-17 | Hours tracking added: an Hours tab in the Subscriptions sheet (about 35 hours from March to mid-November), updated every Monday from `scripts/work-hours.py`. |
