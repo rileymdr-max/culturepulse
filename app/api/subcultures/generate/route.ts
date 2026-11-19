@@ -5,6 +5,7 @@ import { getPlan, withinLimit } from "@/lib/plans";
 import { countUsageThisMonth, getUserPlan, recordUsage } from "@/lib/plan-usage";
 import { generateSubcultureProfile } from "@/lib/subculture-generator";
 import { enrichSubcultureWithSignals } from "@/lib/subculture-enricher";
+import { hasLiveSignals } from "@/lib/subculture-refresh";
 import { prisma, withDbRetry } from "@/lib/prisma";
 import type { SubcultureProfile, SubcultureSignalData } from "@/lib/types/subculture";
 
@@ -108,6 +109,7 @@ export async function POST(req: NextRequest) {
         brandFitSignals: profile.brand_fit_signals as object,
         signalData: signalData as object ?? null,
         generatedByAi: true,
+        enrichedByApify: hasLiveSignals(signalData),
         reviewedBy: null,
       },
     }));

@@ -20,6 +20,7 @@ import { PlatformLogos, PlatformLogoRow, platformIcons } from "@/components/plat
 import { useSubculture, usePickSubculture, type LibraryAccessInfo, type SubcultureFull, type SubcultureSummary } from "@/hooks/use-subcultures";
 import { useMonitors, useCreateMonitor, type MonitorData } from "@/hooks/use-monitors";
 import { useCreateBrief, useBriefs } from "@/hooks/use-briefs";
+import type { SubcultureSignalData } from "@/lib/types/subculture";
 
 const signed = (n: number) => `${n > 0 ? "+" : n < 0 ? "−" : ""}${Math.abs(n)}%`;
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -121,6 +122,105 @@ function Chips({ items, limit = 15, chip = "bg-muted text-foreground", quote = f
         </button>
       )}
     </div>
+  );
+}
+
+// Live snapshot (stored scrape) ─────────────────────────────────────────────
+
+const compact = (n: number) =>
+  n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : n >= 1_000 ? `${Math.round(n / 1_000)}K` : String(n);
+
+type SnapshotItem = { platform: string; title: string; url: string; meta: string; weight: number };
+
+/** What the last live scrape found: one tile per source + the top posts. */
+function LiveSnapshot({ data }: { data: SubcultureSignalData }) {
+  const tiles: { platform: string; value: string; label: string; detail?: string }[] = [];
+  const items: SnapshotItem[] = [];
+  const { reddit, tiktok, twitter, youtube, instagram, trends } = data;
+
+  if (reddit) {
+    tiles.push({ platform: "Reddit", value: String(reddit.total_posts_found), label: "posts",
+      detail: reddit.communities.slice(0, 2).map((c) => `r/${c.subreddit}`).join(" · ") });
+    reddit.top_posts.slice(0, 3).forEach((p) => items.push({ platform: "Reddit", title: p.title, url: p.url,
+      meta: `r/${p.subreddit} · ${compact(p.score)} upvotes`, weight: p.score + 3 * p.comments }));
+  }
+  if (tiktok) {
+    tiles.push({ platform: "TikTok", value: compact(tiktok.total_views), label: "views",
+      detail: tiktok.top_hashtags.slice(0, 3).join(" ") });
+    tiktok.top_videos.slice(0, 3).forEach((v) => items.push({ platform: "TikTok", title: v.caption || `@${v.creator}`, url: v.url,
+      meta: `@${v.creator} · ${compact(v.views)} views`, weight: v.views / 100 }));
+  }
+  if (youtube) {
+    tiles.push({ platform: "YouTube", value: compact(youtube.total_views), label: "views",
+      detail: youtube.top_videos[0]?.channel });
+    youtube.top_videos.slice(0, 2).forEach((v) => items.push({ platform: "YouTube", title: v.title, url: v.url,
+      meta: `${v.channel} · ${compact(v.views)} views`, weight: v.views / 100 }));
+  }
+  if (twitter) {
+    tiles.push({ platform: "X", value: compact(twitter.total_engagement), label: "engagement",
+      detail: `${twitter.tweets_found} posts` });
+    twitter.top_tweets.slice(0, 2).forEach((t) => items.push({ platform: "X", title: t.text, url: t.url,
+      meta: `${t.author ? `@${t.author} · ` : ""}${compact(t.engagement)} engagement`, weight: t.engagement }));
+  }
+  if (instagram) {
+    tiles.push({ platform: "Instagram", value: String(instagram.posts_found), label: "posts",
+      detail: instagram.posts_per_day ? `~${instagram.posts_per_day}/day` : instagram.top_hashtags.slice(0, 2).join(" ") });
+  }
+  if (trends) {
+    tiles.push({ platform: "Google Trends", value: `${trends.interest_score}/100`, label: `search interest · ${trends.trend}`,
+      detail: trends.related_queries.slice(0, 2).join(", ") });
+  }
+  if (tiles.length === 0) return null;
+
+  // Views and upvotes aren't comparable, so take each platform's best post in turn.
+  const byPlatform = new Map<string, SnapshotItem[]>();
+  for (const i of items.filter((i) => i.url)) byPlatform.set(i.platform, [...(byPlatform.get(i.platform) ?? []), i]);
+  const queues = [...byPlatform.values()].map((q) => q.sort((a, b) => b.weight - a.weight));
+  const top: SnapshotItem[] = [];
+  for (let round = 0; top.length < 5 && queues.some((q) => q[round]); round++) {
+    for (const q of queues) if (q[round] && top.length < 5) top.push(q[round]);
+  }
+  const when = new Date(data.enriched_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+
+  return (
+    <section aria-label="Live snapshot" className={cn(BOX, "overflow-hidden bg-card")}>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b-2 border-foreground px-5 py-2.5">
+        <p className={cn(EYEBROW, "flex items-center gap-1.5 text-foreground")}>
+          <Radio className="h-3.5 w-3.5" aria-hidden />Live snapshot
+        </p>
+        <span className="text-xs text-muted-foreground">Scraped {when}</span>
+      </div>
+      <div className="grid grid-cols-2 gap-px bg-foreground/15 sm:grid-cols-3">
+        {tiles.map((t) => (
+          <div key={t.platform} className="min-w-0 px-5 py-4" style={{ backgroundColor: "hsl(var(--card))" }}>
+            <p className={cn(EYEBROW, "flex items-center gap-1.5")}>
+              <PlatformLogos platform={t.platform} className="h-3.5 w-3.5" />{t.platform}
+            </p>
+            <p className="mt-1 flex items-baseline gap-1.5">
+              <span className={cn(D, "text-2xl leading-none tabular-nums")}>{t.value}</span>
+              <span className="text-xs text-muted-foreground">{t.label}</span>
+            </p>
+            {t.detail && <p className="mt-1 truncate text-xs text-muted-foreground">{t.detail}</p>}
+          </div>
+        ))}
+      </div>
+      {top.length > 0 && (
+        <div className="border-t-2 border-foreground px-5 py-4">
+          <p className={EYEBROW}>Top posts</p>
+          <ol className="mt-2 space-y-2">
+            {top.map((i) => (
+              <li key={i.url} className="flex min-w-0 items-start gap-2.5">
+                <PlatformLogos platform={i.platform} className="mt-0.5 h-4 w-4" />
+                <a href={i.url} target="_blank" rel="noopener noreferrer" className="group min-w-0 flex-1">
+                  <span className="line-clamp-1 text-sm font-medium group-hover:text-primary">{i.title}</span>
+                  <span className="block text-xs text-muted-foreground">{i.meta}</span>
+                </a>
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -332,6 +432,11 @@ export default function SubcultureDetailPage() {
         <div className="min-w-0 max-w-3xl">
           <div className="flex flex-wrap items-center gap-2">
             <p className={cn(EYEBROW, "text-primary")}>{s.category}</p>
+            {s.enrichedByApify && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-accent px-2 py-0.5 text-xs font-semibold text-accent-foreground">
+                <Radio className="h-3 w-3" aria-hidden />Live data
+              </span>
+            )}
             {s.status !== "approved" && (
               <span className="rounded-full border-[1.5px] border-foreground bg-[#FFE14D] px-2 py-0.5 text-xs font-bold">Draft</span>
             )}
@@ -394,6 +499,7 @@ export default function SubcultureDetailPage() {
       </div>
 
       {existingMonitor && <div className="mt-6"><LiveSignal monitor={existingMonitor} /></div>}
+      {s.signalData && <div className="mt-6"><LiveSnapshot data={s.signalData} /></div>}
 
       {/* Jump links */}
       <nav aria-label="Profile sections" className="mt-8 flex flex-wrap gap-2">

@@ -12,7 +12,8 @@
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
     "seed:subcultures": "npx tsx scripts/seed-subcultures.ts",
-    "seed:briefs": "npx tsx scripts/seed-briefs.ts"
+    "seed:briefs": "npx tsx scripts/seed-briefs.ts",
+    "refresh:subcultures": "npx tsx scripts/refresh-subcultures.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.6.0",
