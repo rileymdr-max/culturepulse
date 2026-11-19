@@ -179,6 +179,7 @@ The pre-built library profiles were first written by Claude alone. The **library
 |---|---|
 | How to run | `npm run refresh:subcultures` (all approved profiles not refreshed in the last 30 days). `-- --list` shows each profile's search phrase without spending anything; `-- --only=slug` does one profile |
 | Time window | Last 14 days (§3.1). The snapshot card says "Posts from the 14 days before [date]" |
+| Reddit communities | Reddit search finds any post that mentions the phrase, so one viral post can come from an unrelated subreddit. The card lists subreddits whose name matches the subculture first, then those with the most matching posts. Unrelated subreddits with only one post are left out, and so are their posts. If none qualify, the Reddit tile shows the post count only. Rules in `lib/reddit-communities.ts`. Monitors are unchanged |
 | Search phrase | The profile name without words like "culture", "community", "fans". Awkward names have a fixed phrase in `SEARCH_OVERRIDES` in `lib/subculture-refresh.ts` (e.g. Tunnel Fit Critics → "tunnel fit") |
 | Safety | If fewer than 2 platforms return data, the profile is left unchanged. Name, slug and category never change |
 | Cost and time | About $0.20–0.40 Apify + one Claude call (roughly $0.30–0.50) per profile, about 2 minutes each, two at a time. All 62 profiles: roughly $30–50 and about an hour |
@@ -440,6 +441,7 @@ Newest first. One line per change that affects anything in this playbook.
 
 | Date | Change |
 |---|---|
+| 2026-11-19 | Live snapshot: Reddit "top communities" now favour subreddits named after the subculture and ones with several posts, instead of whichever had the single most popular post (Sneakerheads showed r/1000lbsisters; now r/Sneakers). Off-topic one-post subreddits and their posts are hidden. Applies to existing snapshots straight away. |
 | 2026-11-19 | Live snapshots and Discover search now only use posts from the last 14 days (before, YouTube and TikTok could show years-old videos). All library profiles re-refreshed with the window. Monitors unchanged. |
 | 2026-11-19 | Launch checklist: library profiles must be majority real data before launch (plan in MAINTENANCE-NOTES). |
 | 2026-11-19 | Library refresh: all approved library profiles were re-checked against live scraped data from six platforms and updated by Claude. They now show the Live data tag and a Live snapshot card (platform numbers + top posts). Re-run any time with `npm run refresh:subcultures`. |
