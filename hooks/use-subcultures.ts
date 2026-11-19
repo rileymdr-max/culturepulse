@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import type { SubcultureProfile } from "@/lib/types/subculture";
+import type { SubcultureProfile, SubcultureSignalData } from "@/lib/types/subculture";
 
 export interface SubcultureSummary {
   id: string;
@@ -39,6 +39,8 @@ export interface SubcultureFull extends SubcultureSummary {
   psychographics: { hero: string; villain: string; core_values: string[]; motivations: string[] };
   adjacentSubcultures: string[];
   brandFitSignals: { fit_industries: string[]; red_flags: string[] };
+  /** Last live scrape (Discover search or library refresh); null if never scraped. */
+  signalData: SubcultureSignalData | null;
 }
 
 export function useSubcultures(category?: string) {

@@ -16,6 +16,10 @@ _Last updated: November 17, 2026_
 - Apify is on the **Scale plan, $199/month** (since Nov 11, 2026). It includes $199 of usage, but CulturePulse used about $36 in the first period.
 - Worth checking whether a smaller plan covers the usage, especially before monitor auto-runs come back on (~$35–40/month expected).
 
+### Around Feb 2027: refresh the library again
+- The library profiles were refreshed with live data on Nov 19, 2026. Culture moves fast, so re-run every 1–3 months: ask Claude to "refresh the subculture library", or run `npm run refresh:subcultures` (about $30–50, about an hour). It skips profiles refreshed in the last 30 days.
+- New approved profiles (for example from Brand Audit drafts) get picked up on the next run.
+
 ### Before launch: turn automatic monitor runs back on
 - **Why it's off:** since Nov 11, 2026, monitors only run when you click **Run all now** (or a card's run button), to save Apify credit while we build. Each run of 5 monitors costs roughly $0.30–0.50 in Apify credit, mostly Reddit.
 - **What you'll see while it's off:** the Signal Board says "Auto-runs paused · run manually". The 6-hourly scheduled job still fires but skips.

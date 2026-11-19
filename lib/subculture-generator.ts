@@ -267,3 +267,49 @@ export async function generateSubcultureProfile(
 
   return toolUse.input as SubcultureProfile;
 }
+
+/**
+ * Update an existing library profile using fresh scraped signals. Claude keeps
+ * what the live data still supports, swaps in the real terms, hashtags,
+ * communities, creators and moments it shows, and drops anything outdated.
+ * Name, slug and category always stay as they were.
+ */
+export async function refreshSubcultureProfile(
+  current: SubcultureProfile,
+  signalData: SubcultureSignalData
+): Promise<SubcultureProfile> {
+  const client = new Anthropic();
+
+  const { signal_data: _ignored, ...baseline } = current;
+  const userMessage = `Update this existing subculture profile using the live data below.
+
+Rules:
+- Keep anything in the current profile that is still accurate; the live data is a sample, so absence alone is not a reason to delete.
+- Add or swap in real terms, hashtags, communities, creators, media sources and moments the live data shows the community actually using now.
+- Remove or replace anything the live data shows is outdated or wrong.
+- Keep the same name, slug and category.
+- Return the full profile (every field), not just the changes.
+
+CURRENT PROFILE (JSON):
+${JSON.stringify(baseline, null, 2)}
+
+${buildSignalContext(signalData)}`;
+
+  const stream = client.messages.stream({
+    model: "claude-opus-5-5",
+    max_tokens: 16000,
+    thinking: { type: "adaptive" },
+    system: SYSTEM_PROMPT,
+    tools: [PROFILE_TOOL],
+    messages: [{ role: "user", content: userMessage }],
+  });
+
+  const response = await stream.finalMessage();
+  const toolUse = response.content.find((b) => b.type === "tool_use");
+  if (!toolUse || toolUse.type !== "tool_use") {
+    throw new Error(`Claude did not return an updated profile for ${current.name}`);
+  }
+
+  const updated = toolUse.input as SubcultureProfile;
+  return { ...updated, name: current.name, slug: current.slug, category: current.category };
+}

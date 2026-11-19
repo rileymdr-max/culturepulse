@@ -2,7 +2,7 @@
 
 How the site is built, where its data comes from, how the scores work, what it runs on, and how to change it.
 
-_Last updated: November 17, 2026_
+_Last updated: November 19, 2026_
 
 > **This is a living document.** Every change to the site should update the matching section here, and add a line to the [Change log](#9-change-log) at the bottom. Claude is instructed to do this automatically (see `CLAUDE.md`). No passwords or keys go in this file.
 
@@ -47,7 +47,7 @@ It's organised in five layers:
 | Screen | Path | What it does |
 |---|---|---|
 | Home / Discover | `/dashboard` | Type a subculture or idea → live scrape + AI profile ("Discover search") |
-| Subculture library | `/dashboard/subcultures` | Saved subculture profiles (pre-built + custom), shown as cards with a category icon, Live data / Draft tags and logos of each profile's main platforms, plus at-a-glance tiles (profiles, categories, live data, picks) and icon category filters. Without full-library access, locked profiles show a teaser and can be unlocked with a "pick". Each profile (`/dashboard/subcultures/[slug]`) opens as a visual page: bold lead line, at-a-glance tiles (main platforms, moments, icons, terms), live-signal panel when monitored, jump links, and numbered card sections for language, moments, icons (sentiment-coloured), platforms (logos), psychographics, brand fit and media sources |
+| Subculture library | `/dashboard/subcultures` | Saved subculture profiles (pre-built + custom), shown as cards with a category icon, Live data / Draft tags (Live data = the profile has been checked against a real scrape) and logos of each profile's main platforms, plus at-a-glance tiles (profiles, categories, live data, picks) and icon category filters. Without full-library access, locked profiles show a teaser and can be unlocked with a "pick". Each profile (`/dashboard/subcultures/[slug]`) opens as a visual page: bold lead line, at-a-glance tiles (main platforms, moments, icons, terms), live-signal panel when monitored, a **Live snapshot** card (what the last scrape found on each platform, plus the top posts) for profiles with live data, jump links, and numbered card sections for language, moments, icons (sentiment-coloured), platforms (logos), psychographics, brand fit and media sources |
 | Signal Board (Monitors) | `/dashboard/monitors` | Watched subcultures with Breakout Scores; "Run all now" |
 | Briefs | `/dashboard/briefs` | AI content briefs. The list shows urgency filter tiles (All / 🔥 Act now / This week / Monitor) and a card per brief with its urgency, first line of "The moment", subculture, velocity and platform logos. Each brief opens as a visual page: urgency sticker, at-a-glance tiles (window, velocity, angle and platform counts), jump links, and colour-coded cards with real platform logos (Simple Icons, `components/platform-logo.tsx`) for the moment, angles (with a yellow "Example" box), platforms and brand fit. Layout lives in `components/brief-view.tsx`; "Copy as text" still gives the plain version |
 | Brand Audit | `/dashboard/brand-audit` | Enter a brand's social handles → its "subculture DNA" + new discoveries. "Your brands" lists saved brands (removing one frees a brand slot); "Download PDF" prints the report |
@@ -158,6 +158,21 @@ Each platform is capped at 4 communities before being sent to Claude so no one p
 | Spike content (posts behind a spike) | twitter / reddit / tiktok / instagram scrapers | `app/api/spike-content/route.ts` |
 | Older community search | `trudax/reddit-scraper-lite`, `apidojo/tweet-scraper`, `apify/instagram-profile-scraper`, etc. | `lib/platforms/*/live.ts` |
 
+### 3.3a Library refresh (keeping pre-built profiles live)
+
+The pre-built library profiles were first written by Claude alone. The **library refresh** runs the same six scrapers as §3.1 for each approved profile, then asks Claude to update the profile against what the scrape shows (§4). The profile gets the **Live data** tag and a Live snapshot card on its page.
+
+| What | Detail |
+|---|---|
+| How to run | `npm run refresh:subcultures` (all approved profiles not refreshed in the last 30 days). `-- --list` shows each profile's search phrase without spending anything; `-- --only=slug` does one profile |
+| Search phrase | The profile name without words like "culture", "community", "fans". Awkward names have a fixed phrase in `SEARCH_OVERRIDES` in `lib/subculture-refresh.ts` (e.g. Tunnel Fit Critics → "tunnel fit") |
+| Safety | If fewer than 2 platforms return data, the profile is left unchanged. Name, slug and category never change |
+| Cost and time | About $0.20–0.40 Apify + one Claude call (roughly $0.30–0.50) per profile, about 2 minutes each, two at a time. All 62 profiles: roughly $30–50 and about an hour |
+| How often | Every 1–3 months is enough. Monitored subcultures already get fresh data on their own |
+| Backup | Before the first run (2026-11-19) every profile was saved to `research/library-backup-2026-11-19.json` (local only, not in git) |
+
+Code: `lib/subculture-refresh.ts`, `scripts/refresh-subcultures.ts`. New custom profiles saved from Discover search now also get the Live data tag when their scrape returned data.
+
 ### 3.4 What's *not* live
 
 - **Facebook organic** and **Substack** are mock / unused. (Facebook would need Meta app approval.)
@@ -172,6 +187,7 @@ All AI calls use model **`claude-opus-5-5`** with the `ANTHROPIC_API_KEY` stored
 | Feature | File | Input | Output |
 |---|---|---|---|
 | **Subculture profile** | `lib/subculture-generator.ts` | Subculture name + the live scraped data from §3.1 | Keywords, vernacular, categorical behaviours, moments, media sources, icons, platforms, psychographics, adjacent subcultures, brand fit + red flags (Speedbag's 4-quadrant input doc) |
+| **Library refresh** | `lib/subculture-generator.ts` → `refreshSubcultureProfile` (adaptive thinking) | An existing profile + a fresh scrape (§3.3a) | The same profile, updated: keeps what's still accurate, adds real terms, hashtags, communities, creators and moments from the scrape, drops what's outdated |
 | **Brand Audit** | `lib/brand-audit.ts` (adaptive thinking) | Communities/topics from §3.2 | Audience summary, 5–8 matched subcultures with **match %**, newly discovered subcultures, platforms, themes |
 | **Content brief** | `lib/content-intelligence.ts` (adaptive thinking) | Subculture profile + (if from a monitor) its Acceleration Signal and top posts | Headline, **urgency**, moment summary, content angles, platform strategy, brand fit |
 
@@ -376,6 +392,7 @@ Vercel deploys automatically. Watch it at vercel.com → culturepulse → Deploy
 | Score thresholds | `lib/acceleration.ts`, `lib/signal-tier.ts` |
 | AI instructions | `SYSTEM_PROMPT` in `lib/subculture-generator.ts`, `lib/brand-audit.ts`, `lib/content-intelligence.ts` |
 | Which scraper / how many results | `lib/subculture-enricher.ts` |
+| Library refresh search phrases | `SEARCH_OVERRIDES` in `lib/subculture-refresh.ts` |
 | Email wording | `lib/email.ts` |
 | A setting/key | Vercel → culturepulse → Settings → Environment Variables, then **Redeploy** |
 
@@ -408,6 +425,7 @@ Newest first. One line per change that affects anything in this playbook.
 
 | Date | Change |
 |---|---|
+| 2026-11-19 | Library refresh: all approved library profiles were re-checked against live scraped data from six platforms and updated by Claude. They now show the Live data tag and a Live snapshot card (platform numbers + top posts). Re-run any time with `npm run refresh:subcultures`. |
 | 2026-11-17 | Hours tracking added: an Hours tab in the Subscriptions sheet (about 35 hours from March to mid-November), updated every Monday from `scripts/work-hours.py`. |
 | 2026-11-17 | Playbook published as a private page pinned in the claude.ai sidebar; Claude republishes it with every playbook change. |
 | 2026-11-17 | Weekly usage log added: every Monday a scheduled task adds Apify, Anthropic API and Vercel spend to the Usage tab of the Subscriptions sheet. |
