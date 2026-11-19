@@ -5,7 +5,7 @@ import { getPlan, withinLimit } from "@/lib/plans";
 import { countUsageThisMonth, getUserPlan, recordUsage } from "@/lib/plan-usage";
 import { generateSubcultureProfile } from "@/lib/subculture-generator";
 import { enrichSubcultureWithSignals } from "@/lib/subculture-enricher";
-import { hasLiveSignals } from "@/lib/subculture-refresh";
+import { hasLiveSignals, SNAPSHOT_WINDOW_DAYS } from "@/lib/subculture-refresh";
 import { prisma, withDbRetry } from "@/lib/prisma";
 import type { SubcultureProfile, SubcultureSignalData } from "@/lib/types/subculture";
 
@@ -69,7 +69,7 @@ export async function POST(req: NextRequest) {
       signalData = prebuiltSignals as SubcultureSignalData | undefined;
     } else {
       // 1. Scrape real signals in parallel across Reddit, TikTok, Twitter
-      signalData = await enrichSubcultureWithSignals(seed ?? name);
+      signalData = await enrichSubcultureWithSignals(seed ?? name, undefined, { maxAgeDays: SNAPSHOT_WINDOW_DAYS });
 
       // 2. Generate profile with real signals as Claude context
       profile = await generateSubcultureProfile(name, seed, signalData);
